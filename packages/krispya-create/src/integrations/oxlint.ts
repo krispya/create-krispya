@@ -1,5 +1,5 @@
 import { defaultLinterConfig } from '../constants.js'
-import type { Generator } from '../index.js'
+import { getBaseTemplate, type Generator } from '../index.js'
 
 export type GenerateOxlintOptions = {} | boolean
 
@@ -18,10 +18,21 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
 
   const { rules } = defaultLinterConfig
 
+  // Check if it's a React project
+  const template = generator.options.template ?? 'vanilla'
+  const baseTemplate = getBaseTemplate(template)
+  const isReact = baseTemplate === 'react' || baseTemplate === 'r3f'
+
+  // Build plugins list - add react plugin for React projects
+  const plugins = ['unicorn', 'typescript', 'oxc']
+  if (isReact) {
+    plugins.push('react')
+  }
+
   // Add oxlint config with plugins and common rules
   const oxlintConfig = {
     $schema: './node_modules/oxlint/configuration_schema.json',
-    plugins: ['unicorn', 'typescript', 'oxc'],
+    plugins,
     rules: {
       'no-unused-vars': [
         toOxlintLevel(rules.noUnusedVars.level),
@@ -47,9 +58,8 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
 
   generator.inject(
     'readme-tools',
-    '[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript'
+    '[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript',
   )
   generator.inject('vscode-extension-suggestion', 'oxc.oxc-vscode')
   generator.addVscodeSetting('oxc.enable', true)
 }
-
