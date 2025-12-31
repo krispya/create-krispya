@@ -1,6 +1,12 @@
+import { defaultLinterConfig } from '../constants.js'
 import type { Generator } from '../index.js'
 
 export type GenerateOxlintOptions = {} | boolean
+
+// Helper to convert level to oxlint format
+function toOxlintLevel(level: 'off' | 'warn' | 'error'): string {
+  return level
+}
 
 export function generateOxlint(generator: Generator, options: GenerateOxlintOptions | undefined) {
   if (options == null) {
@@ -10,10 +16,28 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
   const version = generator.versions.oxlint ?? '0.16.0'
   generator.addDependency('oxlint', `^${version}`)
 
-  // Add oxlint config
+  const { rules } = defaultLinterConfig
+
+  // Add oxlint config with plugins and common rules
   const oxlintConfig = {
     $schema: './node_modules/oxlint/configuration_schema.json',
-    rules: {},
+    plugins: ['unicorn', 'typescript', 'oxc'],
+    rules: {
+      'no-unused-vars': [
+        toOxlintLevel(rules.noUnusedVars.level),
+        {
+          argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
+          varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
+          caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+        },
+      ],
+      'no-useless-escape': 'off',
+      'no-unused-expressions': [
+        toOxlintLevel(rules.noUnusedExpressions.level),
+        { allowShortCircuit: rules.noUnusedExpressions.allowShortCircuit },
+      ],
+    },
+    ignorePatterns: defaultLinterConfig.ignorePatterns,
   }
 
   generator.addFile('oxlint.json', {
@@ -21,7 +45,10 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     content: JSON.stringify(oxlintConfig, null, 2),
   })
 
-  generator.inject('readme-tools', '[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript')
+  generator.inject(
+    'readme-tools',
+    '[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript'
+  )
   generator.inject('vscode-extension-suggestion', 'oxc.oxc-vscode')
   generator.addVscodeSetting('oxc.enable', true)
 }

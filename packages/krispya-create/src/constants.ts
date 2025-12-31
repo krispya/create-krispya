@@ -111,3 +111,41 @@ export const defaultFormatterConfig: FormatterConfig = {
   bracketSpacing: true,
   arrowParens: 'always',
 }
+
+// Common linter configuration
+export type LinterConfig = {
+  // Ignore patterns (files/directories to skip)
+  ignorePatterns: string[]
+
+  // Common rule configurations
+  rules: {
+    // Unused vars handling with underscore prefix pattern
+    noUnusedVars: {
+      level: 'off' | 'warn' | 'error'
+      argsIgnorePattern: string
+      varsIgnorePattern: string
+      caughtErrorsIgnorePattern: string
+    }
+    // Allow short-circuit expressions like `foo && bar()`
+    noUnusedExpressions: {
+      level: 'off' | 'warn' | 'error'
+      allowShortCircuit: boolean
+    }
+  }
+}
+
+export const defaultLinterConfig: LinterConfig = {
+  ignorePatterns: ['dist'],
+  rules: {
+    noUnusedVars: {
+      level: 'warn',
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+      caughtErrorsIgnorePattern: '^_',
+    },
+    noUnusedExpressions: {
+      level: 'warn',
+      allowShortCircuit: true,
+    },
+  },
+}

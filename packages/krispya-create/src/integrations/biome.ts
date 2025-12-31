@@ -1,4 +1,4 @@
-import { defaultFormatterConfig } from '../constants.js'
+import { defaultFormatterConfig, defaultLinterConfig } from '../constants.js'
 import type { Generator } from '../index.js'
 
 export type GenerateBiomeOptions = {
@@ -6,6 +6,11 @@ export type GenerateBiomeOptions = {
   linter?: boolean
   /** Whether biome is used as a formatter */
   formatter?: boolean
+}
+
+// Helper to convert level to Biome format
+function toBiomeLevel(level: 'off' | 'warn' | 'error'): string {
+  return level
 }
 
 export function generateBiome(generator: Generator, options: GenerateBiomeOptions | undefined) {
@@ -16,9 +21,14 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
   const version = generator.versions.biome ?? '1.9.4'
   generator.addDependency('@biomejs/biome', `^${version}`)
 
+  const { rules } = defaultLinterConfig
+
   // Build biome config based on roles
   const biomeConfig: Record<string, unknown> = {
     $schema: 'https://biomejs.dev/schemas/1.9.4/schema.json',
+    files: {
+      ignore: defaultLinterConfig.ignorePatterns,
+    },
   }
 
   if (options.linter) {
@@ -26,6 +36,9 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
       enabled: true,
       rules: {
         recommended: true,
+        correctness: {
+          noUnusedVariables: toBiomeLevel(rules.noUnusedVars.level),
+        },
       },
     }
   } else {

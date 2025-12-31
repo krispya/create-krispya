@@ -1,6 +1,12 @@
+import { defaultLinterConfig } from '../constants.js'
 import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../index.js'
 
 export type GenerateEslintOptions = {} | boolean
+
+// Helper to convert level to eslint format
+function toEslintLevel(level: 'off' | 'warn' | 'error'): string {
+  return level
+}
 
 export function generateEslint(generator: Generator, options: GenerateEslintOptions | undefined) {
   if (options == null) {
@@ -16,6 +22,8 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
   const isTypescript = getLanguageFromTemplate(template) === 'typescript'
   const isReact = baseTemplate === 'react' || baseTemplate === 'r3f'
 
+  const { rules } = defaultLinterConfig
+
   const imports: string[] = ['import js from "@eslint/js"']
   const configs: string[] = ['js.configs.recommended']
 
@@ -30,10 +38,33 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
     imports.push('import reactHooks from "eslint-plugin-react-hooks"')
   }
 
+  // Build ignore patterns string
+  const ignoresArray = JSON.stringify(defaultLinterConfig.ignorePatterns)
+
+  // Build rules object - use @typescript-eslint/no-unused-vars for TS projects
+  const unusedVarsRule = isTypescript ? '@typescript-eslint/no-unused-vars' : 'no-unused-vars'
+  const rulesConfig = {
+    [unusedVarsRule]: [
+      toEslintLevel(rules.noUnusedVars.level),
+      {
+        argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
+        varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
+        caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+      },
+    ],
+    'no-unused-expressions': [
+      toEslintLevel(rules.noUnusedExpressions.level),
+      { allowShortCircuit: rules.noUnusedExpressions.allowShortCircuit },
+    ],
+  }
+
+  const rulesString = JSON.stringify(rulesConfig, null, 4).replace(/\n/g, '\n    ')
+
   const configContent = [
     ...imports,
     '',
     'export default [',
+    `  { ignores: ${ignoresArray} },`,
     `  ${configs.join(',\n  ')},`,
     isReact
       ? `  {
@@ -43,6 +74,9 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
     rules: reactHooks.configs.recommended.rules,
   },`
       : '',
+    `  {
+    rules: ${rulesString},
+  },`,
     ']',
   ]
     .filter(Boolean)
