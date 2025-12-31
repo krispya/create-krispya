@@ -88,3 +88,26 @@ export const GitAttributes = [
   '*.glb binary',
   '*.gltf binary',
 ].join('\n')
+
+// Common formatter configuration (Prettier-style format)
+export type FormatterConfig = {
+  printWidth: number
+  tabWidth: number
+  useTabs: boolean
+  semi: boolean
+  singleQuote: boolean
+  trailingComma: 'none' | 'es5' | 'all'
+  bracketSpacing: boolean
+  arrowParens: 'always' | 'avoid'
+}
+
+export const defaultFormatterConfig: FormatterConfig = {
+  printWidth: 102,
+  tabWidth: 4,
+  useTabs: false,
+  semi: true,
+  singleQuote: true,
+  trailingComma: 'es5',
+  bracketSpacing: true,
+  arrowParens: 'always',
+}

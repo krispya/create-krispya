@@ -1,3 +1,4 @@
+import { defaultFormatterConfig } from '../constants.js'
 import type { Generator } from '../index.js'
 
 export type GeneratePrettierOptions = {} | boolean
@@ -10,12 +11,17 @@ export function generatePrettier(generator: Generator, options: GeneratePrettier
   const version = generator.versions.prettier ?? '3.4.2'
   generator.addDependency('prettier', `^${version}`)
 
-  // Add prettier config
+  // Add prettier config using common formatter settings
   const prettierConfig = {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'all',
-    printWidth: 100,
+    $schema: 'https://json.schemastore.org/prettierrc',
+    printWidth: defaultFormatterConfig.printWidth,
+    tabWidth: defaultFormatterConfig.tabWidth,
+    useTabs: defaultFormatterConfig.useTabs,
+    semi: defaultFormatterConfig.semi,
+    singleQuote: defaultFormatterConfig.singleQuote,
+    trailingComma: defaultFormatterConfig.trailingComma,
+    bracketSpacing: defaultFormatterConfig.bracketSpacing,
+    arrowParens: defaultFormatterConfig.arrowParens,
   }
 
   generator.addFile('.prettierrc', {

@@ -1,3 +1,4 @@
+import { defaultFormatterConfig } from '../constants.js'
 import type { Generator } from '../index.js'
 
 export type GenerateOxfmtOptions = {} | boolean
@@ -10,12 +11,16 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
   const version = generator.versions.oxfmt ?? '0.1.0'
   generator.addDependency('oxfmt', `^${version}`)
 
-  // Add oxfmt config (Prettier-compatible format)
+  // Add oxfmt config using common formatter settings (Prettier-compatible format)
   const oxfmtConfig = {
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'all',
-    printWidth: 100,
+    printWidth: defaultFormatterConfig.printWidth,
+    tabWidth: defaultFormatterConfig.tabWidth,
+    useTabs: defaultFormatterConfig.useTabs,
+    semi: defaultFormatterConfig.semi,
+    singleQuote: defaultFormatterConfig.singleQuote,
+    trailingComma: defaultFormatterConfig.trailingComma,
+    bracketSpacing: defaultFormatterConfig.bracketSpacing,
+    arrowParens: defaultFormatterConfig.arrowParens,
   }
 
   generator.addFile('.oxfmt.json', {
@@ -23,7 +28,10 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
     content: JSON.stringify(oxfmtConfig, null, 2),
   })
 
-  generator.inject('readme-tools', '[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter')
+  generator.inject(
+    'readme-tools',
+    '[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter'
+  )
   generator.inject('vscode-extension-suggestion', 'oxc.oxc-vscode')
   generator.addVscodeSetting('editor.defaultFormatter', 'oxc.oxc-vscode')
 }

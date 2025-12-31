@@ -1,4 +1,11 @@
-import { GitAttributes, HtmlContent, IndexContent, ViteHtmlContent, ViteIndexContent, ViteStyleContent } from './constants.js'
+import {
+  GitAttributes,
+  HtmlContent,
+  IndexContent,
+  ViteHtmlContent,
+  ViteIndexContent,
+  ViteStyleContent,
+} from './constants.js'
 import { generateBiome } from './integrations/biome.js'
 import { GenerateDreiOptions, generateDrei } from './integrations/drei.js'
 import { generateEslint } from './integrations/eslint.js'
@@ -327,7 +334,7 @@ export function generate(options: GenerateOptions) {
 
   // Add engines field if needed
   const engines: Record<string, string> = {}
-  
+
   if (isPnpm) {
     const pnpmVersion = options.pnpmVersion ?? '10.11.0'
     const majorVersion = pnpmVersion.split('.')[0]
@@ -353,13 +360,13 @@ export function generate(options: GenerateOptions) {
   if (isPnpm) {
     const manageVersions = options.pnpmManageVersions ?? true
     const workspaceLines: string[] = []
-    
+
     if (manageVersions) {
       workspaceLines.push('manage-package-manager-versions: true', '')
     }
-    
+
     workspaceLines.push('onlyBuiltDependencies:', '  - esbuild')
-    
+
     files['pnpm-workspace.yaml'] = {
       type: 'text',
       content: workspaceLines.join('\n'),
@@ -374,9 +381,7 @@ export function generate(options: GenerateOptions) {
 
   // Add library descriptions based on template
   if (isVanilla) {
-    codeSnippets['readme-libraries'].unshift(
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
-    )
+    codeSnippets['readme-libraries'].unshift(`[Vite](https://vitejs.dev/) - Next generation frontend tooling`)
   } else if (isReact) {
     codeSnippets['readme-libraries'].unshift(
       `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
@@ -451,9 +456,7 @@ export function generate(options: GenerateOptions) {
     const ext = language === 'javascript' ? 'js' : 'ts'
     files[`src/main.${ext}`] = { type: 'text', content: ViteIndexContent }
     files['src/style.css'] = { type: 'text', content: ViteStyleContent }
-    const indexHtml = ViteHtmlContent
-      .replace('$indexPath', `./src/main.${ext}`)
-      .replace('$title', name)
+    const indexHtml = ViteHtmlContent.replace('$indexPath', `./src/main.${ext}`).replace('$title', name)
     files['index.html'] = { type: 'text', content: indexHtml }
   } else {
     // React and R3F templates
