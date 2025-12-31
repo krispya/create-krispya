@@ -1,35 +1,38 @@
-import type { Generator } from '../index.js'
+import type { Generator } from "../index.js";
 
 export type GenerateXrOptions =
   | {
-      storeOptions?: any
+      storeOptions?: any;
     }
-  | boolean
+  | boolean;
 
 export function generateXr(generator: Generator, options: GenerateXrOptions | undefined) {
   if (options == null || options === false) {
-    return
+    return;
   }
   if (options === true) {
-    options = {}
+    options = {};
   }
-  generator.addDependency('@react-three/xr', '^6.6.16')
-  generator.addDependency("@vitejs/plugin-basic-ssl", "^2.0.0")
-  generator.inject('import', "import { XR, createXRStore } from '@react-three/xr'")
-  generator.inject(`global-start`, `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`)
-  generator.inject('scene-start', '<XR store={store}>')
-  generator.inject('scene-end', '</XR>')
+  generator.addDependency("@react-three/xr", "^6.6.16");
+  generator.addDependency("@vitejs/plugin-basic-ssl", "^2.0.0");
+  generator.inject("import", "import { XR, createXRStore } from '@react-three/xr'");
+  generator.inject(
+    `global-start`,
+    `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`,
+  );
+  generator.inject("scene-start", "<XR store={store}>");
+  generator.inject("scene-end", "</XR>");
 
-  generator.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl'")
+  generator.inject("vite-config-import", "import basicSsl from '@vitejs/plugin-basic-ssl'");
   generator.configureVite({
     server: {
       host: true,
     },
-    plugins: ['$raw:basicSsl()'],
-  })
+    plugins: ["$raw:basicSsl()"],
+  });
 
   generator.inject(
-    'dom-start',
+    "dom-start",
     `<div style={{
         display: "flex",
           flexDirection: "row",
@@ -59,6 +62,9 @@ export function generateXr(generator: Generator, options: GenerateXrOptions | un
       >
         Enter VR
       </button></div>`,
-  )
-  generator.inject("readme-libraries", `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`,)
+  );
+  generator.inject(
+    "readme-libraries",
+    `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`,
+  );
 }

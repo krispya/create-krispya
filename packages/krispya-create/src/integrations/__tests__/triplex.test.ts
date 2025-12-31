@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
-import { generateTriplex } from '../triplex'
+import { describe, it, expect, vi } from "vitest";
+import { generateTriplex } from "../triplex";
 
-describe('triplex integration', () => {
-  it('should generate empty providers', () => {
-    const addFile = vi.fn()
+describe("triplex integration", () => {
+  it("should generate empty providers", () => {
+    const addFile = vi.fn();
 
     generateTriplex(
       {
@@ -15,7 +15,7 @@ describe('triplex integration', () => {
         inject: vi.fn(),
       },
       {},
-    )
+    );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
       [
@@ -63,11 +63,11 @@ describe('triplex integration', () => {
           "type": "text",
         },
       ]
-    `)
-  })
+    `);
+  });
 
-  it('should generate uikit color mode switcher', () => {
-    const addFile = vi.fn()
+  it("should generate uikit color mode switcher", () => {
+    const addFile = vi.fn();
 
     generateTriplex(
       {
@@ -79,7 +79,7 @@ describe('triplex integration', () => {
         inject: vi.fn(),
       },
       {},
-    )
+    );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
       [
@@ -133,11 +133,11 @@ describe('triplex integration', () => {
           "type": "text",
         },
       ]
-    `)
-  })
+    `);
+  });
 
-  it('should generate populated providers', () => {
-    const addFile = vi.fn()
+  it("should generate populated providers", () => {
+    const addFile = vi.fn();
 
     generateTriplex(
       {
@@ -149,7 +149,7 @@ describe('triplex integration', () => {
         inject: vi.fn(),
       },
       {},
-    )
+    );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
       [
@@ -208,6 +208,6 @@ describe('triplex integration', () => {
           "type": "text",
         },
       ]
-    `)
-  })
-})
+    `);
+  });
+});

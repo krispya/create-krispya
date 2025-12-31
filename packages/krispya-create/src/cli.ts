@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { cwd } from 'process'
+import { cwd } from "process";
 import {
-  BaseTemplate,
   generate,
   GenerateOptions,
   generateRandomName,
@@ -10,52 +9,40 @@ import {
   getLatestPnpmVersion,
   PackageVersions,
   Template,
-} from './index.js'
-import { getLatestNodeVersion, getLatestNpmVersion } from './utils.js'
-import { dirname, join } from 'path'
-import { mkdir, writeFile } from 'fs/promises'
-import { Command } from 'commander'
-import * as p from '@clack/prompts'
-import color from 'chalk'
-import { fetch } from 'undici'
+} from "./index.js";
+import { getLatestNodeVersion, getLatestNpmVersion } from "./utils.js";
+import { dirname, join } from "path";
+import { mkdir, writeFile } from "fs/promises";
+import { Command } from "commander";
+import * as p from "@clack/prompts";
+import color from "chalk";
+import { fetch } from "undici";
 
 function getDefaultProjectName(template: Template): string {
-  const base = getBaseTemplate(template)
+  const base = getBaseTemplate(template);
   switch (base) {
-    case 'vanilla':
-      return `vanilla-${generateRandomName()}`
-    case 'react':
-      return `react-${generateRandomName()}`
-    case 'r3f':
-      return `react-three-${generateRandomName()}`
-  }
-}
-
-function getTemplateLabel(template: Template): string {
-  const base = getBaseTemplate(template)
-  switch (base) {
-    case 'vanilla':
-      return 'Vanilla'
-    case 'react':
-      return 'React'
-    case 'r3f':
-      return 'React Three Fiber'
+    case "vanilla":
+      return `vanilla-${generateRandomName()}`;
+    case "react":
+      return `react-${generateRandomName()}`;
+    case "r3f":
+      return `react-three-${generateRandomName()}`;
   }
 }
 
 function getDefaultOptions(template: Template, name: string): GenerateOptions {
-  const baseTemplate = getBaseTemplate(template)
+  const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
     name,
     template,
-    packageManager: 'pnpm',
+    packageManager: "pnpm",
     pnpmManageVersions: true,
-    nodeVersion: 'latest',
-    linter: 'oxlint',
-    formatter: 'oxfmt',
-  }
+    nodeVersion: "latest",
+    linter: "oxlint",
+    formatter: "oxfmt",
+  };
 
-  if (baseTemplate === 'r3f') {
+  if (baseTemplate === "r3f") {
     return {
       ...base,
       drei: {},
@@ -70,235 +57,248 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
       koota: {},
       triplex: {},
       viverse: {},
-    }
+    };
   }
 
-  return base
+  return base;
 }
 
 function formatConfigSummary(options: GenerateOptions): string {
-  const lines: string[] = []
-  const VALUE_COL = 27 // Start position for values
+  const lines: string[] = [];
+  const VALUE_COL = 27; // Start position for values
 
-  const formatRow = (label: string, value: string, indent = '') => {
-    const fullLabel = indent + label
-    const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1)
-    const dots = color.gray('.'.repeat(dotCount))
-    return `${indent}${label} ${dots} ${value}`
-  }
+  const formatRow = (label: string, value: string, indent = "") => {
+    const fullLabel = indent + label;
+    const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1);
+    const dots = color.gray(".".repeat(dotCount));
+    return `${indent}${label} ${dots} ${value}`;
+  };
 
   const formatLanguage = (lang: string) => {
-    return lang === 'typescript' ? 'TypeScript' : lang === 'javascript' ? 'JavaScript' : lang
-  }
+    return lang === "typescript"
+      ? "TypeScript"
+      : lang === "javascript"
+      ? "JavaScript"
+      : lang;
+  };
 
   // Language (derived from template)
-  const language = options.template ? getLanguageFromTemplate(options.template) : 'typescript'
-  lines.push(formatRow('Language', formatLanguage(language)))
+  const language = options.template
+    ? getLanguageFromTemplate(options.template)
+    : "typescript";
+  lines.push(formatRow("Language", formatLanguage(language)));
 
   // Node version
-  lines.push(formatRow('Node version', options.nodeVersion || 'latest'))
+  lines.push(formatRow("Node version", options.nodeVersion || "latest"));
 
   // Package manager
-  lines.push(formatRow('Package manager', options.packageManager || 'pnpm'))
+  lines.push(formatRow("Package manager", options.packageManager || "pnpm"));
 
   // pnpm-specific options
-  if (options.packageManager === 'pnpm') {
-    const versionManaged = options.pnpmManageVersions ? 'yes' : 'no'
-    lines.push(formatRow('↳ Version managed', versionManaged, ''))
+  if (options.packageManager === "pnpm") {
+    const versionManaged = options.pnpmManageVersions ? "yes" : "no";
+    lines.push(formatRow("↳ Version managed", versionManaged, ""));
   }
 
   // Linter
   if (options.linter) {
-    lines.push(formatRow('Linter', options.linter))
+    lines.push(formatRow("Linter", options.linter));
   }
 
   // Formatter
   if (options.formatter) {
-    lines.push(formatRow('Formatter', options.formatter))
+    lines.push(formatRow("Formatter", options.formatter));
   }
 
   // R3F integrations
-  if (options.template && getBaseTemplate(options.template) === 'r3f') {
+  if (options.template && getBaseTemplate(options.template) === "r3f") {
     const integrationNames = [
-      options.drei && 'drei',
-      options.handle && 'handle',
-      options.leva && 'leva',
-      options.postprocessing && 'postproc',
-      options.rapier && 'rapier',
-      options.xr && 'xr',
-      options.uikit && 'uikit',
-      options.offscreen && 'offscreen',
-      options.zustand && 'zustand',
-      options.koota && 'koota',
-      options.triplex && 'triplex',
-      options.viverse && 'viverse',
-    ].filter(Boolean) as string[]
+      options.drei && "drei",
+      options.handle && "handle",
+      options.leva && "leva",
+      options.postprocessing && "postproc",
+      options.rapier && "rapier",
+      options.xr && "xr",
+      options.uikit && "uikit",
+      options.offscreen && "offscreen",
+      options.zustand && "zustand",
+      options.koota && "koota",
+      options.triplex && "triplex",
+      options.viverse && "viverse",
+    ].filter(Boolean) as string[];
 
-    lines.push('')
-    lines.push(color.dim('Integrations'))
+    lines.push("");
+    lines.push(color.dim("Integrations"));
 
     // Two-column layout
     for (let i = 0; i < integrationNames.length; i += 2) {
-      const left = `${color.green('●')} ${integrationNames[i]}`
-      const right = integrationNames[i + 1] ? `${color.green('●')} ${integrationNames[i + 1]}` : ''
-      const spacing = ' '.repeat(Math.max(1, 16 - integrationNames[i]!.length))
-      lines.push(`  ${left}${spacing}${right}`)
+      const left = `${color.green("●")} ${integrationNames[i]}`;
+      const right = integrationNames[i + 1]
+        ? `${color.green("●")} ${integrationNames[i + 1]}`
+        : "";
+      const spacing = " ".repeat(Math.max(1, 16 - integrationNames[i]!.length));
+      lines.push(`  ${left}${spacing}${right}`);
     }
   }
 
-  return lines.join('\n')
+  return lines.join("\n");
 }
 
-async function promptForCustomization(template: Template, name: string): Promise<GenerateOptions> {
+async function promptForCustomization(
+  template: Template,
+  name: string
+): Promise<GenerateOptions> {
   const nodeVersion = await p.text({
-    message: 'Node.js version',
-    placeholder: 'latest',
-    defaultValue: 'latest',
+    message: "Node.js version",
+    placeholder: "latest",
+    defaultValue: "latest",
     validate: (value) => {
-      if (!value.length) return 'Required'
-      if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
-        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")'
+      if (!value.length) return "Required";
+      if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
       }
     },
-  })
+  });
 
   if (p.isCancel(nodeVersion)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
   const packageManager = await p.select({
-    message: 'Package manager',
+    message: "Package manager",
     options: [
-      { value: 'pnpm', label: 'pnpm' },
-      { value: 'npm', label: 'npm' },
-      { value: 'yarn', label: 'yarn' },
-      { value: 'custom', label: 'Other (custom)' },
+      { value: "pnpm", label: "pnpm" },
+      { value: "npm", label: "npm" },
+      { value: "yarn", label: "yarn" },
+      { value: "custom", label: "Other (custom)" },
     ],
-    initialValue: 'pnpm',
-  })
+    initialValue: "pnpm",
+  });
 
   if (p.isCancel(packageManager)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
-  let finalPackageManager = packageManager as string
-  if (packageManager === 'custom') {
+  let finalPackageManager = packageManager as string;
+  if (packageManager === "custom") {
     const customPm = await p.text({
-      message: 'Enter package manager command',
+      message: "Enter package manager command",
       validate: (value) => {
-        if (!value.length) return 'Required'
+        if (!value.length) return "Required";
       },
-    })
+    });
     if (p.isCancel(customPm)) {
-      p.cancel('Operation cancelled.')
-      process.exit(0)
+      p.cancel("Operation cancelled.");
+      process.exit(0);
     }
-    finalPackageManager = customPm
+    finalPackageManager = customPm;
   }
 
-  let pnpmManageVersions = true
-  if (packageManager === 'pnpm') {
+  let pnpmManageVersions = true;
+  if (packageManager === "pnpm") {
     const managePnpm = await p.confirm({
-      message: 'Enable manage-package-manager-versions?',
+      message: "Enable manage-package-manager-versions?",
       initialValue: true,
-    })
+    });
     if (p.isCancel(managePnpm)) {
-      p.cancel('Operation cancelled.')
-      process.exit(0)
+      p.cancel("Operation cancelled.");
+      process.exit(0);
     }
-    pnpmManageVersions = managePnpm
+    pnpmManageVersions = managePnpm;
   }
 
   const linter = await p.select({
-    message: 'Linter',
+    message: "Linter",
     options: [
-      { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
-      { value: 'eslint', label: 'ESLint', hint: 'classic' },
-      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+      { value: "oxlint", label: "Oxlint", hint: "fast, from OXC" },
+      { value: "eslint", label: "ESLint", hint: "classic" },
+      { value: "biome", label: "Biome", hint: "all-in-one" },
     ],
-    initialValue: 'oxlint',
-  })
+    initialValue: "oxlint",
+  });
 
   if (p.isCancel(linter)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
   const formatter = await p.select({
-    message: 'Formatter',
+    message: "Formatter",
     options: [
-      { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
-      { value: 'prettier', label: 'Prettier', hint: 'classic' },
-      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+      { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
+      { value: "prettier", label: "Prettier", hint: "classic" },
+      { value: "biome", label: "Biome", hint: "all-in-one" },
     ],
-    initialValue: 'oxfmt',
-  })
+    initialValue: "oxfmt",
+  });
 
   if (p.isCancel(formatter)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
   const language = await p.select({
-    message: 'Language',
+    message: "Language",
     options: [
-      { value: 'typescript', label: 'TypeScript' },
-      { value: 'javascript', label: 'JavaScript' },
+      { value: "typescript", label: "TypeScript" },
+      { value: "javascript", label: "JavaScript" },
     ],
-    initialValue: 'typescript',
-  })
+    initialValue: "typescript",
+  });
 
   if (p.isCancel(language)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
   // Derive final template based on language selection
-  const baseTemplate = getBaseTemplate(template)
+  const baseTemplate = getBaseTemplate(template);
   const finalTemplate: Template =
-    language === 'javascript' ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template)
+    language === "javascript"
+      ? (`${baseTemplate}-js` as Template)
+      : (baseTemplate as Template);
 
-  let integrations: string[] = []
-  if (baseTemplate === 'r3f') {
+  let integrations: string[] = [];
+  if (baseTemplate === "r3f") {
     const selected = await p.multiselect({
-      message: 'R3F integrations',
+      message: "R3F integrations",
       options: [
-        { value: 'drei', label: 'Drei' },
-        { value: 'handle', label: 'Handle' },
-        { value: 'leva', label: 'Leva' },
-        { value: 'postprocessing', label: 'Postprocessing' },
-        { value: 'rapier', label: 'Rapier' },
-        { value: 'xr', label: 'XR' },
-        { value: 'uikit', label: 'UIKit' },
-        { value: 'offscreen', label: 'Offscreen' },
-        { value: 'zustand', label: 'Zustand' },
-        { value: 'koota', label: 'Koota' },
-        { value: 'triplex', label: 'Triplex' },
-        { value: 'viverse', label: 'Viverse' },
+        { value: "drei", label: "Drei" },
+        { value: "handle", label: "Handle" },
+        { value: "leva", label: "Leva" },
+        { value: "postprocessing", label: "Postprocessing" },
+        { value: "rapier", label: "Rapier" },
+        { value: "xr", label: "XR" },
+        { value: "uikit", label: "UIKit" },
+        { value: "offscreen", label: "Offscreen" },
+        { value: "zustand", label: "Zustand" },
+        { value: "koota", label: "Koota" },
+        { value: "triplex", label: "Triplex" },
+        { value: "viverse", label: "Viverse" },
       ],
       initialValues: [
-        'drei',
-        'handle',
-        'leva',
-        'postprocessing',
-        'rapier',
-        'xr',
-        'uikit',
-        'offscreen',
-        'zustand',
-        'koota',
-        'triplex',
-        'viverse',
+        "drei",
+        "handle",
+        "leva",
+        "postprocessing",
+        "rapier",
+        "xr",
+        "uikit",
+        "offscreen",
+        "zustand",
+        "koota",
+        "triplex",
+        "viverse",
       ],
       required: false,
-    })
+    });
     if (p.isCancel(selected)) {
-      p.cancel('Operation cancelled.')
-      process.exit(0)
+      p.cancel("Operation cancelled.");
+      process.exit(0);
     }
-    integrations = selected as string[]
+    integrations = selected as string[];
   }
 
   return {
@@ -307,154 +307,176 @@ async function promptForCustomization(template: Template, name: string): Promise
     nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
-    linter: linter as 'eslint' | 'oxlint' | 'biome',
-    formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
-    ...(baseTemplate === 'r3f' && {
-      drei: integrations.includes('drei') ? {} : undefined,
-      handle: integrations.includes('handle') ? {} : undefined,
-      leva: integrations.includes('leva') ? {} : undefined,
-      postprocessing: integrations.includes('postprocessing') ? {} : undefined,
-      rapier: integrations.includes('rapier') ? {} : undefined,
-      xr: integrations.includes('xr') ? {} : undefined,
-      uikit: integrations.includes('uikit') ? {} : undefined,
-      offscreen: integrations.includes('offscreen') ? {} : undefined,
-      zustand: integrations.includes('zustand') ? {} : undefined,
-      koota: integrations.includes('koota') ? {} : undefined,
-      triplex: integrations.includes('triplex') ? {} : undefined,
-      viverse: integrations.includes('viverse') ? {} : undefined,
+    linter: linter as "eslint" | "oxlint" | "biome",
+    formatter: formatter as "prettier" | "oxfmt" | "biome",
+    ...(baseTemplate === "r3f" && {
+      drei: integrations.includes("drei") ? {} : undefined,
+      handle: integrations.includes("handle") ? {} : undefined,
+      leva: integrations.includes("leva") ? {} : undefined,
+      postprocessing: integrations.includes("postprocessing") ? {} : undefined,
+      rapier: integrations.includes("rapier") ? {} : undefined,
+      xr: integrations.includes("xr") ? {} : undefined,
+      uikit: integrations.includes("uikit") ? {} : undefined,
+      offscreen: integrations.includes("offscreen") ? {} : undefined,
+      zustand: integrations.includes("zustand") ? {} : undefined,
+      koota: integrations.includes("koota") ? {} : undefined,
+      triplex: integrations.includes("triplex") ? {} : undefined,
+      viverse: integrations.includes("viverse") ? {} : undefined,
     }),
-  }
+  };
 }
 
-async function promptForOptions(name: string | undefined): Promise<GenerateOptions> {
+async function promptForOptions(
+  name: string | undefined
+): Promise<GenerateOptions> {
   // Step 1: Project Name (if not provided via argument)
-  let projectName = name
+  let projectName = name;
   if (!projectName) {
     const nameResult = await p.text({
-      message: 'What is your project named?',
+      message: "What is your project named?",
       placeholder: generateRandomName(),
       defaultValue: generateRandomName(),
       validate: (value) => {
-        if (!value.length) return 'Project name is required'
+        if (!value.length) return "Project name is required";
       },
-    })
+    });
     if (p.isCancel(nameResult)) {
-      p.cancel('Operation cancelled.')
-      process.exit(0)
+      p.cancel("Operation cancelled.");
+      process.exit(0);
     }
-    projectName = nameResult
+    projectName = nameResult;
   }
 
   // Step 2: Select template (TypeScript by default, customize for JavaScript)
   const template = await p.select({
-    message: 'Select a template',
+    message: "Select a template",
     options: [
-      { value: 'vanilla', label: 'Vanilla' },
-      { value: 'react', label: 'React' },
-      { value: 'r3f', label: 'React Three Fiber' },
+      { value: "vanilla", label: "Vanilla" },
+      { value: "react", label: "React" },
+      { value: "r3f", label: "React Three Fiber" },
     ],
-    initialValue: 'vanilla',
-  })
+    initialValue: "vanilla",
+  });
 
   if (p.isCancel(template)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
-  const defaultOptions = getDefaultOptions(template as Template, projectName)
+  const defaultOptions = getDefaultOptions(template as Template, projectName);
 
   // Step 3: Show summary and ask confirm/customize
-  p.note(formatConfigSummary(defaultOptions), 'Template Configuration')
+  p.note(formatConfigSummary(defaultOptions), "Template Configuration");
 
   const action = await p.select({
-    message: 'Proceed with these settings?',
+    message: "Proceed with these settings?",
     options: [
-      { value: 'confirm', label: 'Yes, create project' },
-      { value: 'customize', label: 'No, let me customize' },
+      { value: "confirm", label: "Yes, create project" },
+      { value: "customize", label: "No, let me customize" },
     ],
-    initialValue: 'confirm',
-  })
+    initialValue: "confirm",
+  });
 
   if (p.isCancel(action)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
+    p.cancel("Operation cancelled.");
+    process.exit(0);
   }
 
-  if (action === 'confirm') {
-    return defaultOptions
+  if (action === "confirm") {
+    return defaultOptions;
   }
 
   // Step 4: Customize
-  return promptForCustomization(template as Template, projectName)
+  return promptForCustomization(template as Template, projectName);
 }
 
 interface CliOptions {
-  template?: Template
-  linter?: 'eslint' | 'oxlint' | 'biome'
-  formatter?: 'prettier' | 'oxfmt' | 'biome'
-  drei?: boolean
-  handle?: boolean
-  leva?: boolean
-  postprocessing?: boolean
-  rapier?: boolean
-  xr?: boolean
-  uikit?: boolean
-  offscreen?: boolean
-  zustand?: boolean
-  koota?: boolean
-  pnpmManageVersions?: boolean
-  triplex?: boolean
-  viverse?: boolean
-  packageManager?: string
-  nodeVersion?: string
-  yes?: boolean
+  template?: Template;
+  linter?: "eslint" | "oxlint" | "biome";
+  formatter?: "prettier" | "oxfmt" | "biome";
+  drei?: boolean;
+  handle?: boolean;
+  leva?: boolean;
+  postprocessing?: boolean;
+  rapier?: boolean;
+  xr?: boolean;
+  uikit?: boolean;
+  offscreen?: boolean;
+  zustand?: boolean;
+  koota?: boolean;
+  pnpmManageVersions?: boolean;
+  triplex?: boolean;
+  viverse?: boolean;
+  packageManager?: string;
+  nodeVersion?: string;
+  yes?: boolean;
 }
 
 async function main() {
   const program = new Command()
-    .name('krispya-create')
-    .description('CLI for creating Vanilla, React, and React Three Fiber projects')
-    .argument('[name]', 'name for the app')
-    .option(
-      '--template <type>',
-      'project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)',
+    .name("krispya-create")
+    .description(
+      "CLI for creating Vanilla, React, and React Three Fiber projects"
     )
-    .option('--linter <type>', 'linter: eslint, oxlint, or biome (default: oxlint)')
-    .option('--formatter <type>', 'formatter: prettier, oxfmt, or biome (default: oxfmt)')
-    .option('--drei', 'add @react-three/drei (r3f only)')
-    .option('--handle', 'add @react-three/handle (r3f only)')
-    .option('--leva', 'add leva (r3f only)')
-    .option('--postprocessing', 'add @react-three/postprocessing (r3f only)')
-    .option('--rapier', 'add @react-three/rapier (r3f only)')
-    .option('--xr', 'add @react-three/xr (r3f only)')
-    .option('--uikit', 'add @react-three/uikit (r3f only)')
-    .option('--offscreen', 'add @react-three/offscreen (r3f only)')
-    .option('--zustand', 'add zustand (r3f only)')
-    .option('--koota', 'add koota (r3f only)')
-    .option('--triplex', 'set up triplex development environment (r3f only)')
-    .option('--viverse', 'set up viverse deployment (r3f only)')
-    .option('--package-manager <manager>', 'specify package manager (e.g. npm, yarn, pnpm)')
-    .option('--pnpm-manage-versions', 'enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)')
-    .option('--no-pnpm-manage-versions', 'disable manage-package-manager-versions in pnpm-workspace.yaml')
-    .option('--node-version <version>', 'set Node.js version for engines.node field (default: "latest")')
-    .option('-y, --yes', 'Skip prompts and use default values')
+    .argument("[name]", "name for the app")
+    .option(
+      "--template <type>",
+      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
+    )
+    .option(
+      "--linter <type>",
+      "linter: eslint, oxlint, or biome (default: oxlint)"
+    )
+    .option(
+      "--formatter <type>",
+      "formatter: prettier, oxfmt, or biome (default: oxfmt)"
+    )
+    .option("--drei", "add @react-three/drei (r3f only)")
+    .option("--handle", "add @react-three/handle (r3f only)")
+    .option("--leva", "add leva (r3f only)")
+    .option("--postprocessing", "add @react-three/postprocessing (r3f only)")
+    .option("--rapier", "add @react-three/rapier (r3f only)")
+    .option("--xr", "add @react-three/xr (r3f only)")
+    .option("--uikit", "add @react-three/uikit (r3f only)")
+    .option("--offscreen", "add @react-three/offscreen (r3f only)")
+    .option("--zustand", "add zustand (r3f only)")
+    .option("--koota", "add koota (r3f only)")
+    .option("--triplex", "set up triplex development environment (r3f only)")
+    .option("--viverse", "set up viverse deployment (r3f only)")
+    .option(
+      "--package-manager <manager>",
+      "specify package manager (e.g. npm, yarn, pnpm)"
+    )
+    .option(
+      "--pnpm-manage-versions",
+      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)"
+    )
+    .option(
+      "--no-pnpm-manage-versions",
+      "disable manage-package-manager-versions in pnpm-workspace.yaml"
+    )
+    .option(
+      "--node-version <version>",
+      'set Node.js version for engines.node field (default: "latest")'
+    )
+    .option("-y, --yes", "Skip prompts and use default values")
     .action(async (name: string | undefined, options: CliOptions) => {
-      console.clear()
-      p.intro(color.bgCyan(color.black(' krispya-create ')))
+      console.clear();
+      p.intro(color.bgCyan(color.black(" krispya-create ")));
 
-      let generateOptions: GenerateOptions
+      let generateOptions: GenerateOptions;
 
       if (Object.keys(options).length > 0) {
-        const template: Template = options.template ?? 'vanilla'
-        const baseTemplate = getBaseTemplate(template)
-        const defaultName = getDefaultProjectName(template)
+        const template: Template = options.template ?? "vanilla";
+        const baseTemplate = getBaseTemplate(template);
+        const defaultName = getDefaultProjectName(template);
 
         generateOptions = {
           name: name || defaultName,
           template,
-          linter: options.linter ?? 'oxlint',
-          formatter: options.formatter ?? 'oxfmt',
-          ...(baseTemplate === 'r3f' && {
+          linter: options.linter ?? "oxlint",
+          formatter: options.formatter ?? "oxfmt",
+          ...(baseTemplate === "r3f" && {
             drei: options.drei ? {} : undefined,
             handle: options.handle ? {} : undefined,
             leva: options.leva ? {} : undefined,
@@ -470,123 +492,131 @@ async function main() {
           }),
           packageManager: options.packageManager,
           pnpmManageVersions: options.pnpmManageVersions,
-          nodeVersion: options.nodeVersion ?? 'latest',
-        }
+          nodeVersion: options.nodeVersion ?? "latest",
+        };
       } else {
-        generateOptions = await promptForOptions(name)
+        generateOptions = await promptForOptions(name);
       }
 
-      const base = generateOptions.template ? getBaseTemplate(generateOptions.template) : 'vanilla'
+      const base = generateOptions.template
+        ? getBaseTemplate(generateOptions.template)
+        : "vanilla";
       const defaultFallbackName =
-        base === 'vanilla' ? 'vanilla-app' : base === 'react' ? 'react-app' : 'react-three-app'
-      generateOptions.name ??= defaultFallbackName
+        base === "vanilla"
+          ? "vanilla-app"
+          : base === "react"
+          ? "react-app"
+          : "react-three-app";
+      generateOptions.name ??= defaultFallbackName;
 
       // Fetch latest pnpm version if pnpm is selected
-      const packageManager = generateOptions.packageManager || 'pnpm'
-      if (packageManager === 'pnpm') {
-        generateOptions.pnpmVersion = await getLatestPnpmVersion()
+      const packageManager = generateOptions.packageManager || "pnpm";
+      if (packageManager === "pnpm") {
+        generateOptions.pnpmVersion = await getLatestPnpmVersion();
       }
 
       // Fetch latest Node version if "latest" is specified or default
-      const nodeVersion = generateOptions.nodeVersion ?? 'latest'
-      if (nodeVersion === 'latest') {
-        generateOptions.nodeVersion = await getLatestNodeVersion()
+      const nodeVersion = generateOptions.nodeVersion ?? "latest";
+      if (nodeVersion === "latest") {
+        generateOptions.nodeVersion = await getLatestNodeVersion();
       }
 
       // Fetch latest package versions in parallel
-      const versions: PackageVersions = {}
+      const versions: PackageVersions = {};
       const versionPromises: Promise<void>[] = [
-        getLatestNpmVersion('vite', '6.3.4').then((v) => {
-          versions.vite = v
+        getLatestNpmVersion("vite", "6.3.4").then((v) => {
+          versions.vite = v;
         }),
-      ]
+      ];
 
       // Fetch linter version
-      const linter = generateOptions.linter ?? 'oxlint'
-      if (linter === 'eslint') {
+      const linter = generateOptions.linter ?? "oxlint";
+      if (linter === "eslint") {
         versionPromises.push(
-          getLatestNpmVersion('eslint', '9.17.0').then((v) => {
-            versions.eslint = v
-          }),
-        )
-      } else if (linter === 'oxlint') {
+          getLatestNpmVersion("eslint", "9.17.0").then((v) => {
+            versions.eslint = v;
+          })
+        );
+      } else if (linter === "oxlint") {
         versionPromises.push(
-          getLatestNpmVersion('oxlint', '0.16.0').then((v) => {
-            versions.oxlint = v
-          }),
-        )
-      } else if (linter === 'biome') {
+          getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
+            versions.oxlint = v;
+          })
+        );
+      } else if (linter === "biome") {
         versionPromises.push(
-          getLatestNpmVersion('@biomejs/biome', '1.9.4').then((v) => {
-            versions.biome = v
-          }),
-        )
+          getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
+            versions.biome = v;
+          })
+        );
       }
 
       // Fetch formatter version
-      const formatter = generateOptions.formatter ?? 'oxfmt'
-      if (formatter === 'prettier') {
+      const formatter = generateOptions.formatter ?? "oxfmt";
+      if (formatter === "prettier") {
         versionPromises.push(
-          getLatestNpmVersion('prettier', '3.4.2').then((v) => {
-            versions.prettier = v
-          }),
-        )
-      } else if (formatter === 'oxfmt') {
+          getLatestNpmVersion("prettier", "3.4.2").then((v) => {
+            versions.prettier = v;
+          })
+        );
+      } else if (formatter === "oxfmt") {
         versionPromises.push(
-          getLatestNpmVersion('oxfmt', '0.1.0').then((v) => {
-            versions.oxfmt = v
-          }),
-        )
-      } else if (formatter === 'biome' && linter !== 'biome') {
+          getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
+            versions.oxfmt = v;
+          })
+        );
+      } else if (formatter === "biome" && linter !== "biome") {
         // Only fetch if not already fetched for linter
         versionPromises.push(
-          getLatestNpmVersion('@biomejs/biome', '1.9.4').then((v) => {
-            versions.biome = v
-          }),
-        )
+          getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
+            versions.biome = v;
+          })
+        );
       }
 
-      await Promise.all(versionPromises)
-      generateOptions.versions = versions
+      await Promise.all(versionPromises);
+      generateOptions.versions = versions;
 
-      const basePath = join(cwd(), generateOptions.name)
-      const s = p.spinner()
-      s.start('Creating project...')
+      const basePath = join(cwd(), generateOptions.name);
+      const s = p.spinner();
+      s.start("Creating project...");
 
       try {
-        const files = generate(generateOptions)
-        const filePaths = Object.keys(files).sort()
+        const files = generate(generateOptions);
+        const filePaths = Object.keys(files).sort();
 
         for (const filePath of filePaths) {
-          const fullFilePath = join(basePath, filePath)
-          await mkdir(dirname(fullFilePath), { recursive: true })
-          const file = files[filePath]!
+          const fullFilePath = join(basePath, filePath);
+          await mkdir(dirname(fullFilePath), { recursive: true });
+          const file = files[filePath]!;
 
-          if (file.type === 'text') {
-            await writeFile(fullFilePath, file.content)
+          if (file.type === "text") {
+            await writeFile(fullFilePath, file.content);
           } else {
-            const response = await fetch(file.url)
-            await writeFile(fullFilePath, response.body!)
+            const response = await fetch(file.url);
+            await writeFile(fullFilePath, response.body!);
           }
         }
 
-        s.stop('Project created!')
+        s.stop("Project created!");
 
-        const nextSteps = [`cd ${generateOptions.name}`, `${packageManager} install`, `${packageManager} run dev`].join(
-          '\n',
-        )
+        const nextSteps = [
+          `cd ${generateOptions.name}`,
+          `${packageManager} install`,
+          `${packageManager} run dev`,
+        ].join("\n");
 
-        p.note(nextSteps, 'Next steps')
+        p.note(nextSteps, "Next steps");
 
-        p.outro(color.green('Happy coding! ✨'))
+        p.outro(color.green("Happy coding! ✨"));
       } catch (error) {
-        s.stop('Failed to create project')
-        p.log.error(String(error))
-        process.exit(1)
+        s.stop("Failed to create project");
+        p.log.error(String(error));
+        process.exit(1);
       }
-    })
+    });
 
-  await program.parseAsync()
+  await program.parseAsync();
 }
 
-main().catch(console.error)
+main().catch(console.error);

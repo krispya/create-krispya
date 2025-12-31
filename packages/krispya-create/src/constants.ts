@@ -10,7 +10,7 @@ export const HtmlContent = `<!DOCTYPE html>
     <script type="module" src="$indexPath"></script>
     <div style="width: 100dvw; height: 100dvh; overflow: hidden;" id="root"></div>
 </body>
-</html>`
+</html>`;
 
 // HTML for vanilla Vite template
 export const ViteHtmlContent = `<!DOCTYPE html>
@@ -24,7 +24,7 @@ export const ViteHtmlContent = `<!DOCTYPE html>
     <div id="app"></div>
     <script type="module" src="$indexPath"></script>
 </body>
-</html>`
+</html>`;
 
 // Entry point for React and R3F templates
 export const IndexContent = `import { StrictMode } from 'react'
@@ -35,7 +35,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
-)`
+)`;
 
 // Entry point for vanilla Vite template
 export const ViteIndexContent = `import './style.css'
@@ -43,7 +43,7 @@ export const ViteIndexContent = `import './style.css'
 document.querySelector('#app')!.innerHTML = \`
   <h1>Hello Vite!</h1>
   <p>Edit src/main.ts and save to see HMR in action.</p>
-\``
+\``;
 
 // Default styles for vanilla Vite template
 export const ViteStyleContent = `body {
@@ -61,45 +61,45 @@ h1 {
 
 a {
   color: #646cff;
-}`
+}`;
 
 export const GitAttributes = [
-  '* text eol=lf',
-  '*.png binary',
-  '*.jpg binary',
-  '*.jpeg binary',
-  '*.gif binary',
-  '*.ico binary',
-  '*.mov binary',
-  '*.mp4 binary',
-  '*.mp3 binary',
-  '*.flv binary',
-  '*.fla binary',
-  '*.wav binary',
-  '*.swf binary',
-  '*.gz binary',
-  '*.zip binary',
-  '*.7z binary',
-  '*.ttf binary',
-  '*.eot binary',
-  '*.woff binary',
-  '*.pyc binary',
-  '*.pdf binary',
-  '*.glb binary',
-  '*.gltf binary',
-].join('\n')
+  "* text eol=lf",
+  "*.png binary",
+  "*.jpg binary",
+  "*.jpeg binary",
+  "*.gif binary",
+  "*.ico binary",
+  "*.mov binary",
+  "*.mp4 binary",
+  "*.mp3 binary",
+  "*.flv binary",
+  "*.fla binary",
+  "*.wav binary",
+  "*.swf binary",
+  "*.gz binary",
+  "*.zip binary",
+  "*.7z binary",
+  "*.ttf binary",
+  "*.eot binary",
+  "*.woff binary",
+  "*.pyc binary",
+  "*.pdf binary",
+  "*.glb binary",
+  "*.gltf binary",
+].join("\n");
 
 // Common formatter configuration (Prettier-style format)
 export type FormatterConfig = {
-  printWidth: number
-  tabWidth: number
-  useTabs: boolean
-  semi: boolean
-  singleQuote: boolean
-  trailingComma: 'none' | 'es5' | 'all'
-  bracketSpacing: boolean
-  arrowParens: 'always' | 'avoid'
-}
+  printWidth: number;
+  tabWidth: number;
+  useTabs: boolean;
+  semi: boolean;
+  singleQuote: boolean;
+  trailingComma: "none" | "es5" | "all";
+  bracketSpacing: boolean;
+  arrowParens: "always" | "avoid";
+};
 
 export const defaultFormatterConfig: FormatterConfig = {
   printWidth: 102,
@@ -107,45 +107,45 @@ export const defaultFormatterConfig: FormatterConfig = {
   useTabs: false,
   semi: true,
   singleQuote: true,
-  trailingComma: 'es5',
+  trailingComma: "es5",
   bracketSpacing: true,
-  arrowParens: 'always',
-}
+  arrowParens: "always",
+};
 
 // Common linter configuration
 export type LinterConfig = {
   // Ignore patterns (files/directories to skip)
-  ignorePatterns: string[]
+  ignorePatterns: string[];
 
   // Common rule configurations
   rules: {
     // Unused vars handling with underscore prefix pattern
     noUnusedVars: {
-      level: 'off' | 'warn' | 'error'
-      argsIgnorePattern: string
-      varsIgnorePattern: string
-      caughtErrorsIgnorePattern: string
-    }
+      level: "off" | "warn" | "error";
+      argsIgnorePattern: string;
+      varsIgnorePattern: string;
+      caughtErrorsIgnorePattern: string;
+    };
     // Allow short-circuit expressions like `foo && bar()`
     noUnusedExpressions: {
-      level: 'off' | 'warn' | 'error'
-      allowShortCircuit: boolean
-    }
-  }
-}
+      level: "off" | "warn" | "error";
+      allowShortCircuit: boolean;
+    };
+  };
+};
 
 export const defaultLinterConfig: LinterConfig = {
-  ignorePatterns: ['dist'],
+  ignorePatterns: ["dist"],
   rules: {
     noUnusedVars: {
-      level: 'warn',
-      argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_',
-      caughtErrorsIgnorePattern: '^_',
+      level: "warn",
+      argsIgnorePattern: "^_",
+      varsIgnorePattern: "^_",
+      caughtErrorsIgnorePattern: "^_",
     },
     noUnusedExpressions: {
-      level: 'warn',
+      level: "warn",
       allowShortCircuit: true,
     },
   },
-}
+};

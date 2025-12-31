@@ -1,14 +1,14 @@
-import type { Generator } from '../index.js'
+import type { Generator } from "../index.js";
 
-export type GenerateViverseOptions = {} | boolean
+export type GenerateViverseOptions = {} | boolean;
 
 export function generateViverse(generator: Generator, options: GenerateViverseOptions | undefined) {
-  if (options == null || (generator.options.packageManager ?? 'npm') != 'npm') {
-    return
+  if (options == null || (generator.options.packageManager ?? "npm") != "npm") {
+    return;
   }
 
-  generator.addFile('.github/workflows/viverse.yml', {
-    type: 'text',
+  generator.addFile(".github/workflows/viverse.yml", {
+    type: "text",
     content: `name: Deploy to Viverse
 
 on:
@@ -61,12 +61,12 @@ jobs:
         run: npx viverse-cli app publish ./dist --auto-create-app --name ${generator.options.name}
 
 `,
-  })
+  });
 
-  generator.addDependency('@viverse/cli', '^0.9.5-beta.8')
+  generator.addDependency("@viverse/cli", "^0.9.5-beta.8");
 
   generator.inject(
-    'readme-start',
+    "readme-start",
     `A GitHub CI/CD workflow for publishing to Viverse is configured.
 
 To use publish to viverse via the CI/CD workflow:
@@ -80,5 +80,5 @@ viverse-cli auth login -e <email> -p <password>
 npm run build
 viverse-cli app publish ./dist --auto-create-app --name ${generator.options.name}
 \`\`\`\n`,
-  )
+  );
 }

@@ -23,25 +23,25 @@ npm create krispya my-app
 
 ## Templates
 
-| Template     | Description                      |
-| ------------ | -------------------------------- |
-| `vanilla`    | Vanilla TypeScript (default)     |
-| `vanilla-js` | Vanilla JavaScript               |
-| `react`      | React with TypeScript            |
-| `react-js`   | React with JavaScript            |
-| `r3f`        | React Three Fiber with TypeScript|
-| `r3f-js`     | React Three Fiber with JavaScript|
+| Template     | Description                       |
+| ------------ | --------------------------------- |
+| `vanilla`    | Vanilla TypeScript (default)      |
+| `vanilla-js` | Vanilla JavaScript                |
+| `react`      | React with TypeScript             |
+| `react-js`   | React with JavaScript             |
+| `r3f`        | React Three Fiber with TypeScript |
+| `r3f-js`     | React Three Fiber with JavaScript |
 
 ## Options
 
 ### Basic Options
 
-| Option                        | Description                                   |
-| ----------------------------- | --------------------------------------------- |
-| `[name]`                      | Project name (prompted if not provided)       |
-| `--template <type>`           | Template (see above, default: vanilla)        |
-| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm)  |
-| `-y, --yes`                   | Use default values without prompts            |
+| Option                        | Description                                  |
+| ----------------------------- | -------------------------------------------- |
+| `[name]`                      | Project name (prompted if not provided)      |
+| `--template <type>`           | Template (see above, default: vanilla)       |
+| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm) |
+| `-y, --yes`                   | Use default values without prompts           |
 
 ### Advanced Options
 
