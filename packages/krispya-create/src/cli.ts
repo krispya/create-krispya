@@ -9,20 +9,6 @@ import * as p from '@clack/prompts'
 import color from 'chalk'
 import { fetch } from 'undici'
 
-async function loadOptionsFromUrl(url: string): Promise<GenerateOptions> {
-  const s = p.spinner()
-  s.start('Loading template from URL...')
-  try {
-    const response = await fetch(url)
-    const options = await response.json()
-    s.stop('Create options loaded successfully')
-    return options as any
-  } catch (error) {
-    s.stop('Failed to load template')
-    throw error
-  }
-}
-
 function getDefaultProjectName(template: Template): string {
   switch (template) {
     case 'vite':
@@ -342,7 +328,6 @@ async function promptForOptions(name: string | undefined): Promise<GenerateOptio
 }
 
 interface CliOptions {
-  url?: string
   template?: Template
   js?: boolean
   ts?: boolean
@@ -369,7 +354,6 @@ async function main() {
     .name('krispya-create')
     .description('CLI for creating Vite, React, and React Three Fiber projects')
     .argument('[name]', 'name for the app')
-    .option('--url <url>', 'URL to load the create options from')
     .option('--template <type>', 'project template: vite, react, or r3f (default: vite)')
     .option('--js', 'use javascript')
     .option('--ts', 'use typescript (default)')
@@ -396,10 +380,7 @@ async function main() {
 
       let generateOptions: GenerateOptions
 
-      if (options.url) {
-        generateOptions = await loadOptionsFromUrl(options.url)
-        generateOptions.name ??= name || `react-three-${generateRandomName()}`
-      } else if (Object.keys(options).length > 0) {
+      if (Object.keys(options).length > 0) {
         const template: Template = options.template ?? 'vite'
         const defaultName = getDefaultProjectName(template)
 
