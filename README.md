@@ -16,24 +16,32 @@ npm create krispya my-app
 
 ## Features
 
-- **Multiple Templates**: Choose from Vite (vanilla), React, or React Three Fiber
-- **TypeScript or JavaScript**: Pick your preferred language
+- **Multiple Templates**: Choose from Vanilla, React, or React Three Fiber (each with TypeScript or JavaScript variants)
 - **Package Manager Support**: Works with npm, yarn, or pnpm
 - **Node Version Management**: Built-in support for specifying Node.js versions
 - **Interactive Setup**: Guided prompts to configure your project
+
+## Templates
+
+| Template     | Description                      |
+| ------------ | -------------------------------- |
+| `vanilla`    | Vanilla TypeScript (default)     |
+| `vanilla-js` | Vanilla JavaScript               |
+| `react`      | React with TypeScript            |
+| `react-js`   | React with JavaScript            |
+| `r3f`        | React Three Fiber with TypeScript|
+| `r3f-js`     | React Three Fiber with JavaScript|
 
 ## Options
 
 ### Basic Options
 
-| Option                        | Description                                        |
-| ----------------------------- | -------------------------------------------------- |
-| `[name]`                      | Project name (prompted if not provided)            |
-| `--template <type>`           | Template type: vite, react, or r3f (default: vite) |
-| `--js`                        | Use JavaScript instead of TypeScript               |
-| `--ts`                        | Use TypeScript (default)                           |
-| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm)       |
-| `-y, --yes`                   | Use default values without prompts                 |
+| Option                        | Description                                   |
+| ----------------------------- | --------------------------------------------- |
+| `[name]`                      | Project name (prompted if not provided)       |
+| `--template <type>`           | Template (see above, default: vanilla)        |
+| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm)  |
+| `-y, --yes`                   | Use default values without prompts            |
 
 ### Advanced Options
 
@@ -45,7 +53,7 @@ npm create krispya my-app
 
 ### React Three Fiber Integration Options
 
-These options are only available when using the `r3f` template:
+These options are only available when using the `r3f` or `r3f-js` templates:
 
 | Option             | Description                                        |
 | ------------------ | -------------------------------------------------- |
@@ -73,7 +81,7 @@ npm create krispya
 Create a React project with JavaScript:
 
 ```bash
-npm create krispya my-app --template react --js
+npm create krispya my-app --template react-js
 ```
 
 Create a React Three Fiber project with integrations:

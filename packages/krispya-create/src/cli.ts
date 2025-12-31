@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { cwd } from 'process'
 import {
+  BaseTemplate,
   generate,
   GenerateOptions,
   generateRandomName,
+  getBaseTemplate,
+  getLanguageFromTemplate,
   getLatestPnpmVersion,
   PackageVersions,
   Template,
@@ -17,9 +20,10 @@ import color from 'chalk'
 import { fetch } from 'undici'
 
 function getDefaultProjectName(template: Template): string {
-  switch (template) {
-    case 'vite':
-      return `vite-${generateRandomName()}`
+  const base = getBaseTemplate(template)
+  switch (base) {
+    case 'vanilla':
+      return `vanilla-${generateRandomName()}`
     case 'react':
       return `react-${generateRandomName()}`
     case 'r3f':
@@ -28,9 +32,10 @@ function getDefaultProjectName(template: Template): string {
 }
 
 function getTemplateLabel(template: Template): string {
-  switch (template) {
-    case 'vite':
-      return 'Vite (vanilla)'
+  const base = getBaseTemplate(template)
+  switch (base) {
+    case 'vanilla':
+      return 'Vanilla'
     case 'react':
       return 'React'
     case 'r3f':
@@ -39,10 +44,10 @@ function getTemplateLabel(template: Template): string {
 }
 
 function getDefaultOptions(template: Template, name: string): GenerateOptions {
+  const baseTemplate = getBaseTemplate(template)
   const base: GenerateOptions = {
     name,
     template,
-    language: 'typescript',
     packageManager: 'pnpm',
     pnpmManageVersions: true,
     nodeVersion: 'latest',
@@ -50,7 +55,7 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
     formatter: 'oxfmt',
   }
 
-  if (template === 'r3f') {
+  if (baseTemplate === 'r3f') {
     return {
       ...base,
       drei: {},
@@ -86,8 +91,9 @@ function formatConfigSummary(options: GenerateOptions): string {
     return lang === 'typescript' ? 'TypeScript' : lang === 'javascript' ? 'JavaScript' : lang
   }
 
-  // Language
-  lines.push(formatRow('Language', formatLanguage(options.language || 'typescript')))
+  // Language (derived from template)
+  const language = options.template ? getLanguageFromTemplate(options.template) : 'typescript'
+  lines.push(formatRow('Language', formatLanguage(language)))
 
   // Node version
   lines.push(formatRow('Node version', options.nodeVersion || 'latest'))
@@ -112,7 +118,7 @@ function formatConfigSummary(options: GenerateOptions): string {
   }
 
   // R3F integrations
-  if (options.template === 'r3f') {
+  if (options.template && getBaseTemplate(options.template) === 'r3f') {
     const integrationNames = [
       options.drei && 'drei',
       options.handle && 'handle',
@@ -205,20 +211,6 @@ async function promptForCustomization(template: Template, name: string): Promise
     pnpmManageVersions = managePnpm
   }
 
-  const language = await p.select({
-    message: 'Language',
-    options: [
-      { value: 'typescript', label: 'TypeScript' },
-      { value: 'javascript', label: 'JavaScript' },
-    ],
-    initialValue: 'typescript',
-  })
-
-  if (p.isCancel(language)) {
-    p.cancel('Operation cancelled.')
-    process.exit(0)
-  }
-
   const linter = await p.select({
     message: 'Linter',
     options: [
@@ -249,8 +241,27 @@ async function promptForCustomization(template: Template, name: string): Promise
     process.exit(0)
   }
 
+  const language = await p.select({
+    message: 'Language',
+    options: [
+      { value: 'typescript', label: 'TypeScript' },
+      { value: 'javascript', label: 'JavaScript' },
+    ],
+    initialValue: 'typescript',
+  })
+
+  if (p.isCancel(language)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
+  // Derive final template based on language selection
+  const baseTemplate = getBaseTemplate(template)
+  const finalTemplate: Template =
+    language === 'javascript' ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template)
+
   let integrations: string[] = []
-  if (template === 'r3f') {
+  if (baseTemplate === 'r3f') {
     const selected = await p.multiselect({
       message: 'R3F integrations',
       options: [
@@ -292,14 +303,13 @@ async function promptForCustomization(template: Template, name: string): Promise
 
   return {
     name,
-    template,
-    language: language as 'typescript' | 'javascript',
+    template: finalTemplate,
     nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
     linter: linter as 'eslint' | 'oxlint' | 'biome',
     formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
-    ...(template === 'r3f' && {
+    ...(baseTemplate === 'r3f' && {
       drei: integrations.includes('drei') ? {} : undefined,
       handle: integrations.includes('handle') ? {} : undefined,
       leva: integrations.includes('leva') ? {} : undefined,
@@ -335,15 +345,15 @@ async function promptForOptions(name: string | undefined): Promise<GenerateOptio
     projectName = nameResult
   }
 
-  // Step 2: Select template
+  // Step 2: Select template (TypeScript by default, customize for JavaScript)
   const template = await p.select({
     message: 'Select a template',
     options: [
-      { value: 'vite', label: 'Vite', hint: 'vanilla TypeScript' },
-      { value: 'react', label: 'React', hint: 'with Vite' },
-      { value: 'r3f', label: 'React Three Fiber', hint: '3D graphics with React' },
+      { value: 'vanilla', label: 'Vanilla' },
+      { value: 'react', label: 'React' },
+      { value: 'r3f', label: 'React Three Fiber' },
     ],
-    initialValue: 'vite',
+    initialValue: 'vanilla',
   })
 
   if (p.isCancel(template)) {
@@ -380,8 +390,6 @@ async function promptForOptions(name: string | undefined): Promise<GenerateOptio
 
 interface CliOptions {
   template?: Template
-  js?: boolean
-  ts?: boolean
   linter?: 'eslint' | 'oxlint' | 'biome'
   formatter?: 'prettier' | 'oxfmt' | 'biome'
   drei?: boolean
@@ -405,11 +413,12 @@ interface CliOptions {
 async function main() {
   const program = new Command()
     .name('krispya-create')
-    .description('CLI for creating Vite, React, and React Three Fiber projects')
+    .description('CLI for creating Vanilla, React, and React Three Fiber projects')
     .argument('[name]', 'name for the app')
-    .option('--template <type>', 'project template: vite, react, or r3f (default: vite)')
-    .option('--js', 'use javascript')
-    .option('--ts', 'use typescript (default)')
+    .option(
+      '--template <type>',
+      'project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)',
+    )
     .option('--linter <type>', 'linter: eslint, oxlint, or biome (default: oxlint)')
     .option('--formatter <type>', 'formatter: prettier, oxfmt, or biome (default: oxfmt)')
     .option('--drei', 'add @react-three/drei (r3f only)')
@@ -436,16 +445,16 @@ async function main() {
       let generateOptions: GenerateOptions
 
       if (Object.keys(options).length > 0) {
-        const template: Template = options.template ?? 'vite'
+        const template: Template = options.template ?? 'vanilla'
+        const baseTemplate = getBaseTemplate(template)
         const defaultName = getDefaultProjectName(template)
 
         generateOptions = {
           name: name || defaultName,
           template,
-          language: options.js ? 'javascript' : 'typescript',
           linter: options.linter ?? 'oxlint',
           formatter: options.formatter ?? 'oxfmt',
-          ...(template === 'r3f' && {
+          ...(baseTemplate === 'r3f' && {
             drei: options.drei ? {} : undefined,
             handle: options.handle ? {} : undefined,
             leva: options.leva ? {} : undefined,
@@ -467,12 +476,9 @@ async function main() {
         generateOptions = await promptForOptions(name)
       }
 
+      const base = generateOptions.template ? getBaseTemplate(generateOptions.template) : 'vanilla'
       const defaultFallbackName =
-        generateOptions.template === 'vite'
-          ? 'vite-app'
-          : generateOptions.template === 'react'
-          ? 'react-app'
-          : 'react-three-app'
+        base === 'vanilla' ? 'vanilla-app' : base === 'react' ? 'react-app' : 'react-three-app'
       generateOptions.name ??= defaultFallbackName
 
       // Fetch latest pnpm version if pnpm is selected

@@ -1,4 +1,4 @@
-import type { Generator } from '../index.js'
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../index.js'
 
 export type GenerateEslintOptions = {} | boolean
 
@@ -11,8 +11,10 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
   generator.addDependency('eslint', `^${version}`)
 
   // Add eslint flat config
-  const isTypescript = generator.options.language === 'typescript'
-  const isReact = generator.options.template === 'react' || generator.options.template === 'r3f'
+  const template = generator.options.template ?? 'vanilla'
+  const baseTemplate = getBaseTemplate(template)
+  const isTypescript = getLanguageFromTemplate(template) === 'typescript'
+  const isReact = baseTemplate === 'react' || baseTemplate === 'r3f'
 
   const imports: string[] = ['import js from "@eslint/js"']
   const configs: string[] = ['js.configs.recommended']

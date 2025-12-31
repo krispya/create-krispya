@@ -22,7 +22,17 @@ import { generateViverse, GenerateViverseOptions } from './integrations/viverse.
 
 export * from './utils.js'
 
-export type Template = 'vite' | 'react' | 'r3f'
+export type Template = 'vanilla' | 'vanilla-js' | 'react' | 'react-js' | 'r3f' | 'r3f-js'
+
+export type BaseTemplate = 'vanilla' | 'react' | 'r3f'
+
+export function getLanguageFromTemplate(template: Template): 'javascript' | 'typescript' {
+  return template.endsWith('-js') ? 'javascript' : 'typescript'
+}
+
+export function getBaseTemplate(template: Template): BaseTemplate {
+  return template.replace('-js', '') as BaseTemplate
+}
 
 export type PackageVersions = {
   vite?: string
@@ -38,7 +48,6 @@ export type GenerateOptions = {
   githubRepoName?: string
   name: string
   template?: Template
-  language?: 'javascript' | 'typescript'
   linter?: Linter
   formatter?: Formatter
   versions?: PackageVersions
@@ -112,10 +121,12 @@ export type Generator = {
 export function generate(options: GenerateOptions) {
   //deep cloning since integrations might decide to modify the options
   const clonedOptions = structuredClone(options)
-  const template = clonedOptions.template ?? 'vite'
-  const isVite = template === 'vite'
-  const isReact = template === 'react'
-  const isR3f = template === 'r3f'
+  const template = clonedOptions.template ?? 'vanilla'
+  const baseTemplate = getBaseTemplate(template)
+  const language = getLanguageFromTemplate(template)
+  const isVanilla = baseTemplate === 'vanilla'
+  const isReact = baseTemplate === 'react'
+  const isR3f = baseTemplate === 'r3f'
 
   const files: Record<string, File> = {
     ...clonedOptions.files,
@@ -143,7 +154,7 @@ export function generate(options: GenerateOptions) {
   }
 
   // TypeScript configuration
-  if (clonedOptions.language === 'typescript') {
+  if (language === 'typescript') {
     const tsConfig: any = {
       compilerOptions: {
         target: 'ESNext',
@@ -188,7 +199,7 @@ export function generate(options: GenerateOptions) {
     codeSnippets['import'] = [`import { Canvas } from "@react-three/fiber"`]
   }
 
-  const defaultName = isVite ? 'vite-app' : isReact ? 'react-app' : 'react-three-app'
+  const defaultName = isVanilla ? 'vanilla-app' : isReact ? 'react-app' : 'react-three-app'
   const name = clonedOptions.name ?? defaultName
 
   // Build vite config based on template
@@ -362,7 +373,7 @@ export function generate(options: GenerateOptions) {
   codeSnippets['readme-commands'] ??= []
 
   // Add library descriptions based on template
-  if (isVite) {
+  if (isVanilla) {
     codeSnippets['readme-libraries'].unshift(
       `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
     )
@@ -386,21 +397,23 @@ export function generate(options: GenerateOptions) {
   )
 
   // Generate template-specific architecture description
+  const ext = language === 'javascript' ? 'js' : 'ts'
+  const jsxExt = language === 'javascript' ? 'jsx' : 'tsx'
   let architectureDesc: string[]
-  if (isVite) {
+  if (isVanilla) {
     architectureDesc = [
-      `- \`src/main.ts\` is the entry point for your application`,
+      `- \`src/main.${ext}\` is the entry point for your application`,
       `- Static assets can be placed in the \`public\` folder`,
     ]
   } else if (isReact) {
     architectureDesc = [
-      `- \`src/app.tsx\` defines the main application component`,
-      `- \`src/index.tsx\` renders the React app into the DOM`,
+      `- \`src/app.${jsxExt}\` defines the main application component`,
+      `- \`src/index.${jsxExt}\` renders the React app into the DOM`,
       `- Static assets can be placed in the \`public\` folder`,
     ]
   } else {
     architectureDesc = [
-      `- \`app.tsx\` defines the main application component containing your 3D content`,
+      `- \`app.${jsxExt}\` defines the main application component containing your 3D content`,
       `- Modify the content inside the \`<Canvas>\` component to change what is visible on screen`,
       `- Static assets can be placed in the \`public\` folder`,
     ]
@@ -433,9 +446,9 @@ export function generate(options: GenerateOptions) {
   }
 
   // Generate template-specific source files
-  if (isVite) {
-    // Vanilla Vite template
-    const ext = clonedOptions.language === 'javascript' ? 'js' : 'ts'
+  if (isVanilla) {
+    // Vanilla template
+    const ext = language === 'javascript' ? 'js' : 'ts'
     files[`src/main.${ext}`] = { type: 'text', content: ViteIndexContent }
     files['src/style.css'] = { type: 'text', content: ViteStyleContent }
     const indexHtml = ViteHtmlContent
@@ -448,7 +461,7 @@ export function generate(options: GenerateOptions) {
 
     const indexHtml = HtmlContent.replace(
       '$indexPath',
-      clonedOptions.language === 'javascript' ? './src/index.jsx' : './src/index.tsx',
+      language === 'javascript' ? './src/index.jsx' : './src/index.tsx',
     ).replace('$title', name)
     files['index.html'] = { type: 'text', content: indexHtml }
 
@@ -520,7 +533,7 @@ export function generate(options: GenerateOptions) {
     }
   }
 
-  if (clonedOptions.language === 'javascript') {
+  if (language === 'javascript') {
     //TODO: transpile tsx? to jsx? files}
   }
   //TODO: execute prettier on ts(x), js(x), and json files``
