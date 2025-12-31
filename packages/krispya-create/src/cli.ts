@@ -4,20 +4,20 @@ import { generate, GenerateOptions, generateRandomName, getLatestPnpmVersion, Te
 import { dirname, join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
 import { Command } from 'commander'
-import prompts, { PromptObject } from 'prompts'
-import chalk from 'chalk'
-import ora from 'ora'
+import * as p from '@clack/prompts'
+import color from 'chalk'
 import { fetch } from 'undici'
 
 async function loadOptionsFromUrl(url: string): Promise<GenerateOptions> {
-  const spinner = ora('Loading template from URL...').start()
+  const s = p.spinner()
+  s.start('Loading template from URL...')
   try {
     const response = await fetch(url)
     const options = await response.json()
-    spinner.succeed('Create options loaded successfully')
+    s.stop('Create options loaded successfully')
     return options as any
   } catch (error) {
-    spinner.fail('Failed to load template')
+    s.stop('Failed to load template')
     throw error
   }
 }
@@ -74,195 +74,248 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
   return base
 }
 
-function displayDefaults(options: GenerateOptions): void {
-  const dim = chalk.dim
-  const packageManagerInfo =
-    options.packageManager === 'pnpm' && options.pnpmManageVersions
-      ? `${options.packageManager} (version managed)`
-      : options.packageManager
+function formatConfigSummary(options: GenerateOptions): string {
+  const lines: string[] = []
+  const VALUE_COL = 27 // Start position for values
 
-  console.log(dim(`  Template: ${getTemplateLabel(options.template!)}`))
-  console.log(dim(`  Language: ${options.language}`))
-  console.log(dim(`  Package manager: ${packageManagerInfo}`))
-  if (options.template === 'r3f') {
-    console.log(dim(`  R3F integrations: all enabled`))
+  const formatRow = (label: string, value: string, indent = '') => {
+    const fullLabel = indent + label
+    const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1)
+    const dots = color.gray('.'.repeat(dotCount))
+    return `${indent}${label} ${dots} ${value}`
   }
+
+  const formatLanguage = (lang: string) => {
+    return lang === 'typescript' ? 'TypeScript' : lang === 'javascript' ? 'JavaScript' : lang
+  }
+
+  // Language
+  lines.push(formatRow('Language', formatLanguage(options.language || 'typescript')))
+
+  // Package manager
+  lines.push(formatRow('Package manager', options.packageManager || 'pnpm'))
+
+  // pnpm-specific options
+  if (options.packageManager === 'pnpm') {
+    const versionManaged = options.pnpmManageVersions ? 'yes' : 'no'
+    lines.push(formatRow('↳ Version managed', versionManaged, '  '))
+  }
+
+  // R3F integrations
+  if (options.template === 'r3f') {
+    const integrationNames = [
+      options.drei && 'drei',
+      options.handle && 'handle',
+      options.leva && 'leva',
+      options.postprocessing && 'postproc',
+      options.rapier && 'rapier',
+      options.xr && 'xr',
+      options.uikit && 'uikit',
+      options.offscreen && 'offscreen',
+      options.zustand && 'zustand',
+      options.koota && 'koota',
+      options.triplex && 'triplex',
+      options.viverse && 'viverse',
+    ].filter(Boolean) as string[]
+
+    lines.push('')
+    lines.push(color.dim('Integrations'))
+
+    // Two-column layout
+    for (let i = 0; i < integrationNames.length; i += 2) {
+      const left = `${color.green('●')} ${integrationNames[i]}`
+      const right = integrationNames[i + 1] ? `${color.green('●')} ${integrationNames[i + 1]}` : ''
+      const spacing = ' '.repeat(Math.max(1, 16 - integrationNames[i]!.length))
+      lines.push(`  ${left}${spacing}${right}`)
+    }
+  }
+
+  return lines.join('\n')
 }
 
-async function promptForCustomization(template: Template, defaultName: string): Promise<GenerateOptions> {
-  let cancelled = false
-
-  const nameAnswer = await prompts(
-    {
-      type: 'text',
-      name: 'name',
-      message: 'Project name',
-      initial: defaultName,
-      validate: (name: string) => (name.length > 0 ? true : 'Project name is required'),
-    },
-    {
-      onCancel: () => {
-        cancelled = true
-        return false
-      },
-    },
-  )
-
-  if (cancelled) return Promise.reject('Input cancelled')
-
-  const questions: PromptObject[] = [
-    {
-      type: 'autocomplete',
-      name: 'packageManager',
-      message: 'Package manager',
-      choices: [
-        { title: 'pnpm', value: 'pnpm' },
-        { title: 'npm', value: 'npm' },
-        { title: 'yarn', value: 'yarn' },
-        { title: 'Other (custom)', value: 'custom' },
-      ],
-      initial: 0,
-    },
-    {
-      type: (prev) => (prev === 'custom' ? 'text' : null),
-      name: 'customPackageManager',
-      message: 'Enter package manager command',
-      validate: (value: string) => (value.length > 0 ? true : 'Required'),
-    },
-    {
-      type: (prev, values) => (values.packageManager === 'pnpm' ? 'confirm' : null),
-      name: 'pnpmManageVersions',
-      message: 'Enable manage-package-manager-versions?',
-      initial: true,
-    },
-    {
-      type: 'select',
-      name: 'language',
-      message: 'Language',
-      choices: [
-        { title: 'TypeScript', value: 'typescript' },
-        { title: 'JavaScript', value: 'javascript' },
-      ],
-      initial: 0,
-    },
-  ]
-
-  if (template === 'r3f') {
-    questions.push({
-      type: 'multiselect',
-      name: 'integrations',
-      message: 'R3F integrations',
-      choices: [
-        { title: 'Drei', value: 'drei', selected: true },
-        { title: 'Handle', value: 'handle', selected: true },
-        { title: 'Leva', value: 'leva', selected: true },
-        { title: 'Postprocessing', value: 'postprocessing', selected: true },
-        { title: 'Rapier', value: 'rapier', selected: true },
-        { title: 'XR', value: 'xr', selected: true },
-        { title: 'UIKit', value: 'uikit', selected: true },
-        { title: 'Offscreen', value: 'offscreen', selected: true },
-        { title: 'Zustand', value: 'zustand', selected: true },
-        { title: 'Koota', value: 'koota', selected: true },
-        { title: 'Triplex', value: 'triplex', selected: true },
-        { title: 'Viverse', value: 'viverse', selected: true },
-      ],
-    })
-  }
-
-  const answers = await prompts(questions, {
-    onCancel: () => {
-      cancelled = true
-      return false
-    },
+async function promptForCustomization(template: Template, name: string): Promise<GenerateOptions> {
+  const packageManager = await p.select({
+    message: 'Package manager',
+    options: [
+      { value: 'pnpm', label: 'pnpm' },
+      { value: 'npm', label: 'npm' },
+      { value: 'yarn', label: 'yarn' },
+      { value: 'custom', label: 'Other (custom)' },
+    ],
+    initialValue: 'pnpm',
   })
 
-  if (cancelled) return Promise.reject('Input cancelled')
+  if (p.isCancel(packageManager)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
+  let finalPackageManager = packageManager as string
+  if (packageManager === 'custom') {
+    const customPm = await p.text({
+      message: 'Enter package manager command',
+      validate: (value) => {
+        if (!value.length) return 'Required'
+      },
+    })
+    if (p.isCancel(customPm)) {
+      p.cancel('Operation cancelled.')
+      process.exit(0)
+    }
+    finalPackageManager = customPm
+  }
+
+  let pnpmManageVersions = true
+  if (packageManager === 'pnpm') {
+    const managePnpm = await p.confirm({
+      message: 'Enable manage-package-manager-versions?',
+      initialValue: true,
+    })
+    if (p.isCancel(managePnpm)) {
+      p.cancel('Operation cancelled.')
+      process.exit(0)
+    }
+    pnpmManageVersions = managePnpm
+  }
+
+  const language = await p.select({
+    message: 'Language',
+    options: [
+      { value: 'typescript', label: 'TypeScript' },
+      { value: 'javascript', label: 'JavaScript' },
+    ],
+    initialValue: 'typescript',
+  })
+
+  if (p.isCancel(language)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
+  let integrations: string[] = []
+  if (template === 'r3f') {
+    const selected = await p.multiselect({
+      message: 'R3F integrations',
+      options: [
+        { value: 'drei', label: 'Drei' },
+        { value: 'handle', label: 'Handle' },
+        { value: 'leva', label: 'Leva' },
+        { value: 'postprocessing', label: 'Postprocessing' },
+        { value: 'rapier', label: 'Rapier' },
+        { value: 'xr', label: 'XR' },
+        { value: 'uikit', label: 'UIKit' },
+        { value: 'offscreen', label: 'Offscreen' },
+        { value: 'zustand', label: 'Zustand' },
+        { value: 'koota', label: 'Koota' },
+        { value: 'triplex', label: 'Triplex' },
+        { value: 'viverse', label: 'Viverse' },
+      ],
+      initialValues: [
+        'drei',
+        'handle',
+        'leva',
+        'postprocessing',
+        'rapier',
+        'xr',
+        'uikit',
+        'offscreen',
+        'zustand',
+        'koota',
+        'triplex',
+        'viverse',
+      ],
+      required: false,
+    })
+    if (p.isCancel(selected)) {
+      p.cancel('Operation cancelled.')
+      process.exit(0)
+    }
+    integrations = selected as string[]
+  }
 
   return {
-    name: nameAnswer.name,
+    name,
     template,
-    language: answers.language,
-    packageManager: answers.packageManager === 'custom' ? answers.customPackageManager : answers.packageManager,
-    pnpmManageVersions: answers.pnpmManageVersions,
+    language: language as 'typescript' | 'javascript',
+    packageManager: finalPackageManager,
+    pnpmManageVersions,
     ...(template === 'r3f' && {
-      drei: answers.integrations?.includes('drei') ? {} : undefined,
-      handle: answers.integrations?.includes('handle') ? {} : undefined,
-      leva: answers.integrations?.includes('leva') ? {} : undefined,
-      postprocessing: answers.integrations?.includes('postprocessing') ? {} : undefined,
-      rapier: answers.integrations?.includes('rapier') ? {} : undefined,
-      xr: answers.integrations?.includes('xr') ? {} : undefined,
-      uikit: answers.integrations?.includes('uikit') ? {} : undefined,
-      offscreen: answers.integrations?.includes('offscreen') ? {} : undefined,
-      zustand: answers.integrations?.includes('zustand') ? {} : undefined,
-      koota: answers.integrations?.includes('koota') ? {} : undefined,
-      triplex: answers.integrations?.includes('triplex') ? {} : undefined,
-      viverse: answers.integrations?.includes('viverse') ? {} : undefined,
+      drei: integrations.includes('drei') ? {} : undefined,
+      handle: integrations.includes('handle') ? {} : undefined,
+      leva: integrations.includes('leva') ? {} : undefined,
+      postprocessing: integrations.includes('postprocessing') ? {} : undefined,
+      rapier: integrations.includes('rapier') ? {} : undefined,
+      xr: integrations.includes('xr') ? {} : undefined,
+      uikit: integrations.includes('uikit') ? {} : undefined,
+      offscreen: integrations.includes('offscreen') ? {} : undefined,
+      zustand: integrations.includes('zustand') ? {} : undefined,
+      koota: integrations.includes('koota') ? {} : undefined,
+      triplex: integrations.includes('triplex') ? {} : undefined,
+      viverse: integrations.includes('viverse') ? {} : undefined,
     }),
   }
 }
 
 async function promptForOptions(name: string | undefined): Promise<GenerateOptions> {
-  let cancelled = false
-
-  // Step 1: Select template
-  const templateAnswer = await prompts(
-    {
-      type: 'select',
-      name: 'template',
-      message: 'Select a template',
-      choices: [
-        { title: 'Vite (vanilla)', value: 'vite' },
-        { title: 'React', value: 'react' },
-        { title: 'React Three Fiber', value: 'r3f' },
-      ],
-      initial: 0,
-    },
-    {
-      onCancel: () => {
-        cancelled = true
-        return false
+  // Step 1: Project Name (if not provided via argument)
+  let projectName = name
+  if (!projectName) {
+    const nameResult = await p.text({
+      message: 'What is your project named?',
+      placeholder: generateRandomName(),
+      defaultValue: generateRandomName(),
+      validate: (value) => {
+        if (!value.length) return 'Project name is required'
       },
-    },
-  )
+    })
+    if (p.isCancel(nameResult)) {
+      p.cancel('Operation cancelled.')
+      process.exit(0)
+    }
+    projectName = nameResult
+  }
 
-  if (cancelled) return Promise.reject('Input cancelled')
+  // Step 2: Select template
+  const template = await p.select({
+    message: 'Select a template',
+    options: [
+      { value: 'vite', label: 'Vite', hint: 'vanilla TypeScript' },
+      { value: 'react', label: 'React', hint: 'with Vite' },
+      { value: 'r3f', label: 'React Three Fiber', hint: '3D graphics with React' },
+    ],
+    initialValue: 'vite',
+  })
 
-  const template: Template = templateAnswer.template
-  const defaultName = name ?? getDefaultProjectName(template)
-  const defaultOptions = getDefaultOptions(template, defaultName)
+  if (p.isCancel(template)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
 
-  // Step 2: Show defaults and ask confirm/customize
-  console.log(chalk.dim('\nDefault configuration:'))
-  displayDefaults(defaultOptions)
-  console.log()
+  const defaultOptions = getDefaultOptions(template as Template, projectName)
 
-  const confirmAnswer = await prompts(
-    {
-      type: 'select',
-      name: 'action',
-      message: 'Proceed?',
-      choices: [
-        { title: 'Confirm', value: 'confirm' },
-        { title: 'Customize', value: 'customize' },
-      ],
-      initial: 0,
-    },
-    {
-      onCancel: () => {
-        cancelled = true
-        return false
-      },
-    },
-  )
+  // Step 3: Show summary and ask confirm/customize
+  p.note(formatConfigSummary(defaultOptions), 'Template Configuration')
 
-  if (cancelled) return Promise.reject('Input cancelled')
+  const action = await p.select({
+    message: 'Proceed with these settings?',
+    options: [
+      { value: 'confirm', label: 'Yes, create project' },
+      { value: 'customize', label: 'No, let me customize' },
+    ],
+    initialValue: 'confirm',
+  })
 
-  if (confirmAnswer.action === 'confirm') {
+  if (p.isCancel(action)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
+  if (action === 'confirm') {
     return defaultOptions
   }
 
-  // Step 3: Customize
-  return promptForCustomization(template, defaultName)
+  // Step 4: Customize
+  return promptForCustomization(template as Template, projectName)
 }
 
 interface CliOptions {
@@ -313,6 +366,9 @@ async function main() {
     .option('--no-pnpm-manage-versions', 'disable manage-package-manager-versions in pnpm-workspace.yaml')
     .option('-y, --yes', 'Skip prompts and use default values')
     .action(async (name: string | undefined, options: CliOptions) => {
+      console.clear()
+      p.intro(color.bgCyan(color.black(' krispya-create ')))
+
       let generateOptions: GenerateOptions
 
       if (options.url) {
@@ -358,13 +414,12 @@ async function main() {
       // Fetch latest pnpm version if pnpm is selected
       const packageManager = generateOptions.packageManager || 'pnpm'
       if (packageManager === 'pnpm') {
-        const versionSpinner = ora('Fetching latest pnpm version...').start()
         generateOptions.pnpmVersion = await getLatestPnpmVersion()
-        versionSpinner.succeed(`Using pnpm@${generateOptions.pnpmVersion}`)
       }
 
       const basePath = join(cwd(), generateOptions.name)
-      const spinner = ora('Generating project structure...').start()
+      const s = p.spinner()
+      s.start('Creating project...')
 
       try {
         const files = generate(generateOptions)
@@ -383,15 +438,18 @@ async function main() {
           }
         }
 
-        spinner.succeed('Project created successfully!')
+        s.stop('Project created!')
 
-        console.log(chalk.green('\nNext steps:'))
-        console.log(chalk.cyan(`  cd ${generateOptions.name}`))
-        console.log(chalk.cyan(`  ${packageManager} install`))
-        console.log(chalk.cyan(`  ${packageManager} run dev\n`))
+        const nextSteps = [`cd ${generateOptions.name}`, `${packageManager} install`, `${packageManager} run dev`].join(
+          '\n',
+        )
+
+        p.note(nextSteps, 'Next steps')
+
+        p.outro(color.green('Happy coding! ✨'))
       } catch (error) {
-        spinner.fail('Failed to create project')
-        console.error(error)
+        s.stop('Failed to create project')
+        p.log.error(String(error))
         process.exit(1)
       }
     })
