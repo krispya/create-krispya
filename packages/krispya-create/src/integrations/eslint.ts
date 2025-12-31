@@ -87,7 +87,7 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
     content: configContent,
   });
 
-  // Add lint script
+  generator.addScript("lint", "eslint .");
   generator.inject(
     "readme-tools",
     "[ESLint](https://eslint.org/) - Linter for JavaScript and TypeScript",

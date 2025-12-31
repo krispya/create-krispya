@@ -28,6 +28,7 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
     content: JSON.stringify(oxfmtConfig, null, 2),
   });
 
+  generator.addScript("format", "oxfmt --write .");
   generator.inject(
     "readme-tools",
     "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter",

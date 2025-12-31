@@ -56,6 +56,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     content: JSON.stringify(oxlintConfig, null, 2),
   });
 
+  generator.addScript("lint", "oxlint");
   generator.inject(
     "readme-tools",
     "[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript",

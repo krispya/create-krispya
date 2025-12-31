@@ -32,6 +32,7 @@ export function generatePrettier(
     content: JSON.stringify(prettierConfig, null, 2),
   });
 
+  generator.addScript("format", "prettier --write .");
   generator.inject("readme-tools", "[Prettier](https://prettier.io/) - Opinionated code formatter");
   generator.inject("vscode-extension-suggestion", "esbenp.prettier-vscode");
   generator.addVscodeSetting("editor.defaultFormatter", "esbenp.prettier-vscode");

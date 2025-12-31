@@ -122,6 +122,7 @@ export type Generator = {
   get versions(): PackageVersions;
   addDependency(name: string, semver: string): void;
   addFile(path: string, file: File): void;
+  addScript(name: string, command: string): void;
   inject(location: CodeInjectionLocation, code: string): void;
   replace(search: string, replace: string): void;
   configureVite(object: any): void;
@@ -198,6 +199,10 @@ export function generate(options: GenerateOptions) {
 
   const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
   const vscodeSettings: Record<string, unknown> = {};
+  const scripts: Record<string, string> = {
+    dev: "vite",
+    build: "vite build",
+  };
 
   // Setup vite config imports based on template
   if (isReact || isR3f) {
@@ -238,6 +243,9 @@ export function generate(options: GenerateOptions) {
     },
     addFile(path, content) {
       files[path] = content;
+    },
+    addScript(name, command) {
+      scripts[name] = command;
     },
     inject(location, code) {
       let entries = codeSnippets[location];
@@ -329,10 +337,7 @@ export function generate(options: GenerateOptions) {
     name,
     type: "module",
     dependencies,
-    scripts: {
-      dev: "vite",
-      build: "vite build",
-    },
+    scripts,
   };
 
   // Add engines field if needed

@@ -75,6 +75,13 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
     content: JSON.stringify(biomeConfig, null, 2),
   });
 
+  if (options.linter) {
+    generator.addScript("lint", "biome lint .");
+  }
+  if (options.formatter) {
+    generator.addScript("format", "biome format --write .");
+  }
+
   const roles: string[] = [];
   if (options.linter) roles.push("linter");
   if (options.formatter) roles.push("formatter");
