@@ -1,74 +1,95 @@
-<h1 align="center">@react-three/create</h1>
-<h3 align="center">Official CLI for creating React Three Fiber projects</h3>
-<br/>
+# krispya-create
 
-<p align="center">
-  <a href="https://npmjs.com/package/@react-three/create" target="_blank">
-    <img src="https://img.shields.io/npm/v/@react-three/create?style=flat&colorA=000000&colorB=000000" alt="NPM" />
-  </a>
-  <a href="https://npmjs.com/package/@react-three/create" target="_blank">
-    <img src="https://img.shields.io/npm/dt/@react-three/create.svg?style=flat&colorA=000000&colorB=000000" alt="NPM" />
-  </a>
-  <a href="https://twitter.com/pmndrs" target="_blank">
-    <img src="https://img.shields.io/twitter/follow/pmndrs?label=%40pmndrs&style=flat&colorA=000000&colorB=000000&logo=twitter&logoColor=000000" alt="Twitter" />
-  </a>
-  <a href="https://discord.gg/ZZjjNvJ" target="_blank">
-    <img src="https://img.shields.io/discord/740090768164651008?style=flat&colorA=000000&colorB=000000&label=discord&logo=discord&logoColor=000000" alt="Discord" />
-  </a>
-</p>
+A CLI tool for scaffolding modern web projects with sensible defaults.
 
-Create a new React Three project using the following command:
+## Usage
 
 ```bash
-npm create @react-three
+npm create krispya
 ```
 
-### Arguments
+Or specify a project name:
 
-- `[name]` - Optional name for your application. If not provided, you'll be prompted to enter one.
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--url <url>` | Specify a custom URL to fetch create options from |
-| `--js` | Use JavaScript instead of TypeScript |
-| `--ts` | Use TypeScript (default) |
-| `--drei` | Add [@react-three/drei](https://github.com/pmndrs/drei) for useful helpers and abstractions |
-| `--handle` | Add [@react-three/handle](https://github.com/pmndrs/handle) for event handling |
-| `--leva` | Add [leva](https://github.com/pmndrs/leva) for creating controls and panels |
-| `--postprocessing` | Add [@react-three/postprocessing](https://github.com/pmndrs/postprocessing) for post-processing effects |
-| `--rapier` | Add [@react-three/rapier](https://github.com/pmndrs/rapier) for physics |
-| `--xr` | Add [@react-three/xr](https://github.com/pmndrs/xr) for VR/AR support |
-| `--uikit` | Add [@react-three/uikit](https://github.com/pmndrs/uikit) for UI components |
-| `--offscreen` | Add [@react-three/offscreen](https://github.com/pmndrs/offscreen) for offscreen rendering |
-| `--zustand` | Add [zustand](https://github.com/pmndrs/zustand) for state management |
-| `--koota` | Add [koota](https://github.com/pmndrs/koota) for animation |
-| `--triplex` | Add [Triplex](https://triplex.dev) for a visual development environment |
-| `--viverse` | Setup [viverse](https://docs.viverse.com) deplyoment |
-| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm) |
-| `--skip-setup` | Skip automatic dependency installation, dev server start, and browser opening |
-| `-y, --yes` | Skip prompts and use default values |
-
-### Examples
-
-Create a new project with TypeScript and drei:
 ```bash
-npm create @react-three my-app --drei
+npm create krispya my-app
 ```
 
-Create a project with JavaScript and multiple features:
+## Features
+
+- **Multiple Templates**: Choose from Vite (vanilla), React, or React Three Fiber
+- **TypeScript or JavaScript**: Pick your preferred language
+- **Package Manager Support**: Works with npm, yarn, or pnpm
+- **Node Version Management**: Built-in support for specifying Node.js versions
+- **Interactive Setup**: Guided prompts to configure your project
+
+## Options
+
+### Basic Options
+
+| Option                        | Description                                        |
+| ----------------------------- | -------------------------------------------------- |
+| `[name]`                      | Project name (prompted if not provided)            |
+| `--template <type>`           | Template type: vite, react, or r3f (default: vite) |
+| `--js`                        | Use JavaScript instead of TypeScript               |
+| `--ts`                        | Use TypeScript (default)                           |
+| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm)       |
+| `-y, --yes`                   | Use default values without prompts                 |
+
+### Advanced Options
+
+| Option                      | Description                                                 |
+| --------------------------- | ----------------------------------------------------------- |
+| `--node-version <version>`  | Set Node.js version (default: "latest")                     |
+| `--pnpm-manage-versions`    | Enable pnpm manage-package-manager-versions (default: true) |
+| `--no-pnpm-manage-versions` | Disable pnpm manage-package-manager-versions                |
+
+### React Three Fiber Integration Options
+
+These options are only available when using the `r3f` template:
+
+| Option             | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| `--drei`           | Add @react-three/drei for helpers and abstractions |
+| `--handle`         | Add @react-three/handle for event handling         |
+| `--leva`           | Add leva for controls and panels                   |
+| `--postprocessing` | Add @react-three/postprocessing for effects        |
+| `--rapier`         | Add @react-three/rapier for physics                |
+| `--xr`             | Add @react-three/xr for VR/AR support              |
+| `--uikit`          | Add @react-three/uikit for UI components           |
+| `--offscreen`      | Add @react-three/offscreen for offscreen rendering |
+| `--zustand`        | Add zustand for state management                   |
+| `--koota`          | Add koota for animation                            |
+| `--triplex`        | Set up Triplex development environment             |
+| `--viverse`        | Set up viverse deployment                          |
+
+## Examples
+
+Create a new project interactively:
+
 ```bash
-npm create @react-three my-app --js --drei --leva --zustand
+npm create krispya
 ```
 
-Create a project using pnpm:
+Create a React project with JavaScript:
+
 ```bash
-npm create @react-three my-app --package-manager pnpm
+npm create krispya my-app --template react --js
 ```
 
-## Sponsors
+Create a React Three Fiber project with integrations:
 
-This project is supported by a few companies and individuals building cutting edge 3D Web & XR experiences. Check them out!
+```bash
+npm create krispya my-3d-app --template r3f --drei --leva --rapier
+```
 
-![Sponsors Overview](https://bbohlender.github.io/sponsors/screenshot.png)
+Create a project using pnpm with specific Node version:
+
+```bash
+npm create krispya my-app --package-manager pnpm --node-version 22
+```
+
+Skip prompts and use defaults:
+
+```bash
+npm create krispya my-app --yes
+```
