@@ -3,7 +3,7 @@
     "test": "vitest",
     "lint": "oxlint",
     "format": "oxfmt",
-    "release": "pnpm -F create build && pnpm -F create publish"
+    "release": "pnpm -F create-krispya build && pnpm -F create-krispya publish"
   },
   "devDependencies": {
     "json": "^11.0.0",
