@@ -14,6 +14,27 @@ export async function getLatestPnpmVersion(): Promise<string> {
 }
 
 /**
+ * Fetches the latest LTS version of Node.js
+ * @returns The latest Node.js LTS version string (e.g., "22.13.0")
+ */
+export async function getLatestNodeVersion(): Promise<string> {
+  try {
+    const response = await fetch('https://nodejs.org/dist/index.json')
+    const data = await response.json() as Array<{ version: string; lts: boolean | string }>
+    // Find the first LTS version
+    const ltsVersion = data.find(v => v.lts)
+    if (ltsVersion) {
+      // Remove the 'v' prefix from version string
+      return ltsVersion.version.replace(/^v/, '')
+    }
+    return '22.0.0'
+  } catch {
+    // Fallback to a known recent LTS version if fetch fails
+    return '22.0.0'
+  }
+}
+
+/**
  * Generates a random name in the format "adjective-noun"
  * @returns A randomly generated name string
  */

@@ -46,6 +46,7 @@ export type GenerateOptions = {
   packageManager?: string
   pnpmVersion?: string
   pnpmManageVersions?: boolean
+  nodeVersion?: string
 }
 
 export type File =
@@ -253,13 +254,23 @@ export function generate(options: GenerateOptions) {
     },
   }
 
+  // Add engines field if needed
+  const engines: Record<string, string> = {}
+  
   if (isPnpm) {
     const pnpmVersion = options.pnpmVersion ?? '10.11.0'
     const majorVersion = pnpmVersion.split('.')[0]
-    packageJson.engines = {
-      pnpm: `>=${majorVersion}.0.0`,
-    }
+    engines.pnpm = `>=${majorVersion}.0.0`
     packageJson.packageManager = `pnpm@${pnpmVersion}`
+  }
+
+  if (options.nodeVersion) {
+    const majorVersion = options.nodeVersion.split('.')[0]
+    engines.node = `>=${majorVersion}.0.0`
+  }
+
+  if (Object.keys(engines).length > 0) {
+    packageJson.engines = engines
   }
 
   files['package.json'] = {

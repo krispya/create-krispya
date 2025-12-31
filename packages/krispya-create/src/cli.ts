@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { cwd } from 'process'
 import { generate, GenerateOptions, generateRandomName, getLatestPnpmVersion, Template } from './index.js'
+import { getLatestNodeVersion } from './utils.js'
 import { dirname, join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
 import { Command } from 'commander'
@@ -51,6 +52,7 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
     language: 'typescript',
     packageManager: 'pnpm',
     pnpmManageVersions: true,
+    nodeVersion: 'latest',
   }
 
   if (template === 'r3f') {
@@ -91,6 +93,9 @@ function formatConfigSummary(options: GenerateOptions): string {
 
   // Language
   lines.push(formatRow('Language', formatLanguage(options.language || 'typescript')))
+
+  // Node version
+  lines.push(formatRow('Node version', options.nodeVersion || 'latest'))
 
   // Package manager
   lines.push(formatRow('Package manager', options.packageManager || 'pnpm'))
@@ -134,6 +139,23 @@ function formatConfigSummary(options: GenerateOptions): string {
 }
 
 async function promptForCustomization(template: Template, name: string): Promise<GenerateOptions> {
+  const nodeVersion = await p.text({
+    message: 'Node.js version',
+    placeholder: 'latest',
+    defaultValue: 'latest',
+    validate: (value) => {
+      if (!value.length) return 'Required'
+      if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")'
+      }
+    },
+  })
+
+  if (p.isCancel(nodeVersion)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
   const packageManager = await p.select({
     message: 'Package manager',
     options: [
@@ -237,6 +259,7 @@ async function promptForCustomization(template: Template, name: string): Promise
     name,
     template,
     language: language as 'typescript' | 'javascript',
+    nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
     ...(template === 'r3f' && {
@@ -333,10 +356,11 @@ interface CliOptions {
   offscreen?: boolean
   zustand?: boolean
   koota?: boolean
-  'pnpm-manage-versions'?: boolean
+  pnpmManageVersions?: boolean
   triplex?: boolean
   viverse?: boolean
-  'package-manager'?: string
+  packageManager?: string
+  nodeVersion?: string
   yes?: boolean
 }
 
@@ -364,6 +388,7 @@ async function main() {
     .option('--package-manager <manager>', 'specify package manager (e.g. npm, yarn, pnpm)')
     .option('--pnpm-manage-versions', 'enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)')
     .option('--no-pnpm-manage-versions', 'disable manage-package-manager-versions in pnpm-workspace.yaml')
+    .option('--node-version <version>', 'set Node.js version for engines.node field (default: "latest")')
     .option('-y, --yes', 'Skip prompts and use default values')
     .action(async (name: string | undefined, options: CliOptions) => {
       console.clear()
@@ -396,8 +421,9 @@ async function main() {
             viverse: options.viverse ? {} : undefined,
             triplex: options.triplex ? {} : undefined,
           }),
-          packageManager: options['package-manager'],
-          pnpmManageVersions: options['pnpm-manage-versions'],
+          packageManager: options.packageManager,
+          pnpmManageVersions: options.pnpmManageVersions,
+          nodeVersion: options.nodeVersion ?? 'latest',
         }
       } else {
         generateOptions = await promptForOptions(name)
@@ -415,6 +441,12 @@ async function main() {
       const packageManager = generateOptions.packageManager || 'pnpm'
       if (packageManager === 'pnpm') {
         generateOptions.pnpmVersion = await getLatestPnpmVersion()
+      }
+
+      // Fetch latest Node version if "latest" is specified or default
+      const nodeVersion = generateOptions.nodeVersion ?? 'latest'
+      if (nodeVersion === 'latest') {
+        generateOptions.nodeVersion = await getLatestNodeVersion()
       }
 
       const basePath = join(cwd(), generateOptions.name)
