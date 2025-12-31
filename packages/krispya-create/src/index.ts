@@ -514,11 +514,13 @@ export function generate(options: GenerateOptions) {
   }
 
   if (codeSnippets['vscode-extension-suggestion']?.length) {
+    // Deduplicate extension recommendations
+    const uniqueRecommendations = [...new Set(codeSnippets['vscode-extension-suggestion'])]
     files['.vscode/extensions.json'] = {
       type: 'text',
       content: JSON.stringify(
         {
-          recommendations: codeSnippets['vscode-extension-suggestion'],
+          recommendations: uniqueRecommendations,
         },
         null,
         2,
