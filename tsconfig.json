@@ -9,9 +9,5 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "noUncheckedIndexedAccess": true
-    },
-    "ts-node": {
-        "transpileOnly": true,
-        "esm": true
     }
 }

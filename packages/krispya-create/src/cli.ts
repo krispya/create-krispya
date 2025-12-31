@@ -76,10 +76,11 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
 
 function displayDefaults(options: GenerateOptions): void {
   const dim = chalk.dim
-  const packageManagerInfo = options.packageManager === 'pnpm' && options.pnpmManageVersions
-    ? `${options.packageManager} (version managed)`
-    : options.packageManager
-  
+  const packageManagerInfo =
+    options.packageManager === 'pnpm' && options.pnpmManageVersions
+      ? `${options.packageManager} (version managed)`
+      : options.packageManager
+
   console.log(dim(`  Template: ${getTemplateLabel(options.template!)}`))
   console.log(dim(`  Language: ${options.language}`))
   console.log(dim(`  Package manager: ${packageManagerInfo}`))
@@ -99,7 +100,12 @@ async function promptForCustomization(template: Template, defaultName: string): 
       initial: defaultName,
       validate: (name: string) => (name.length > 0 ? true : 'Project name is required'),
     },
-    { onCancel: () => { cancelled = true; return false } },
+    {
+      onCancel: () => {
+        cancelled = true
+        return false
+      },
+    },
   )
 
   if (cancelled) return Promise.reject('Input cancelled')
@@ -164,7 +170,10 @@ async function promptForCustomization(template: Template, defaultName: string): 
   }
 
   const answers = await prompts(questions, {
-    onCancel: () => { cancelled = true; return false },
+    onCancel: () => {
+      cancelled = true
+      return false
+    },
   })
 
   if (cancelled) return Promise.reject('Input cancelled')
@@ -208,7 +217,12 @@ async function promptForOptions(name: string | undefined): Promise<GenerateOptio
       ],
       initial: 0,
     },
-    { onCancel: () => { cancelled = true; return false } },
+    {
+      onCancel: () => {
+        cancelled = true
+        return false
+      },
+    },
   )
 
   if (cancelled) return Promise.reject('Input cancelled')
@@ -233,7 +247,12 @@ async function promptForOptions(name: string | undefined): Promise<GenerateOptio
       ],
       initial: 0,
     },
-    { onCancel: () => { cancelled = true; return false } },
+    {
+      onCancel: () => {
+        cancelled = true
+        return false
+      },
+    },
   )
 
   if (cancelled) return Promise.reject('Input cancelled')
@@ -332,8 +351,8 @@ async function main() {
         generateOptions.template === 'vite'
           ? 'vite-app'
           : generateOptions.template === 'react'
-            ? 'react-app'
-            : 'react-three-app'
+          ? 'react-app'
+          : 'react-three-app'
       generateOptions.name ??= defaultFallbackName
 
       // Fetch latest pnpm version if pnpm is selected
