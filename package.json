@@ -2,7 +2,8 @@
   "scripts": {
     "test": "vitest",
     "lint": "oxlint",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "release": "pnpm -F krispya-create build && pnpm -F krispya-create publish"
   },
   "devDependencies": {
     "json": "^11.0.0",
