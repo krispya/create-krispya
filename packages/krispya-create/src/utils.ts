@@ -1,16 +1,25 @@
 /**
+ * Fetches the latest version of an npm package from the registry
+ * @param packageName The name of the npm package
+ * @param fallback Fallback version if fetch fails
+ * @returns The latest version string (e.g., "1.0.0")
+ */
+export async function getLatestNpmVersion(packageName: string, fallback: string): Promise<string> {
+  try {
+    const response = await fetch(`https://registry.npmjs.org/${packageName}/latest`)
+    const data = await response.json() as { version: string }
+    return data.version
+  } catch {
+    return fallback
+  }
+}
+
+/**
  * Fetches the latest version of pnpm from the npm registry
  * @returns The latest pnpm version string (e.g., "10.24.0")
  */
 export async function getLatestPnpmVersion(): Promise<string> {
-  try {
-    const response = await fetch('https://registry.npmjs.org/pnpm/latest')
-    const data = await response.json() as { version: string }
-    return data.version
-  } catch {
-    // Fallback to a known recent version if fetch fails
-    return '10.11.0'
-  }
+  return getLatestNpmVersion('pnpm', '10.11.0')
 }
 
 /**

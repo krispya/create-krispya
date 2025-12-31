@@ -7,7 +7,8 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
     return
   }
 
-  generator.addDependency('oxfmt', '^0.1.0')
+  const version = generator.versions.oxfmt ?? '0.1.0'
+  generator.addDependency('oxfmt', `^${version}`)
 
   // Add oxfmt config (Prettier-compatible format)
   const oxfmtConfig = {

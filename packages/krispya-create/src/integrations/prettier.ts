@@ -7,7 +7,8 @@ export function generatePrettier(generator: Generator, options: GeneratePrettier
     return
   }
 
-  generator.addDependency('prettier', '^3.4.2')
+  const version = generator.versions.prettier ?? '3.4.2'
+  generator.addDependency('prettier', `^${version}`)
 
   // Add prettier config
   const prettierConfig = {

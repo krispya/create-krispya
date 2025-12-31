@@ -7,7 +7,8 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     return
   }
 
-  generator.addDependency('oxlint', '^0.16.0')
+  const version = generator.versions.oxlint ?? '0.16.0'
+  generator.addDependency('oxlint', `^${version}`)
 
   // Add oxlint config
   const oxlintConfig = {

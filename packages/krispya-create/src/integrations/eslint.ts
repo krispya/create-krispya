@@ -7,7 +7,8 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
     return
   }
 
-  generator.addDependency('eslint', '^9.17.0')
+  const version = generator.versions.eslint ?? '9.17.0'
+  generator.addDependency('eslint', `^${version}`)
 
   // Add eslint flat config
   const isTypescript = generator.options.language === 'typescript'

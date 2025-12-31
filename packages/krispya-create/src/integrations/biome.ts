@@ -12,7 +12,8 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
     return
   }
 
-  generator.addDependency('@biomejs/biome', '^1.9.4')
+  const version = generator.versions.biome ?? '1.9.4'
+  generator.addDependency('@biomejs/biome', `^${version}`)
 
   // Build biome config based on roles
   const biomeConfig: Record<string, unknown> = {

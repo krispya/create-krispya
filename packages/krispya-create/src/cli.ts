@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { cwd } from 'process'
-import { generate, GenerateOptions, generateRandomName, getLatestPnpmVersion, Template } from './index.js'
-import { getLatestNodeVersion } from './utils.js'
+import {
+  generate,
+  GenerateOptions,
+  generateRandomName,
+  getLatestPnpmVersion,
+  PackageVersions,
+  Template,
+} from './index.js'
+import { getLatestNodeVersion, getLatestNpmVersion } from './utils.js'
 import { dirname, join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
 import { Command } from 'commander'
@@ -479,6 +486,62 @@ async function main() {
       if (nodeVersion === 'latest') {
         generateOptions.nodeVersion = await getLatestNodeVersion()
       }
+
+      // Fetch latest package versions in parallel
+      const versions: PackageVersions = {}
+      const versionPromises: Promise<void>[] = [
+        getLatestNpmVersion('vite', '6.3.4').then((v) => {
+          versions.vite = v
+        }),
+      ]
+
+      // Fetch linter version
+      const linter = generateOptions.linter ?? 'oxlint'
+      if (linter === 'eslint') {
+        versionPromises.push(
+          getLatestNpmVersion('eslint', '9.17.0').then((v) => {
+            versions.eslint = v
+          }),
+        )
+      } else if (linter === 'oxlint') {
+        versionPromises.push(
+          getLatestNpmVersion('oxlint', '0.16.0').then((v) => {
+            versions.oxlint = v
+          }),
+        )
+      } else if (linter === 'biome') {
+        versionPromises.push(
+          getLatestNpmVersion('@biomejs/biome', '1.9.4').then((v) => {
+            versions.biome = v
+          }),
+        )
+      }
+
+      // Fetch formatter version
+      const formatter = generateOptions.formatter ?? 'oxfmt'
+      if (formatter === 'prettier') {
+        versionPromises.push(
+          getLatestNpmVersion('prettier', '3.4.2').then((v) => {
+            versions.prettier = v
+          }),
+        )
+      } else if (formatter === 'oxfmt') {
+        versionPromises.push(
+          getLatestNpmVersion('oxfmt', '0.1.0').then((v) => {
+            versions.oxfmt = v
+          }),
+        )
+      } else if (formatter === 'biome' && linter !== 'biome') {
+        // Only fetch if not already fetched for linter
+        versionPromises.push(
+          getLatestNpmVersion('@biomejs/biome', '1.9.4').then((v) => {
+            versions.biome = v
+          }),
+        )
+      }
+
+      await Promise.all(versionPromises)
+      generateOptions.versions = versions
 
       const basePath = join(cwd(), generateOptions.name)
       const s = p.spinner()

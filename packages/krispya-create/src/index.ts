@@ -24,6 +24,15 @@ export * from './utils.js'
 
 export type Template = 'vite' | 'react' | 'r3f'
 
+export type PackageVersions = {
+  vite?: string
+  eslint?: string
+  oxlint?: string
+  oxfmt?: string
+  prettier?: string
+  biome?: string
+}
+
 export type GenerateOptions = {
   githubUserName?: string
   githubRepoName?: string
@@ -32,6 +41,7 @@ export type GenerateOptions = {
   language?: 'javascript' | 'typescript'
   linter?: Linter
   formatter?: Formatter
+  versions?: PackageVersions
   fiber?: GenerateFiberOptions
   handle?: GenerateHandleOptions
   drei?: GenerateDreiOptions
@@ -90,6 +100,7 @@ export type CodeInjectionLocation =
 
 export type Generator = {
   get options(): GenerateOptions
+  get versions(): PackageVersions
   addDependency(name: string, semver: string): void
   addFile(path: string, file: File): void
   inject(location: CodeInjectionLocation, code: string): void
@@ -112,8 +123,9 @@ export function generate(options: GenerateOptions) {
   const replacements: Array<{ search: string; replace: string }> = clonedOptions.replacements ?? []
 
   // Base dependencies - always include vite
+  const versions = clonedOptions.versions ?? {}
   const dependencies: Record<string, string> = {
-    vite: '^6.3.4',
+    vite: versions.vite ? `^${versions.vite}` : '^6.3.4',
     ...clonedOptions.dependencies,
   }
 
@@ -194,6 +206,7 @@ export function generate(options: GenerateOptions) {
 
   const generator: Generator = {
     options: clonedOptions,
+    versions,
     addDependency(name, semver) {
       const existingSemver = dependencies[name]
       if (existingSemver != null) {
