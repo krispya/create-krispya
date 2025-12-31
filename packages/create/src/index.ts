@@ -438,7 +438,7 @@ export function generate(options: GenerateOptions) {
     type: "text",
     content: [
       `# ${name}`,
-      `This project was generated with krispya-create`,
+      `This project was generated with create-krispya`,
       ...(codeSnippets["readme-start"] ?? []),
       "\n",
       `## Project Architecture`,

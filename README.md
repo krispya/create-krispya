@@ -1,4 +1,4 @@
-# krispya-create
+# create-krispya
 
 A CLI tool for scaffolding modern web projects with sensible defaults.
 

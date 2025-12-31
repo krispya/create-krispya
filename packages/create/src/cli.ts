@@ -414,7 +414,7 @@ interface CliOptions {
 
 async function main() {
   const program = new Command()
-    .name("krispya-create")
+    .name("create-krispya")
     .description(
       "CLI for creating Vanilla, React, and React Three Fiber projects"
     )
@@ -462,7 +462,7 @@ async function main() {
     .option("-y, --yes", "Skip prompts and use default values")
     .action(async (name: string | undefined, options: CliOptions) => {
       console.clear();
-      p.intro(color.bgCyan(color.black(" krispya-create ")));
+      p.intro(color.bgCyan(color.black(" create-krispya ")));
 
       let generateOptions: GenerateOptions;
 
