@@ -39,6 +39,8 @@ function getDefaultOptions(template: Template, name: string): GenerateOptions {
     packageManager: 'pnpm',
     pnpmManageVersions: true,
     nodeVersion: 'latest',
+    linter: 'oxlint',
+    formatter: 'oxfmt',
   }
 
   if (template === 'r3f') {
@@ -90,6 +92,16 @@ function formatConfigSummary(options: GenerateOptions): string {
   if (options.packageManager === 'pnpm') {
     const versionManaged = options.pnpmManageVersions ? 'yes' : 'no'
     lines.push(formatRow('↳ Version managed', versionManaged, ''))
+  }
+
+  // Linter
+  if (options.linter) {
+    lines.push(formatRow('Linter', options.linter))
+  }
+
+  // Formatter
+  if (options.formatter) {
+    lines.push(formatRow('Formatter', options.formatter))
   }
 
   // R3F integrations
@@ -200,6 +212,36 @@ async function promptForCustomization(template: Template, name: string): Promise
     process.exit(0)
   }
 
+  const linter = await p.select({
+    message: 'Linter',
+    options: [
+      { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
+      { value: 'eslint', label: 'ESLint', hint: 'classic' },
+      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+    ],
+    initialValue: 'oxlint',
+  })
+
+  if (p.isCancel(linter)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
+  const formatter = await p.select({
+    message: 'Formatter',
+    options: [
+      { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
+      { value: 'prettier', label: 'Prettier', hint: 'classic' },
+      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+    ],
+    initialValue: 'oxfmt',
+  })
+
+  if (p.isCancel(formatter)) {
+    p.cancel('Operation cancelled.')
+    process.exit(0)
+  }
+
   let integrations: string[] = []
   if (template === 'r3f') {
     const selected = await p.multiselect({
@@ -248,6 +290,8 @@ async function promptForCustomization(template: Template, name: string): Promise
     nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
+    linter: linter as 'eslint' | 'oxlint' | 'biome',
+    formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
     ...(template === 'r3f' && {
       drei: integrations.includes('drei') ? {} : undefined,
       handle: integrations.includes('handle') ? {} : undefined,
@@ -331,6 +375,8 @@ interface CliOptions {
   template?: Template
   js?: boolean
   ts?: boolean
+  linter?: 'eslint' | 'oxlint' | 'biome'
+  formatter?: 'prettier' | 'oxfmt' | 'biome'
   drei?: boolean
   handle?: boolean
   leva?: boolean
@@ -357,6 +403,8 @@ async function main() {
     .option('--template <type>', 'project template: vite, react, or r3f (default: vite)')
     .option('--js', 'use javascript')
     .option('--ts', 'use typescript (default)')
+    .option('--linter <type>', 'linter: eslint, oxlint, or biome (default: oxlint)')
+    .option('--formatter <type>', 'formatter: prettier, oxfmt, or biome (default: oxfmt)')
     .option('--drei', 'add @react-three/drei (r3f only)')
     .option('--handle', 'add @react-three/handle (r3f only)')
     .option('--leva', 'add leva (r3f only)')
@@ -388,6 +436,8 @@ async function main() {
           name: name || defaultName,
           template,
           language: options.js ? 'javascript' : 'typescript',
+          linter: options.linter ?? 'oxlint',
+          formatter: options.formatter ?? 'oxfmt',
           ...(template === 'r3f' && {
             drei: options.drei ? {} : undefined,
             handle: options.handle ? {} : undefined,

@@ -1,12 +1,17 @@
 import { GitAttributes, HtmlContent, IndexContent, ViteHtmlContent, ViteIndexContent, ViteStyleContent } from './constants.js'
+import { generateBiome } from './integrations/biome.js'
 import { GenerateDreiOptions, generateDrei } from './integrations/drei.js'
+import { generateEslint } from './integrations/eslint.js'
 import { generateFiber, GenerateFiberOptions } from './integrations/fiber.js'
 import { generateGithubPages, GenerateGithubPagesOptions } from './integrations/github-pages.js'
 import { generateHandle, GenerateHandleOptions } from './integrations/handle.js'
 import { generateKoota, GenerateKootaOptions } from './integrations/koota.js'
 import { generateLeva, GenerateLevaOptions } from './integrations/leva.js'
 import { generateOffscreen, GenerateOffscreenOptions } from './integrations/offscreen.js'
+import { generateOxfmt } from './integrations/oxfmt.js'
+import { generateOxlint } from './integrations/oxlint.js'
 import { generatePostprocessing, GeneratePostprocessingOptions } from './integrations/postprocessing.js'
+import { generatePrettier } from './integrations/prettier.js'
 import { generateRapier, GenerateRapierOptions } from './integrations/rapier.js'
 import { generateUikit, GenerateUikitOptions } from './integrations/uikit.js'
 import { generateXr, GenerateXrOptions } from './integrations/xr.js'
@@ -25,6 +30,8 @@ export type GenerateOptions = {
   name: string
   template?: Template
   language?: 'javascript' | 'typescript'
+  linter?: Linter
+  formatter?: Formatter
   fiber?: GenerateFiberOptions
   handle?: GenerateHandleOptions
   drei?: GenerateDreiOptions
@@ -59,6 +66,9 @@ export type File =
       url: string
     }
 
+export type Linter = 'eslint' | 'oxlint' | 'biome'
+export type Formatter = 'prettier' | 'oxfmt' | 'biome'
+
 export type CodeInjectionLocation =
   | 'vite-config-import'
   | 'import'
@@ -76,6 +86,7 @@ export type CodeInjectionLocation =
   | 'readme-tools'
   | 'readme-commands'
   | 'vscode-extension-suggestion'
+  | 'vscode-setting'
 
 export type Generator = {
   get options(): GenerateOptions
@@ -84,6 +95,7 @@ export type Generator = {
   inject(location: CodeInjectionLocation, code: string): void
   replace(search: string, replace: string): void
   configureVite(object: any): void
+  addVscodeSetting(key: string, value: unknown): void
 }
 
 export function generate(options: GenerateOptions) {
@@ -152,6 +164,7 @@ export function generate(options: GenerateOptions) {
   }
 
   const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {}
+  const vscodeSettings: Record<string, unknown> = {}
 
   // Setup vite config imports based on template
   if (isReact || isR3f) {
@@ -205,6 +218,9 @@ export function generate(options: GenerateOptions) {
     configureVite(config) {
       viteConfig = merge(viteConfig, config)
     },
+    addVscodeSetting(key, value) {
+      vscodeSettings[key] = value
+    },
   }
 
   // Only run R3F integrations for r3f template
@@ -226,6 +242,37 @@ export function generate(options: GenerateOptions) {
 
   // GitHub Pages works for all templates
   generateGithubPages(generator, clonedOptions.githubPages)
+
+  // Linter and formatter integrations
+  const linter = clonedOptions.linter
+  const formatter = clonedOptions.formatter
+
+  // Generate linter integrations
+  if (linter === 'eslint') {
+    generateEslint(generator, true)
+    generator.addVscodeSetting('biome.enabled', false)
+    generator.addVscodeSetting('oxc.enable', false)
+  } else if (linter === 'oxlint') {
+    generateOxlint(generator, true)
+    generator.addVscodeSetting('eslint.enable', false)
+    generator.addVscodeSetting('biome.enabled', false)
+  } else if (linter === 'biome') {
+    generateBiome(generator, { linter: true, formatter: formatter === 'biome' })
+    generator.addVscodeSetting('eslint.enable', false)
+    generator.addVscodeSetting('oxc.enable', false)
+  }
+
+  // Generate formatter integrations (skip biome if already handled above)
+  if (formatter === 'prettier') {
+    generatePrettier(generator, true)
+  } else if (formatter === 'oxfmt') {
+    generateOxfmt(generator, true)
+  } else if (formatter === 'biome' && linter !== 'biome') {
+    // Only generate biome for formatting if it wasn't already generated for linting
+    generateBiome(generator, { linter: false, formatter: true })
+    generator.addVscodeSetting('eslint.enable', false)
+    generator.addVscodeSetting('oxc.enable', false)
+  }
 
   for (const { code, location } of clonedOptions.injections ?? []) {
     generator.inject(location, code)
@@ -450,6 +497,13 @@ export function generate(options: GenerateOptions) {
         null,
         2,
       ),
+    }
+  }
+
+  if (Object.keys(vscodeSettings).length > 0) {
+    files['.vscode/settings.json'] = {
+      type: 'text',
+      content: JSON.stringify(vscodeSettings, null, '\t'),
     }
   }
 
