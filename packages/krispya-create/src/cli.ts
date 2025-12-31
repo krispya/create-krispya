@@ -89,7 +89,7 @@ function formatConfigSummary(options: GenerateOptions): string {
   // pnpm-specific options
   if (options.packageManager === 'pnpm') {
     const versionManaged = options.pnpmManageVersions ? 'yes' : 'no'
-    lines.push(formatRow('↳ Version managed', versionManaged, '  '))
+    lines.push(formatRow('↳ Version managed', versionManaged, ''))
   }
 
   // R3F integrations
