@@ -489,11 +489,17 @@ function openInEditor(
   path: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(editor, [path], {
-      detached: true,
-      stdio: "ignore",
-      shell: process.platform === "win32",
-    });
+    const isWindows = process.platform === "win32";
+    const child = isWindows
+      ? spawn(`${editor} "${path}"`, {
+          detached: true,
+          stdio: "ignore",
+          shell: true,
+        })
+      : spawn(editor, [path], {
+          detached: true,
+          stdio: "ignore",
+        });
     child.on("error", reject);
     child.unref();
     setTimeout(resolve, 100);
