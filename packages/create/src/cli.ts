@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from "module";
 import { cwd } from "process";
 import {
   generate,
@@ -19,6 +20,9 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import color from "chalk";
 import { fetch } from "undici";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
 
 function getDefaultProjectName(template: Template): string {
   const base = getBaseTemplate(template);
@@ -537,7 +541,7 @@ async function main() {
     .option("-y, --yes", "Skip prompts and use default values")
     .action(async (name: string | undefined, options: CliOptions) => {
       console.clear();
-      p.intro(color.bgCyan(color.black(" create-krispya ")));
+      p.intro(color.bgCyan(color.black(` create-krispya v${pkg.version} `)));
 
       let generateOptions: GenerateOptions;
 
