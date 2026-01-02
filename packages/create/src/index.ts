@@ -203,9 +203,8 @@ export function generate(options: GenerateOptions) {
         esModuleInterop: true,
         strict: true,
         skipLibCheck: true,
-        outDir: "dist",
       },
-      include: ["src/**/*"],
+      include: ["src", "tests"],
     };
 
     // Add JSX config for React templates
@@ -505,6 +504,7 @@ export function generate(options: GenerateOptions) {
       `\`${packageManager} install\` to install the dependencies`,
       `\`${packageManager} run dev\` to run the development server and preview the app with live updates`,
       `\`${packageManager} run build\` to build the app into the \`dist\` folder`,
+      `\`${packageManager} run test\` to run the tests`,
     );
   }
 
@@ -514,22 +514,26 @@ export function generate(options: GenerateOptions) {
     architectureDesc = [
       `- \`src/index.${isReact || isR3f ? jsxExt : ext}\` is the main entry point for your library exports`,
       `- Add your library code in the \`src\` folder`,
+      `- \`tests/\` contains your test files`,
     ];
   } else if (isVanilla) {
     architectureDesc = [
       `- \`src/main.${ext}\` is the entry point for your application`,
+      `- \`tests/\` contains your test files`,
       `- Static assets can be placed in the \`public\` folder`,
     ];
   } else if (isReact) {
     architectureDesc = [
       `- \`src/app.${jsxExt}\` defines the main application component`,
       `- \`src/index.${jsxExt}\` renders the React app into the DOM`,
+      `- \`tests/\` contains your test files`,
       `- Static assets can be placed in the \`public\` folder`,
     ];
   } else {
     architectureDesc = [
       `- \`app.${jsxExt}\` defines the main application component containing your 3D content`,
       `- Modify the content inside the \`<Canvas>\` component to change what is visible on screen`,
+      `- \`tests/\` contains your test files`,
       `- Static assets can be placed in the \`public\` folder`,
     ];
   }
@@ -667,6 +671,105 @@ export function generate(options: GenerateOptions) {
       appCode = appCode.replace(search, replace);
     }
     files[`src/app.tsx`] = { type: "text", content: appCode };
+  }
+
+  // Generate sample test files
+  if (isLibrary) {
+    // Library test
+    const testExt = isReact || isR3f ? jsxExt : ext;
+    let testContent: string;
+
+    if (isVanilla) {
+      testContent = [
+        `import { describe, it, expect } from "vitest"`,
+        `import { hello } from "../src/index.js"`,
+        ``,
+        `describe("hello", () => {`,
+        `  it("returns greeting with default name", () => {`,
+        `    expect(hello()).toBe("Hello, world!")`,
+        `  })`,
+        ``,
+        `  it("returns greeting with custom name", () => {`,
+        `    expect(hello("vitest")).toBe("Hello, vitest!")`,
+        `  })`,
+        `})`,
+      ].join("\n");
+    } else if (isReact) {
+      testContent = [
+        `import { describe, it, expect } from "vitest"`,
+        `import { render, screen } from "@testing-library/react"`,
+        `import { MyComponent } from "../src/index.js"`,
+        ``,
+        `describe("MyComponent", () => {`,
+        `  it("renders with default message", () => {`,
+        `    render(<MyComponent />)`,
+        `    expect(screen.getByText("Hello from library!")).toBeDefined()`,
+        `  })`,
+        ``,
+        `  it("renders with custom message", () => {`,
+        `    render(<MyComponent message="Custom message" />)`,
+        `    expect(screen.getByText("Custom message")).toBeDefined()`,
+        `  })`,
+        `})`,
+      ].join("\n");
+    } else {
+      // R3F library - basic test without rendering Canvas
+      testContent = [
+        `import { describe, it, expect } from "vitest"`,
+        `import { MyMesh } from "../src/index.js"`,
+        ``,
+        `describe("MyMesh", () => {`,
+        `  it("is defined", () => {`,
+        `    expect(MyMesh).toBeDefined()`,
+        `  })`,
+        `})`,
+      ].join("\n");
+    }
+
+    files[`tests/index.test.${testExt}`] = { type: "text", content: testContent };
+  } else if (isVanilla) {
+    // Vanilla app test
+    const testContent = [
+      `import { describe, it, expect } from "vitest"`,
+      ``,
+      `describe("example", () => {`,
+      `  it("works", () => {`,
+      `    expect(1 + 1).toBe(2)`,
+      `  })`,
+      `})`,
+    ].join("\n");
+
+    files[`tests/main.test.${ext}`] = { type: "text", content: testContent };
+  } else if (isReact) {
+    // React app test
+    const testContent = [
+      `import { describe, it, expect } from "vitest"`,
+      `import { render, screen } from "@testing-library/react"`,
+      `import { App } from "../src/app.js"`,
+      ``,
+      `describe("App", () => {`,
+      `  it("renders heading", () => {`,
+      `    render(<App />)`,
+      `    expect(screen.getByText("Hello React!")).toBeDefined()`,
+      `  })`,
+      `})`,
+    ].join("\n");
+
+    files[`tests/app.test.${jsxExt}`] = { type: "text", content: testContent };
+  } else {
+    // R3F app test - basic test without rendering Canvas
+    const testContent = [
+      `import { describe, it, expect } from "vitest"`,
+      `import { App } from "../src/app.js"`,
+      ``,
+      `describe("App", () => {`,
+      `  it("is defined", () => {`,
+      `    expect(App).toBeDefined()`,
+      `  })`,
+      `})`,
+    ].join("\n");
+
+    files[`tests/app.test.${jsxExt}`] = { type: "text", content: testContent };
   }
 
   if (codeSnippets["vscode-extension-suggestion"]?.length) {
