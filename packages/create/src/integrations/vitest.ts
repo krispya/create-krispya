@@ -2,7 +2,7 @@ import { getBaseTemplate, type Generator } from "../index.js";
 
 export function generateVitest(generator: Generator) {
   const version = generator.versions.vitest ?? "4.0.0"; // fallback if not fetched
-  generator.addDependency("vitest", `^${version}`);
+  generator.addDevDependency("vitest", `^${version}`);
 
   const template = generator.options.template ?? "vanilla";
   const baseTemplate = getBaseTemplate(template);
@@ -10,9 +10,9 @@ export function generateVitest(generator: Generator) {
 
   // Add React Testing Library for React/R3F templates
   if (isReact) {
-    generator.addDependency("@testing-library/react", "^16.2.0");
-    generator.addDependency("@testing-library/dom", "^10.4.0");
-    generator.addDependency("jsdom", "^26.0.0");
+    generator.addDevDependency("@testing-library/react", "^16.2.0");
+    generator.addDevDependency("@testing-library/dom", "^10.4.0");
+    generator.addDevDependency("jsdom", "^26.0.0");
   }
 
   // Merge vitest config into vite config (only if needed)

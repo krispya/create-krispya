@@ -9,7 +9,7 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
   }
 
   const version = generator.versions.oxfmt ?? "0.1.0";
-  generator.addDependency("oxfmt", `^${version}`);
+  generator.addDevDependency("oxfmt", `^${version}`);
 
   // Add oxfmt config using common formatter settings (Prettier-compatible format)
   const oxfmtConfig = {

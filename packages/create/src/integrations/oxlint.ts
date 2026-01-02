@@ -14,7 +14,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
   }
 
   const version = generator.versions.oxlint ?? "0.16.0";
-  generator.addDependency("oxlint", `^${version}`);
+  generator.addDevDependency("oxlint", `^${version}`);
 
   const { rules } = defaultLinterConfig;
 

@@ -19,7 +19,7 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
   }
 
   const version = generator.versions.biome ?? "1.9.4";
-  generator.addDependency("@biomejs/biome", `^${version}`);
+  generator.addDevDependency("@biomejs/biome", `^${version}`);
 
   const { rules } = defaultLinterConfig;
 

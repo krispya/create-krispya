@@ -12,7 +12,7 @@ export function generatePrettier(
   }
 
   const version = generator.versions.prettier ?? "3.4.2";
-  generator.addDependency("prettier", `^${version}`);
+  generator.addDevDependency("prettier", `^${version}`);
 
   // Add prettier config using common formatter settings
   const prettierConfig = {

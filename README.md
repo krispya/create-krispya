@@ -16,10 +16,26 @@ npm create krispya my-app
 
 ## Features
 
+- **Application & Library Mode**: Scaffold applications or publishable libraries
 - **Multiple Templates**: Choose from Vanilla, React, or React Three Fiber (each with TypeScript or JavaScript variants)
 - **Package Manager Support**: Works with npm, yarn, or pnpm
 - **Node Version Management**: Built-in support for specifying Node.js versions
 - **Interactive Setup**: Guided prompts to configure your project
+
+## Project Types
+
+### Application (default)
+
+Creates a ready-to-run web application with Vite for development and bundling.
+
+### Library
+
+Creates a publishable npm package with:
+
+- Proper `package.json` exports (`main`, `module`, `types`, `exports`)
+- Bundling via [unbuild](https://github.com/unjs/unbuild) (default) or [tsdown](https://github.com/nicepkg/tsdown)
+- Peer dependencies for React/Three.js (when applicable)
+- ESM and CJS output formats
 
 ## Templates
 
@@ -36,12 +52,19 @@ npm create krispya my-app
 
 ### Basic Options
 
-| Option                        | Description                                  |
-| ----------------------------- | -------------------------------------------- |
-| `[name]`                      | Project name (prompted if not provided)      |
-| `--template <type>`           | Template (see above, default: vanilla)       |
-| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm) |
-| `-y, --yes`                   | Use default values without prompts           |
+| Option                        | Description                                       |
+| ----------------------------- | ------------------------------------------------- |
+| `[name]`                      | Project name (prompted if not provided)           |
+| `--type <type>`               | Project type: `app` or `library` (default: app)   |
+| `--template <type>`           | Template (see above, default: vanilla)            |
+| `--package-manager <manager>` | Specify package manager (npm, yarn, or pnpm)      |
+| `-y, --yes`                   | Use default values without prompts                |
+
+### Library Options
+
+| Option              | Description                                            |
+| ------------------- | ------------------------------------------------------ |
+| `--bundler <type>`  | Library bundler: `unbuild` or `tsdown` (default: unbuild) |
 
 ### Advanced Options
 
@@ -100,4 +123,16 @@ Skip prompts and use defaults:
 
 ```bash
 npm create krispya my-app --yes
+```
+
+Create a library:
+
+```bash
+npm create krispya my-lib --type library
+```
+
+Create a React component library with tsdown:
+
+```bash
+npm create krispya my-components --type library --template react --bundler tsdown
 ```

@@ -7,7 +7,9 @@ import {
   getBaseTemplate,
   getLanguageFromTemplate,
   getLatestPnpmVersion,
+  LibraryBundler,
   PackageVersions,
+  ProjectType,
   Template,
 } from "./index.js";
 import { getLatestNodeVersion, getLatestNpmVersion } from "./utils.js";
@@ -30,11 +32,18 @@ function getDefaultProjectName(template: Template): string {
   }
 }
 
-function getDefaultOptions(template: Template, name: string): GenerateOptions {
+function getDefaultOptions(
+  template: Template,
+  name: string,
+  projectType: ProjectType = "app",
+  libraryBundler?: LibraryBundler
+): GenerateOptions {
   const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
     name,
     template,
+    projectType,
+    libraryBundler: projectType === "library" ? (libraryBundler ?? "unbuild") : undefined,
     packageManager: "pnpm",
     pnpmManageVersions: true,
     nodeVersion: "latest",
@@ -83,13 +92,18 @@ function formatConfigSummary(options: GenerateOptions): string {
   };
 
   // Language (derived from template)
+  const projectType = options.projectType ?? "app";
   const language = options.template
     ? getLanguageFromTemplate(options.template)
     : "typescript";
   lines.push(formatRow("Language", formatLanguage(language)));
 
-  // Bundler (always vite)
-  lines.push(formatRow("Bundler", "vite"));
+  // Bundler
+  if (projectType === "library") {
+    lines.push(formatRow("Bundler", options.libraryBundler ?? "unbuild"));
+  } else {
+    lines.push(formatRow("Bundler", "vite"));
+  }
 
   // Node version
   lines.push(formatRow("Node version", options.nodeVersion || "latest"));
@@ -152,8 +166,28 @@ function formatConfigSummary(options: GenerateOptions): string {
 
 async function promptForCustomization(
   template: Template,
-  name: string
+  name: string,
+  projectType: ProjectType
 ): Promise<GenerateOptions> {
+  // Library bundler selection (only for libraries)
+  let libraryBundler: LibraryBundler | undefined;
+  if (projectType === "library") {
+    const bundler = await p.select({
+      message: "Library bundler",
+      options: [
+        { value: "unbuild", label: "unbuild", hint: "unjs, simple config" },
+        { value: "tsdown", label: "tsdown", hint: "fast, esbuild-based" },
+      ],
+      initialValue: "unbuild",
+    });
+
+    if (p.isCancel(bundler)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    libraryBundler = bundler as LibraryBundler;
+  }
+
   const nodeVersion = await p.text({
     message: "Node.js version",
     placeholder: "latest",
@@ -310,6 +344,8 @@ async function promptForCustomization(
   return {
     name,
     template: finalTemplate,
+    projectType,
+    libraryBundler: projectType === "library" ? libraryBundler : undefined,
     nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
@@ -353,7 +389,22 @@ async function promptForOptions(
     projectName = nameResult;
   }
 
-  // Step 2: Select template (TypeScript by default, customize for JavaScript)
+  // Step 2: Select project type (app or library)
+  const projectType = await p.select({
+    message: "Project type",
+    options: [
+      { value: "app", label: "Application" },
+      { value: "library", label: "Library" },
+    ],
+    initialValue: "app",
+  });
+
+  if (p.isCancel(projectType)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  // Step 3: Select template (TypeScript by default, customize for JavaScript)
   const template = await p.select({
     message: "Select a template",
     options: [
@@ -369,7 +420,11 @@ async function promptForOptions(
     process.exit(0);
   }
 
-  const defaultOptions = getDefaultOptions(template as Template, projectName);
+  const defaultOptions = getDefaultOptions(
+    template as Template,
+    projectName,
+    projectType as ProjectType
+  );
 
   // Step 3: Show summary and ask confirm/customize
   p.note(formatConfigSummary(defaultOptions), "Template Configuration");
@@ -392,11 +447,17 @@ async function promptForOptions(
     return defaultOptions;
   }
 
-  // Step 4: Customize
-  return promptForCustomization(template as Template, projectName);
+  // Step 5: Customize
+  return promptForCustomization(
+    template as Template,
+    projectName,
+    projectType as ProjectType
+  );
 }
 
 interface CliOptions {
+  type?: ProjectType;
+  bundler?: LibraryBundler;
   template?: Template;
   linter?: "eslint" | "oxlint" | "biome";
   formatter?: "prettier" | "oxfmt" | "biome";
@@ -424,7 +485,15 @@ async function main() {
     .description(
       "CLI for creating Vanilla, React, and React Three Fiber projects"
     )
-    .argument("[name]", "name for the app")
+    .argument("[name]", "name for the project")
+    .option(
+      "--type <type>",
+      "project type: app or library (default: app)"
+    )
+    .option(
+      "--bundler <bundler>",
+      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)"
+    )
     .option(
       "--template <type>",
       "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
@@ -476,9 +545,12 @@ async function main() {
         const template: Template = options.template ?? "vanilla";
         const baseTemplate = getBaseTemplate(template);
         const defaultName = getDefaultProjectName(template);
+        const projectType: ProjectType = options.type ?? "app";
 
         generateOptions = {
           name: name || defaultName,
+          projectType,
+          libraryBundler: projectType === "library" ? (options.bundler ?? "unbuild") : undefined,
           template,
           linter: options.linter ?? "oxlint",
           formatter: options.formatter ?? "oxfmt",
@@ -530,13 +602,19 @@ async function main() {
       // Fetch latest package versions in parallel
       const versions: PackageVersions = {};
       const versionPromises: Promise<void>[] = [
-        getLatestNpmVersion("vite", "6.3.4").then((v) => {
-          versions.vite = v;
-        }),
         getLatestNpmVersion("vitest", "4.0.0").then((v) => {
           versions.vitest = v;
         }),
       ];
+
+      // Only fetch vite version for apps
+      if (generateOptions.projectType !== "library") {
+        versionPromises.push(
+          getLatestNpmVersion("vite", "6.3.4").then((v) => {
+            versions.vite = v;
+          })
+        );
+      }
 
       // Fetch linter version
       const linter = generateOptions.linter ?? "oxlint";
@@ -609,11 +687,18 @@ async function main() {
 
         s.stop("Project created!");
 
-        const nextSteps = [
-          `cd ${generateOptions.name}`,
-          `${packageManager} install`,
-          `${packageManager} run dev`,
-        ].join("\n");
+        const isLibrary = generateOptions.projectType === "library";
+        const nextSteps = isLibrary
+          ? [
+              `cd ${generateOptions.name}`,
+              `${packageManager} install`,
+              `${packageManager} run build`,
+            ].join("\n")
+          : [
+              `cd ${generateOptions.name}`,
+              `${packageManager} install`,
+              `${packageManager} run dev`,
+            ].join("\n");
 
         p.note(nextSteps, "Next steps");
 
