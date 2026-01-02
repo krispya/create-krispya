@@ -461,6 +461,7 @@ export function generate(options: GenerateOptions) {
   const jsxExt = language === "typescript" ? "tsx" : "jsx";
   const packageJson: Record<string, any> = {
     name,
+    description: "Built with 🌹 create-krispya",
     type: "module",
   };
 
