@@ -20,6 +20,7 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import color from "chalk";
 import { fetch } from "undici";
+import { spawn } from "child_process";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -483,6 +484,22 @@ interface CliOptions {
   yes?: boolean;
 }
 
+function openInEditor(
+  editor: "cursor" | "code" | "webstorm",
+  path: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(editor, [path], {
+      detached: true,
+      stdio: "ignore",
+      shell: process.platform === "win32",
+    });
+    child.on("error", reject);
+    child.unref();
+    setTimeout(resolve, 100);
+  });
+}
+
 async function main() {
   const program = new Command()
     .name("create-krispya")
@@ -705,6 +722,38 @@ async function main() {
             ].join("\n");
 
         p.note(nextSteps, "Next steps");
+
+        const openEditor = await p.select({
+          message: "Open project in editor?",
+          options: [
+            { value: "skip", label: "Skip" },
+            { value: "cursor", label: "Cursor" },
+            { value: "code", label: "VS Code" },
+            { value: "webstorm", label: "WebStorm" },
+          ],
+          initialValue: "skip",
+        });
+
+        if (!p.isCancel(openEditor) && openEditor !== "skip") {
+          const editorNames = {
+            cursor: "Cursor",
+            code: "VS Code",
+            webstorm: "WebStorm",
+          };
+          try {
+            await openInEditor(
+              openEditor as "cursor" | "code" | "webstorm",
+              basePath
+            );
+            p.log.success(
+              `Opening in ${editorNames[openEditor as keyof typeof editorNames]}...`
+            );
+          } catch {
+            p.log.warn(
+              `Could not open ${editorNames[openEditor as keyof typeof editorNames]}. Make sure the CLI command is in your PATH.`
+            );
+          }
+        }
 
         p.outro(color.green("Happy coding! ✨"));
       } catch (error) {
