@@ -23,16 +23,19 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
     arrowParens: defaultFormatterConfig.arrowParens,
   };
 
-  generator.addFile(".oxfmt.json", {
+  generator.addFile(".config/oxfmt.json", {
     type: "text",
     content: JSON.stringify(oxfmtConfig, null, 2),
   });
 
-  generator.addScript("format", "oxfmt --write .");
+  generator.addScript("format", "oxfmt -c .config/oxfmt.json --write .");
   generator.inject(
     "readme-tools",
     "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter",
   );
   generator.inject("vscode-extension-suggestion", "oxc.oxc-vscode");
   generator.addVscodeSetting("editor.defaultFormatter", "oxc.oxc-vscode");
+  generator.addVscodeSetting("oxc.fmt.configPath", ".config/oxfmt.json");
+  generator.addVscodeSetting("[json]", { "editor.defaultFormatter": "vscode.json-language-features" });
+  generator.addVscodeSetting("[jsonc]", { "editor.defaultFormatter": "vscode.json-language-features" });
 }

@@ -31,7 +31,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
 
   // Add oxlint config with plugins and common rules
   const oxlintConfig = {
-    $schema: "./node_modules/oxlint/configuration_schema.json",
+    $schema: "../node_modules/oxlint/configuration_schema.json",
     plugins,
     rules: {
       "no-unused-vars": [
@@ -51,16 +51,17 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     ignorePatterns: defaultLinterConfig.ignorePatterns,
   };
 
-  generator.addFile("oxlint.json", {
+  generator.addFile(".config/oxlint.json", {
     type: "text",
     content: JSON.stringify(oxlintConfig, null, 2),
   });
 
-  generator.addScript("lint", "oxlint");
+  generator.addScript("lint", "oxlint -c .config/oxlint.json");
   generator.inject(
     "readme-tools",
     "[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript",
   );
   generator.inject("vscode-extension-suggestion", "oxc.oxc-vscode");
   generator.addVscodeSetting("oxc.enable", true);
+  generator.addVscodeSetting("oxc.configPath", ".config/oxlint.json");
 }
