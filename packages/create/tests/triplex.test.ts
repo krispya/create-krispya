@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { generateTriplex } from "../triplex";
+import { generateTriplex } from "../src/integrations/triplex.js";
 
 describe("triplex integration", () => {
   it("should generate empty providers", () => {
@@ -8,13 +8,17 @@ describe("triplex integration", () => {
     generateTriplex(
       {
         configureVite: vi.fn(),
-        options: {},
+        options: { name: "test" },
         replace: vi.fn(),
         addDependency: vi.fn(),
+        addDevDependency: vi.fn(),
         addFile,
+        addScript: vi.fn(),
         inject: vi.fn(),
+        addVscodeSetting: vi.fn(),
+        versions: {},
       },
-      {},
+      {}
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
@@ -72,13 +76,17 @@ describe("triplex integration", () => {
     generateTriplex(
       {
         configureVite: vi.fn(),
-        options: { uikit: true },
+        options: { name: "test", uikit: {} },
         replace: vi.fn(),
         addDependency: vi.fn(),
+        addDevDependency: vi.fn(),
         addFile,
+        addScript: vi.fn(),
         inject: vi.fn(),
+        addVscodeSetting: vi.fn(),
+        versions: {},
       },
-      {},
+      {}
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
@@ -142,13 +150,17 @@ describe("triplex integration", () => {
     generateTriplex(
       {
         configureVite: vi.fn(),
-        options: { postprocessing: true, rapier: true },
+        options: { name: "test", postprocessing: {}, rapier: {} },
         replace: vi.fn(),
         addDependency: vi.fn(),
+        addDevDependency: vi.fn(),
         addFile,
+        addScript: vi.fn(),
         inject: vi.fn(),
+        addVscodeSetting: vi.fn(),
+        versions: {},
       },
-      {},
+      {}
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`

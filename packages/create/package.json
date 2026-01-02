@@ -12,15 +12,15 @@
   ],
   "license": "ISC",
   "author": "Kris Baumgartner",
-  "bin": "dist/cli.js",
+  "bin": "dist/cli.mjs",
   "files": [
     "dist"
   ],
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc --project ./tsconfig.build.json",
+    "build": "unbuild",
     "dev": "tsx src/cli.ts"
   },
   "dependencies": {
@@ -33,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^20.17.32",
     "tsx": "^4.20.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "unbuild": "^3.6.1"
   }
 }
