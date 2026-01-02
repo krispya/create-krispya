@@ -31,12 +31,12 @@ export function generateUnbuild(generator: Generator) {
   buildConfigLines.push(`  },`);
   buildConfigLines.push(`})`);
 
-  generator.addFile(`build.config.${ext}`, {
+  generator.addFile(`.config/build.config.${ext}`, {
     type: "text",
     content: buildConfigLines.join("\n"),
   });
 
-  generator.addScript("build", "unbuild");
+  generator.addScript("build", `unbuild --config .config/build.config.${ext}`);
   generator.inject(
     "readme-libraries",
     "[unbuild](https://github.com/unjs/unbuild) - Unified JavaScript build system",

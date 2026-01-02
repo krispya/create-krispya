@@ -3,7 +3,10 @@ import type { Generator } from "../index.js";
 
 export type GenerateOxfmtOptions = {} | boolean;
 
-export function generateOxfmt(generator: Generator, options: GenerateOxfmtOptions | undefined) {
+export function generateOxfmt(
+  generator: Generator,
+  options: GenerateOxfmtOptions | undefined
+) {
   if (options == null) {
     return;
   }
@@ -31,11 +34,15 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
   generator.addScript("format", "oxfmt -c .config/oxfmt.json --write .");
   generator.inject(
     "readme-tools",
-    "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter",
+    "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter"
   );
   generator.inject("vscode-extension-suggestion", "oxc.oxc-vscode");
   generator.addVscodeSetting("editor.defaultFormatter", "oxc.oxc-vscode");
   generator.addVscodeSetting("oxc.fmt.configPath", ".config/oxfmt.json");
-  generator.addVscodeSetting("[json]", { "editor.defaultFormatter": "vscode.json-language-features" });
-  generator.addVscodeSetting("[jsonc]", { "editor.defaultFormatter": "vscode.json-language-features" });
+  generator.addVscodeSetting("[json]", {
+    "editor.defaultFormatter": "vscode.json-language-features",
+  });
+  generator.addVscodeSetting("[jsonc]", {
+    "editor.defaultFormatter": "vscode.json-language-features",
+  });
 }
