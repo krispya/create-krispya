@@ -490,13 +490,19 @@ function openInEditor(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === "win32";
+    // Reuse current window if running inside VS Code/Cursor terminal
+    const reuseWindow =
+      (editor === "cursor" || editor === "code") &&
+      process.env.TERM_PROGRAM === "vscode";
+    const args = reuseWindow ? ["-r", path] : [path];
+
     const child = isWindows
-      ? spawn(`${editor} "${path}"`, {
+      ? spawn(`${editor} ${reuseWindow ? "-r " : ""}"${path}"`, {
           detached: true,
           stdio: "ignore",
           shell: true,
         })
-      : spawn(editor, [path], {
+      : spawn(editor, args, {
           detached: true,
           stdio: "ignore",
         });
