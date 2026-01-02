@@ -225,7 +225,58 @@ export function generate(options: GenerateOptions) {
 
   // TypeScript configuration
   if (language === "typescript") {
-    // Base Node.js tsconfig (handles src and tests)
+    // Solution file - references app and node configs in .config/
+    const tsConfig = {
+      $schema: "https://json.schemastore.org/tsconfig",
+      files: [],
+      references: [
+        { path: "./.config/tsconfig.app.json" },
+        { path: "./.config/tsconfig.node.json" },
+      ],
+    };
+
+    files["tsconfig.json"] = {
+      type: "text",
+      content: JSON.stringify(tsConfig, null, 2),
+    };
+
+    // App config - browser environment for src/tests
+    const tsConfigApp: any = {
+      $schema: "https://json.schemastore.org/tsconfig",
+      compilerOptions: {
+        target: "ESNext",
+        module: "ESNext",
+        moduleResolution: "bundler",
+        lib: ["DOM", "DOM.Iterable", "ESNext"],
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        strict: true,
+        skipLibCheck: true,
+        composite: true,
+        rewriteRelativeImportExtensions: true,
+        erasableSyntaxOnly: true,
+      },
+      include: ["../src", "../tests"],
+    };
+
+    // Add JSX config for React templates
+    if (isReact || isR3f) {
+      tsConfigApp.compilerOptions.jsx = "react-jsx";
+      devDependencies["@types/react"] = "^19.0.0";
+      devDependencies["@types/react-dom"] = "^19.0.0";
+    }
+
+    // Add Three.js types for r3f
+    if (isR3f) {
+      devDependencies["@types/three"] = "~0.175.0";
+    }
+
+    files[".config/tsconfig.app.json"] = {
+      type: "text",
+      content: JSON.stringify(tsConfigApp, null, 2),
+    };
+
+    // Node config - Node environment for config files
     const tsConfigNode = {
       $schema: "https://json.schemastore.org/tsconfig",
       compilerOptions: {
@@ -241,38 +292,12 @@ export function generate(options: GenerateOptions) {
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
       },
-      include: ["src", "tests"],
+      include: ["../*.config.ts", "./*.ts"],
     };
 
-    files["tsconfig.node.json"] = {
+    files[".config/tsconfig.node.json"] = {
       type: "text",
       content: JSON.stringify(tsConfigNode, null, 2),
-    };
-
-    // Main tsconfig extends node config (handles config files only)
-    const tsConfig: any = {
-      $schema: "https://json.schemastore.org/tsconfig",
-      extends: "./tsconfig.node.json",
-      compilerOptions: {},
-      include: ["*.config.ts"],
-      references: [{ path: "./tsconfig.node.json" }],
-    };
-
-    // Add JSX config for React templates
-    if (isReact || isR3f) {
-      tsConfig.compilerOptions.jsx = "react-jsx";
-      devDependencies["@types/react"] = "^19.0.0";
-      devDependencies["@types/react-dom"] = "^19.0.0";
-    }
-
-    // Add Three.js types for r3f
-    if (isR3f) {
-      devDependencies["@types/three"] = "~0.175.0";
-    }
-
-    files["tsconfig.json"] = {
-      type: "text",
-      content: JSON.stringify(tsConfig, null, 2),
     };
   }
 
