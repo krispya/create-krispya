@@ -10,11 +10,20 @@ import { generateBiome } from "./integrations/biome.js";
 import { GenerateDreiOptions, generateDrei } from "./integrations/drei.js";
 import { generateEslint } from "./integrations/eslint.js";
 import { generateFiber, GenerateFiberOptions } from "./integrations/fiber.js";
-import { generateGithubPages, GenerateGithubPagesOptions } from "./integrations/github-pages.js";
-import { generateHandle, GenerateHandleOptions } from "./integrations/handle.js";
+import {
+  generateGithubPages,
+  GenerateGithubPagesOptions,
+} from "./integrations/github-pages.js";
+import {
+  generateHandle,
+  GenerateHandleOptions,
+} from "./integrations/handle.js";
 import { generateKoota, GenerateKootaOptions } from "./integrations/koota.js";
 import { generateLeva, GenerateLevaOptions } from "./integrations/leva.js";
-import { generateOffscreen, GenerateOffscreenOptions } from "./integrations/offscreen.js";
+import {
+  generateOffscreen,
+  GenerateOffscreenOptions,
+} from "./integrations/offscreen.js";
 import { generateOxfmt } from "./integrations/oxfmt.js";
 import { generateOxlint } from "./integrations/oxlint.js";
 import {
@@ -22,24 +31,44 @@ import {
   GeneratePostprocessingOptions,
 } from "./integrations/postprocessing.js";
 import { generatePrettier } from "./integrations/prettier.js";
-import { generateRapier, GenerateRapierOptions } from "./integrations/rapier.js";
+import {
+  generateRapier,
+  GenerateRapierOptions,
+} from "./integrations/rapier.js";
 import { generateUikit, GenerateUikitOptions } from "./integrations/uikit.js";
 import { generateXr, GenerateXrOptions } from "./integrations/xr.js";
-import { generateZustand, GenerateZustandOptions } from "./integrations/zustand.js";
-import { generateTriplex, GenerateTriplexOptions } from "./integrations/triplex.js";
+import {
+  generateZustand,
+  GenerateZustandOptions,
+} from "./integrations/zustand.js";
+import {
+  generateTriplex,
+  GenerateTriplexOptions,
+} from "./integrations/triplex.js";
 import { generateTsdown } from "./integrations/tsdown.js";
 import { generateUnbuild } from "./integrations/unbuild.js";
 import { generateVitest } from "./integrations/vitest.js";
 import { merge } from "./merge.js";
-import { generateViverse, GenerateViverseOptions } from "./integrations/viverse.js";
+import {
+  generateViverse,
+  GenerateViverseOptions,
+} from "./integrations/viverse.js";
 
 export * from "./utils.js";
 
-export type Template = "vanilla" | "vanilla-js" | "react" | "react-js" | "r3f" | "r3f-js";
+export type Template =
+  | "vanilla"
+  | "vanilla-js"
+  | "react"
+  | "react-js"
+  | "r3f"
+  | "r3f-js";
 
 export type BaseTemplate = "vanilla" | "react" | "r3f";
 
-export function getLanguageFromTemplate(template: Template): "javascript" | "typescript" {
+export function getLanguageFromTemplate(
+  template: Template
+): "javascript" | "typescript" {
   return template.endsWith("-js") ? "javascript" : "typescript";
 }
 
@@ -154,7 +183,8 @@ export function generate(options: GenerateOptions) {
   const files: Record<string, File> = {
     ...clonedOptions.files,
   };
-  const replacements: Array<{ search: string; replace: string }> = clonedOptions.replacements ?? [];
+  const replacements: Array<{ search: string; replace: string }> =
+    clonedOptions.replacements ?? [];
 
   // Base dependencies
   const versions = clonedOptions.versions ?? {};
@@ -195,16 +225,37 @@ export function generate(options: GenerateOptions) {
 
   // TypeScript configuration
   if (language === "typescript") {
-    const tsConfig: any = {
+    // Base Node.js tsconfig (handles src and tests)
+    const tsConfigNode = {
+      $schema: "https://json.schemastore.org/tsconfig",
       compilerOptions: {
         target: "ESNext",
         module: "ESNext",
         moduleResolution: "bundler",
+        lib: ["ESNext"],
         esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
         strict: true,
         skipLibCheck: true,
+        composite: true,
+        rewriteRelativeImportExtensions: true,
+        erasableSyntaxOnly: true,
       },
       include: ["src", "tests"],
+    };
+
+    files["tsconfig.node.json"] = {
+      type: "text",
+      content: JSON.stringify(tsConfigNode, null, 2),
+    };
+
+    // Main tsconfig extends node config (handles config files only)
+    const tsConfig: any = {
+      $schema: "https://json.schemastore.org/tsconfig",
+      extends: "./tsconfig.node.json",
+      compilerOptions: {},
+      include: ["*.config.ts"],
+      references: [{ path: "./tsconfig.node.json" }],
     };
 
     // Add JSX config for React templates
@@ -225,7 +276,8 @@ export function generate(options: GenerateOptions) {
     };
   }
 
-  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
+  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> =
+    {};
   const vscodeSettings: Record<string, unknown> = {};
   const scripts: Record<string, string> = isLibrary
     ? {} // Library build scripts are added by bundler integrations
@@ -236,7 +288,9 @@ export function generate(options: GenerateOptions) {
 
   // Setup vite config imports based on template (only for apps)
   if (!isLibrary && (isReact || isR3f)) {
-    codeSnippets["vite-config-import"] = ["import react from '@vitejs/plugin-react'"];
+    codeSnippets["vite-config-import"] = [
+      "import react from '@vitejs/plugin-react'",
+    ];
   }
 
   // Setup R3F-specific imports (only for apps)
@@ -244,7 +298,11 @@ export function generate(options: GenerateOptions) {
     codeSnippets["import"] = [`import { Canvas } from "@react-three/fiber"`];
   }
 
-  const defaultName = isVanilla ? "vanilla-app" : isReact ? "react-app" : "react-three-app";
+  const defaultName = isVanilla
+    ? "vanilla-app"
+    : isReact
+    ? "react-app"
+    : "react-three-app";
   const name = clonedOptions.name ?? defaultName;
 
   // Build vite config based on template (only for apps)
@@ -334,7 +392,10 @@ export function generate(options: GenerateOptions) {
     }
     // Add release script for libraries
     const packageManager = clonedOptions.packageManager ?? "pnpm";
-    generator.addScript("release", `${packageManager} run build && ${packageManager} publish`);
+    generator.addScript(
+      "release",
+      `${packageManager} run build && ${packageManager} publish`
+    );
   }
 
   // Testing - always include vitest
@@ -354,7 +415,10 @@ export function generate(options: GenerateOptions) {
     generator.addVscodeSetting("eslint.enable", false);
     generator.addVscodeSetting("biome.enabled", false);
   } else if (linter === "biome") {
-    generateBiome(generator, { linter: true, formatter: formatter === "biome" });
+    generateBiome(generator, {
+      linter: true,
+      formatter: formatter === "biome",
+    });
     generator.addVscodeSetting("eslint.enable", false);
     generator.addVscodeSetting("oxc.enable", false);
   }
@@ -375,15 +439,18 @@ export function generate(options: GenerateOptions) {
     generator.inject(location, code);
   }
 
-  // Generate vite.config.js (only for apps)
+  // Generate vite.config.ts (only for apps)
   if (!isLibrary) {
     const viteConfigContent = [
       `import { defineConfig } from 'vite'`,
       ...(codeSnippets["vite-config-import"] ?? []),
-      `export default defineConfig(${JSON.stringify(viteConfig).replace(/"\$raw:([^"]+)"/g, (_, raw) => raw)})`,
+      `export default defineConfig(${JSON.stringify(viteConfig).replace(
+        /"\$raw:([^"]+)"/g,
+        (_, raw) => raw
+      )})`,
     ].join("\n");
 
-    files["vite.config.js"] = { type: "text", content: viteConfigContent };
+    files["vite.config.ts"] = { type: "text", content: viteConfigContent };
   }
 
   const packageManager = options.packageManager ?? "pnpm";
@@ -466,7 +533,10 @@ export function generate(options: GenerateOptions) {
     };
   }
 
-  files[".gitignore"] = { type: "text", content: ["node_modules", "dist"].join("\n") };
+  files[".gitignore"] = {
+    type: "text",
+    content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
+  };
   files[".gitattributes"] = { type: "text", content: GitAttributes };
 
   codeSnippets["readme-libraries"] ??= [];
@@ -477,18 +547,18 @@ export function generate(options: GenerateOptions) {
     // Libraries don't mention vite, they mention their bundler
   } else if (isVanilla) {
     codeSnippets["readme-libraries"].unshift(
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
+      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
     );
   } else if (isReact) {
     codeSnippets["readme-libraries"].unshift(
       `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
+      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
     );
   } else {
     codeSnippets["readme-libraries"].unshift(
       `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
       `[Three.js](https://threejs.org/) - JavaScript 3D library`,
-      `[@react-three/fiber](https://docs.pmnd.rs/react-three-fiber) - lets you create Three.js scenes using React components`,
+      `[@react-three/fiber](https://docs.pmnd.rs/react-three-fiber) - lets you create Three.js scenes using React components`
     );
   }
 
@@ -497,14 +567,14 @@ export function generate(options: GenerateOptions) {
       `\`${packageManager} install\` to install the dependencies`,
       `\`${packageManager} run build\` to build the library into the \`dist\` folder`,
       `\`${packageManager} run test\` to run the tests`,
-      `\`${packageManager} run release\` to build and publish to npm`,
+      `\`${packageManager} run release\` to build and publish to npm`
     );
   } else {
     codeSnippets["readme-commands"].unshift(
       `\`${packageManager} install\` to install the dependencies`,
       `\`${packageManager} run dev\` to run the development server and preview the app with live updates`,
       `\`${packageManager} run build\` to build the app into the \`dist\` folder`,
-      `\`${packageManager} run test\` to run the tests`,
+      `\`${packageManager} run test\` to run the tests`
     );
   }
 
@@ -512,7 +582,9 @@ export function generate(options: GenerateOptions) {
   let architectureDesc: string[];
   if (isLibrary) {
     architectureDesc = [
-      `- \`src/index.${isReact || isR3f ? jsxExt : ext}\` is the main entry point for your library exports`,
+      `- \`src/index.${
+        isReact || isR3f ? jsxExt : ext
+      }\` is the main entry point for your library exports`,
       `- Add your library code in the \`src\` folder`,
       `- \`tests/\` contains your test files`,
     ];
@@ -548,7 +620,9 @@ export function generate(options: GenerateOptions) {
     type: "text",
     content: [
       `# ${name}`,
-      `This ${isLibrary ? "library" : "project"} was generated with create-krispya`,
+      `This ${
+        isLibrary ? "library" : "project"
+      } was generated with create-krispya`,
       ...(codeSnippets["readme-start"] ?? []),
       "\n",
       `## Project Architecture`,
@@ -557,13 +631,17 @@ export function generate(options: GenerateOptions) {
       "\n",
       `## Libraries`,
       `The following libraries are used - checkout the linked docs to learn more`,
-      ...(codeSnippets["readme-libraries"] ?? []).map((library) => `- ${library}`),
+      ...(codeSnippets["readme-libraries"] ?? []).map(
+        (library) => `- ${library}`
+      ),
       "\n",
       codeSnippets["readme-tools"] && `## Tools`,
       ...(codeSnippets["readme-tools"] ?? []).map((tool) => `- ${tool}`),
       codeSnippets["readme-tools"] && `\n`,
       `## Development Commands`,
-      ...(codeSnippets["readme-commands"] ?? []).map((command) => `- ${command}`),
+      ...(codeSnippets["readme-commands"] ?? []).map(
+        (command) => `- ${command}`
+      ),
       ...(codeSnippets["readme-end"] ?? []),
     ]
       .filter(Boolean)
@@ -610,10 +688,10 @@ export function generate(options: GenerateOptions) {
     // Vanilla template
     files[`src/main.${ext}`] = { type: "text", content: ViteIndexContent };
     files["src/style.css"] = { type: "text", content: ViteStyleContent };
-    const indexHtml = ViteHtmlContent.replace("$indexPath", `./src/main.${ext}`).replace(
-      "$title",
-      name,
-    );
+    const indexHtml = ViteHtmlContent.replace(
+      "$indexPath",
+      `./src/main.${ext}`
+    ).replace("$title", name);
     files["index.html"] = { type: "text", content: indexHtml };
   } else {
     // React and R3F templates
@@ -621,7 +699,7 @@ export function generate(options: GenerateOptions) {
 
     const indexHtml = HtmlContent.replace(
       "$indexPath",
-      language === "javascript" ? "./src/index.jsx" : "./src/index.tsx",
+      language === "javascript" ? "./src/index.jsx" : "./src/index.tsx"
     ).replace("$title", name);
     files["index.html"] = { type: "text", content: indexHtml };
 
@@ -726,7 +804,10 @@ export function generate(options: GenerateOptions) {
       ].join("\n");
     }
 
-    files[`tests/index.test.${testExt}`] = { type: "text", content: testContent };
+    files[`tests/index.test.${testExt}`] = {
+      type: "text",
+      content: testContent,
+    };
   } else if (isVanilla) {
     // Vanilla app test
     const testContent = [
@@ -774,7 +855,9 @@ export function generate(options: GenerateOptions) {
 
   if (codeSnippets["vscode-extension-suggestion"]?.length) {
     // Deduplicate extension recommendations
-    const uniqueRecommendations = [...new Set(codeSnippets["vscode-extension-suggestion"])];
+    const uniqueRecommendations = [
+      ...new Set(codeSnippets["vscode-extension-suggestion"]),
+    ];
     files[".vscode/extensions.json"] = {
       type: "text",
       content: JSON.stringify(
@@ -782,7 +865,7 @@ export function generate(options: GenerateOptions) {
           recommendations: uniqueRecommendations,
         },
         null,
-        2,
+        2
       ),
     };
   }

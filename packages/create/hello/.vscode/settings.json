@@ -1,0 +1,6 @@
+{
+	"oxc.enable": true,
+	"eslint.enable": false,
+	"biome.enabled": false,
+	"editor.defaultFormatter": "oxc.oxc-vscode"
+}
