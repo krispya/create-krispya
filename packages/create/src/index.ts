@@ -27,6 +27,7 @@ import { generateUikit, GenerateUikitOptions } from "./integrations/uikit.js";
 import { generateXr, GenerateXrOptions } from "./integrations/xr.js";
 import { generateZustand, GenerateZustandOptions } from "./integrations/zustand.js";
 import { generateTriplex, GenerateTriplexOptions } from "./integrations/triplex.js";
+import { generateVitest } from "./integrations/vitest.js";
 import { merge } from "./merge.js";
 import { generateViverse, GenerateViverseOptions } from "./integrations/viverse.js";
 
@@ -46,6 +47,7 @@ export function getBaseTemplate(template: Template): BaseTemplate {
 
 export type PackageVersions = {
   vite?: string;
+  vitest?: string;
   eslint?: string;
   oxlint?: string;
   oxfmt?: string;
@@ -284,6 +286,9 @@ export function generate(options: GenerateOptions) {
 
   // GitHub Pages works for all templates
   generateGithubPages(generator, clonedOptions.githubPages);
+
+  // Testing - always include vitest
+  generateVitest(generator);
 
   // Linter and formatter integrations
   const linter = clonedOptions.linter;

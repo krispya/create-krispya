@@ -88,6 +88,9 @@ function formatConfigSummary(options: GenerateOptions): string {
     : "typescript";
   lines.push(formatRow("Language", formatLanguage(language)));
 
+  // Bundler (always vite)
+  lines.push(formatRow("Bundler", "vite"));
+
   // Node version
   lines.push(formatRow("Node version", options.nodeVersion || "latest"));
 
@@ -109,6 +112,9 @@ function formatConfigSummary(options: GenerateOptions): string {
   if (options.formatter) {
     lines.push(formatRow("Formatter", options.formatter));
   }
+
+  // Testing (always vitest)
+  lines.push(formatRow("Testing", "vitest"));
 
   // R3F integrations
   if (options.template && getBaseTemplate(options.template) === "r3f") {
@@ -526,6 +532,9 @@ async function main() {
       const versionPromises: Promise<void>[] = [
         getLatestNpmVersion("vite", "6.3.4").then((v) => {
           versions.vite = v;
+        }),
+        getLatestNpmVersion("vitest", "4.0.0").then((v) => {
+          versions.vitest = v;
         }),
       ];
 
