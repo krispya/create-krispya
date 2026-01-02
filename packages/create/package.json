@@ -1,6 +1,6 @@
 {
   "name": "create-krispya",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "🌹 CLI for creating web projects with (my) sensible defaults",
   "keywords": [
     "cli",
