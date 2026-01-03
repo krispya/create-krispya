@@ -1,7 +1,5 @@
 import chalk from "chalk";
-import type { Generator } from "../index.js";
-
-export type GeneratePostprocessingOptions = {} | boolean;
+import type { GeneratePostprocessingOptions, Generator } from "../types.js";
 
 export function generatePostprocessing(
   generator: Generator,

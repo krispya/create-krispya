@@ -1,13 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateFiberOptions =
-  | {
-      /**
-       * @default true
-       */
-      addExample?: boolean;
-    }
-  | boolean;
+import type { GenerateFiberOptions, Generator } from "../types.js";
 
 export function generateFiber(generator: Generator, _options: GenerateFiberOptions | undefined) {
   generator.inject("import", `import { Box } from "./box.js"`);

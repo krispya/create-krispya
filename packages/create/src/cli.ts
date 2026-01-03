@@ -1,26 +1,19 @@
 #!/usr/bin/env node
 import { createRequire } from "module";
 import { cwd } from "process";
-import {
-  generate,
-  GenerateOptions,
-  generateRandomName,
-  getBaseTemplate,
-  getLanguageFromTemplate,
-  getLatestPnpmVersion,
-  LibraryBundler,
-  PackageVersions,
-  ProjectType,
-  Template,
-} from "./index.js";
-import { getLatestNodeVersion, getLatestNpmVersion } from "./utils.js";
 import { dirname, join } from "path";
 import { mkdir, writeFile } from "fs/promises";
 import { Command } from "commander";
 import * as p from "@clack/prompts";
 import color from "chalk";
 import { fetch } from "undici";
-import { spawn } from "child_process";
+
+import {
+  editorNames,
+  getDefaultProjectName,
+  openInEditor,
+  promptForOptions,
+} from "./cli/index.js";
 import {
   clearConfig,
   EditorChoice,
@@ -29,444 +22,21 @@ import {
   setPreferredEditor,
   setReuseWindow,
 } from "./config.js";
+import {
+  generate,
+  getBaseTemplate,
+  getLatestNodeVersion,
+  getLatestNpmVersion,
+  getLatestPnpmVersion,
+  type GenerateOptions,
+  type LibraryBundler,
+  type PackageVersions,
+  type ProjectType,
+  type Template,
+} from "./index.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
-
-function getDefaultProjectName(template: Template): string {
-  const base = getBaseTemplate(template);
-  switch (base) {
-    case "vanilla":
-      return `vanilla-${generateRandomName()}`;
-    case "react":
-      return `react-${generateRandomName()}`;
-    case "r3f":
-      return `react-three-${generateRandomName()}`;
-  }
-}
-
-function getDefaultOptions(
-  template: Template,
-  name: string,
-  projectType: ProjectType = "app",
-  libraryBundler?: LibraryBundler
-): GenerateOptions {
-  const baseTemplate = getBaseTemplate(template);
-  const base: GenerateOptions = {
-    name,
-    template,
-    projectType,
-    libraryBundler: projectType === "library" ? (libraryBundler ?? "unbuild") : undefined,
-    packageManager: "pnpm",
-    pnpmManageVersions: true,
-    nodeVersion: "latest",
-    linter: "oxlint",
-    formatter: "oxfmt",
-  };
-
-  if (baseTemplate === "r3f") {
-    return {
-      ...base,
-      drei: {},
-      handle: {},
-      leva: {},
-      postprocessing: {},
-      rapier: {},
-      xr: {},
-      uikit: {},
-      offscreen: {},
-      zustand: {},
-      koota: {},
-      triplex: {},
-      viverse: {},
-    };
-  }
-
-  return base;
-}
-
-function formatConfigSummary(options: GenerateOptions): string {
-  const lines: string[] = [];
-  const VALUE_COL = 27; // Start position for values
-
-  const formatRow = (label: string, value: string, indent = "") => {
-    const fullLabel = indent + label;
-    const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1);
-    const dots = color.gray(".".repeat(dotCount));
-    return `${indent}${label} ${dots} ${value}`;
-  };
-
-  const formatLanguage = (lang: string) => {
-    return lang === "typescript"
-      ? "TypeScript"
-      : lang === "javascript"
-      ? "JavaScript"
-      : lang;
-  };
-
-  // Language (derived from template)
-  const projectType = options.projectType ?? "app";
-  const language = options.template
-    ? getLanguageFromTemplate(options.template)
-    : "typescript";
-  lines.push(formatRow("Language", formatLanguage(language)));
-
-  // Bundler
-  if (projectType === "library") {
-    lines.push(formatRow("Bundler", options.libraryBundler ?? "unbuild"));
-  } else {
-    lines.push(formatRow("Bundler", "vite"));
-  }
-
-  // Node version
-  lines.push(formatRow("Node version", options.nodeVersion || "latest"));
-
-  // Package manager
-  lines.push(formatRow("Package manager", options.packageManager || "pnpm"));
-
-  // pnpm-specific options
-  if (options.packageManager === "pnpm") {
-    const versionManaged = options.pnpmManageVersions ? "yes" : "no";
-    lines.push(formatRow("↳ Version managed", versionManaged, ""));
-  }
-
-  // Linter
-  if (options.linter) {
-    lines.push(formatRow("Linter", options.linter));
-  }
-
-  // Formatter
-  if (options.formatter) {
-    lines.push(formatRow("Formatter", options.formatter));
-  }
-
-  // Testing (always vitest)
-  lines.push(formatRow("Testing", "vitest"));
-
-  // R3F integrations
-  if (options.template && getBaseTemplate(options.template) === "r3f") {
-    const integrationNames = [
-      options.drei && "drei",
-      options.handle && "handle",
-      options.leva && "leva",
-      options.postprocessing && "postproc",
-      options.rapier && "rapier",
-      options.xr && "xr",
-      options.uikit && "uikit",
-      options.offscreen && "offscreen",
-      options.zustand && "zustand",
-      options.koota && "koota",
-      options.triplex && "triplex",
-      options.viverse && "viverse",
-    ].filter(Boolean) as string[];
-
-    lines.push("");
-    lines.push(color.dim("Integrations"));
-
-    // Two-column layout
-    for (let i = 0; i < integrationNames.length; i += 2) {
-      const left = `${color.green("●")} ${integrationNames[i]}`;
-      const right = integrationNames[i + 1]
-        ? `${color.green("●")} ${integrationNames[i + 1]}`
-        : "";
-      const spacing = " ".repeat(Math.max(1, 16 - integrationNames[i]!.length));
-      lines.push(`  ${left}${spacing}${right}`);
-    }
-  }
-
-  return lines.join("\n");
-}
-
-async function promptForCustomization(
-  template: Template,
-  name: string,
-  projectType: ProjectType
-): Promise<GenerateOptions> {
-  // Library bundler selection (only for libraries)
-  let libraryBundler: LibraryBundler | undefined;
-  if (projectType === "library") {
-    const bundler = await p.select({
-      message: "Library bundler",
-      options: [
-        { value: "unbuild", label: "unbuild", hint: "unjs, simple config" },
-        { value: "tsdown", label: "tsdown", hint: "fast, esbuild-based" },
-      ],
-      initialValue: "unbuild",
-    });
-
-    if (p.isCancel(bundler)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    libraryBundler = bundler as LibraryBundler;
-  }
-
-  const nodeVersion = await p.text({
-    message: "Node.js version",
-    placeholder: "latest",
-    defaultValue: "latest",
-    validate: (value) => {
-      if (!value.length) return "Required";
-      if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
-        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
-      }
-    },
-  });
-
-  if (p.isCancel(nodeVersion)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const packageManager = await p.select({
-    message: "Package manager",
-    options: [
-      { value: "pnpm", label: "pnpm" },
-      { value: "npm", label: "npm" },
-      { value: "yarn", label: "yarn" },
-      { value: "custom", label: "Other (custom)" },
-    ],
-    initialValue: "pnpm",
-  });
-
-  if (p.isCancel(packageManager)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  let finalPackageManager = packageManager as string;
-  if (packageManager === "custom") {
-    const customPm = await p.text({
-      message: "Enter package manager command",
-      validate: (value) => {
-        if (!value.length) return "Required";
-      },
-    });
-    if (p.isCancel(customPm)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    finalPackageManager = customPm;
-  }
-
-  let pnpmManageVersions = true;
-  if (packageManager === "pnpm") {
-    const managePnpm = await p.confirm({
-      message: "Enable manage-package-manager-versions?",
-      initialValue: true,
-    });
-    if (p.isCancel(managePnpm)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    pnpmManageVersions = managePnpm;
-  }
-
-  const linter = await p.select({
-    message: "Linter",
-    options: [
-      { value: "oxlint", label: "Oxlint", hint: "fast, from OXC" },
-      { value: "eslint", label: "ESLint", hint: "classic" },
-      { value: "biome", label: "Biome", hint: "all-in-one" },
-    ],
-    initialValue: "oxlint",
-  });
-
-  if (p.isCancel(linter)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const formatter = await p.select({
-    message: "Formatter",
-    options: [
-      { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
-      { value: "prettier", label: "Prettier", hint: "classic" },
-      { value: "biome", label: "Biome", hint: "all-in-one" },
-    ],
-    initialValue: "oxfmt",
-  });
-
-  if (p.isCancel(formatter)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const language = await p.select({
-    message: "Language",
-    options: [
-      { value: "typescript", label: "TypeScript" },
-      { value: "javascript", label: "JavaScript" },
-    ],
-    initialValue: "typescript",
-  });
-
-  if (p.isCancel(language)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  // Derive final template based on language selection
-  const baseTemplate = getBaseTemplate(template);
-  const finalTemplate: Template =
-    language === "javascript"
-      ? (`${baseTemplate}-js` as Template)
-      : (baseTemplate as Template);
-
-  let integrations: string[] = [];
-  if (baseTemplate === "r3f") {
-    const selected = await p.multiselect({
-      message: "R3F integrations",
-      options: [
-        { value: "drei", label: "Drei" },
-        { value: "handle", label: "Handle" },
-        { value: "leva", label: "Leva" },
-        { value: "postprocessing", label: "Postprocessing" },
-        { value: "rapier", label: "Rapier" },
-        { value: "xr", label: "XR" },
-        { value: "uikit", label: "UIKit" },
-        { value: "offscreen", label: "Offscreen" },
-        { value: "zustand", label: "Zustand" },
-        { value: "koota", label: "Koota" },
-        { value: "triplex", label: "Triplex" },
-        { value: "viverse", label: "Viverse" },
-      ],
-      initialValues: [
-        "drei",
-        "handle",
-        "leva",
-        "postprocessing",
-        "rapier",
-        "xr",
-        "uikit",
-        "offscreen",
-        "zustand",
-        "koota",
-        "triplex",
-        "viverse",
-      ],
-      required: false,
-    });
-    if (p.isCancel(selected)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    integrations = selected as string[];
-  }
-
-  return {
-    name,
-    template: finalTemplate,
-    projectType,
-    libraryBundler: projectType === "library" ? libraryBundler : undefined,
-    nodeVersion,
-    packageManager: finalPackageManager,
-    pnpmManageVersions,
-    linter: linter as "eslint" | "oxlint" | "biome",
-    formatter: formatter as "prettier" | "oxfmt" | "biome",
-    ...(baseTemplate === "r3f" && {
-      drei: integrations.includes("drei") ? {} : undefined,
-      handle: integrations.includes("handle") ? {} : undefined,
-      leva: integrations.includes("leva") ? {} : undefined,
-      postprocessing: integrations.includes("postprocessing") ? {} : undefined,
-      rapier: integrations.includes("rapier") ? {} : undefined,
-      xr: integrations.includes("xr") ? {} : undefined,
-      uikit: integrations.includes("uikit") ? {} : undefined,
-      offscreen: integrations.includes("offscreen") ? {} : undefined,
-      zustand: integrations.includes("zustand") ? {} : undefined,
-      koota: integrations.includes("koota") ? {} : undefined,
-      triplex: integrations.includes("triplex") ? {} : undefined,
-      viverse: integrations.includes("viverse") ? {} : undefined,
-    }),
-  };
-}
-
-async function promptForOptions(
-  name: string | undefined
-): Promise<GenerateOptions> {
-  // Step 1: Project Name (if not provided via argument)
-  let projectName = name;
-  if (!projectName) {
-    const nameResult = await p.text({
-      message: "What is your project named?",
-      placeholder: generateRandomName(),
-      defaultValue: generateRandomName(),
-      validate: (value) => {
-        if (!value.length) return "Project name is required";
-      },
-    });
-    if (p.isCancel(nameResult)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    projectName = nameResult;
-  }
-
-  // Step 2: Select project type (app or library)
-  const projectType = await p.select({
-    message: "Project type",
-    options: [
-      { value: "app", label: "Application" },
-      { value: "library", label: "Library" },
-    ],
-    initialValue: "app",
-  });
-
-  if (p.isCancel(projectType)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  // Step 3: Select template (TypeScript by default, customize for JavaScript)
-  const template = await p.select({
-    message: "Select a template",
-    options: [
-      { value: "vanilla", label: "Vanilla" },
-      { value: "react", label: "React" },
-      { value: "r3f", label: "React Three Fiber" },
-    ],
-    initialValue: "vanilla",
-  });
-
-  if (p.isCancel(template)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const defaultOptions = getDefaultOptions(
-    template as Template,
-    projectName,
-    projectType as ProjectType
-  );
-
-  // Step 3: Show summary and ask confirm/customize
-  p.note(formatConfigSummary(defaultOptions), "Template Configuration");
-
-  const action = await p.select({
-    message: "Proceed with these settings?",
-    options: [
-      { value: "confirm", label: "Yes, create project" },
-      { value: "customize", label: "No, let me customize" },
-    ],
-    initialValue: "confirm",
-  });
-
-  if (p.isCancel(action)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  if (action === "confirm") {
-    return defaultOptions;
-  }
-
-  // Step 5: Customize
-  return promptForCustomization(
-    template as Template,
-    projectName,
-    projectType as ProjectType
-  );
-}
 
 interface CliOptions {
   type?: ProjectType;
@@ -493,50 +63,12 @@ interface CliOptions {
   clearConfig?: boolean;
 }
 
-const editorNames: Record<string, string> = {
-  cursor: "Cursor",
-  code: "VS Code",
-  webstorm: "WebStorm",
-};
-
-function openInEditor(
-  editor: "cursor" | "code" | "webstorm",
-  path: string,
-  reuseWindow: boolean
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const isWindows = process.platform === "win32";
-    // Only VS Code and Cursor support the -r flag
-    const useReuseFlag = reuseWindow && (editor === "cursor" || editor === "code");
-    const args = useReuseFlag ? ["-r", path] : [path];
-
-    const child = isWindows
-      ? spawn(`${editor} ${useReuseFlag ? "-r " : ""}"${path}"`, {
-          detached: true,
-          stdio: "ignore",
-          shell: true,
-        })
-      : spawn(editor, args, {
-          detached: true,
-          stdio: "ignore",
-        });
-    child.on("error", reject);
-    child.unref();
-    setTimeout(resolve, 100);
-  });
-}
-
 async function main() {
   const program = new Command()
     .name("create-krispya")
-    .description(
-      "CLI for creating Vanilla, React, and React Three Fiber projects"
-    )
+    .description("CLI for creating Vanilla, React, and React Three Fiber projects")
     .argument("[name]", "name for the project")
-    .option(
-      "--type <type>",
-      "project type: app or library (default: app)"
-    )
+    .option("--type <type>", "project type: app or library (default: app)")
     .option(
       "--bundler <bundler>",
       "library bundler: unbuild or tsdown (default: unbuild, only for libraries)"
@@ -545,14 +77,8 @@ async function main() {
       "--template <type>",
       "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
     )
-    .option(
-      "--linter <type>",
-      "linter: eslint, oxlint, or biome (default: oxlint)"
-    )
-    .option(
-      "--formatter <type>",
-      "formatter: prettier, oxfmt, or biome (default: oxfmt)"
-    )
+    .option("--linter <type>", "linter: eslint, oxlint, or biome (default: oxlint)")
+    .option("--formatter <type>", "formatter: prettier, oxfmt, or biome (default: oxfmt)")
     .option("--drei", "add @react-three/drei (r3f only)")
     .option("--handle", "add @react-three/handle (r3f only)")
     .option("--leva", "add leva (r3f only)")
@@ -565,10 +91,7 @@ async function main() {
     .option("--koota", "add koota (r3f only)")
     .option("--triplex", "set up triplex development environment (r3f only)")
     .option("--viverse", "set up viverse deployment (r3f only)")
-    .option(
-      "--package-manager <manager>",
-      "specify package manager (e.g. npm, yarn, pnpm)"
-    )
+    .option("--package-manager <manager>", "specify package manager (e.g. npm, yarn, pnpm)")
     .option(
       "--pnpm-manage-versions",
       "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)"
@@ -631,15 +154,9 @@ async function main() {
         generateOptions = await promptForOptions(name);
       }
 
-      const base = generateOptions.template
-        ? getBaseTemplate(generateOptions.template)
-        : "vanilla";
+      const base = generateOptions.template ? getBaseTemplate(generateOptions.template) : "vanilla";
       const defaultFallbackName =
-        base === "vanilla"
-          ? "vanilla-app"
-          : base === "react"
-          ? "react-app"
-          : "react-three-app";
+        base === "vanilla" ? "vanilla-app" : base === "react" ? "react-app" : "react-three-app";
       generateOptions.name ??= defaultFallbackName;
 
       // Fetch latest pnpm version if pnpm is selected

@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateLevaOptions = {} | boolean;
+import type { GenerateLevaOptions, Generator } from "../types.js";
 
 export function generateLeva(generator: Generator, options: GenerateLevaOptions | undefined) {
   if (options == null) {

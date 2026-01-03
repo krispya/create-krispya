@@ -1,4 +1,4 @@
-import { getBaseTemplate, type Generator } from "../index.js";
+import { getBaseTemplate, type Generator } from "../types.js";
 
 export function generateVitest(generator: Generator) {
   const version = generator.versions.vitest ?? "4.0.0"; // fallback if not fetched

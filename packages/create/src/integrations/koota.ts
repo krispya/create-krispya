@@ -1,13 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateKootaOptions =
-  | {
-      /**
-       * @default true
-       */
-      addExample?: boolean;
-    }
-  | boolean;
+import type { GenerateKootaOptions, Generator } from "../types.js";
 
 export function generateKoota(generator: Generator, options: GenerateKootaOptions | undefined) {
   if (options == null) {

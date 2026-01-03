@@ -1,10 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateXrOptions =
-  | {
-      storeOptions?: any;
-    }
-  | boolean;
+import type { GenerateXrOptions, Generator } from "../types.js";
 
 export function generateXr(generator: Generator, options: GenerateXrOptions | undefined) {
   if (options == null || options === false) {

@@ -1,7 +1,5 @@
-import type { Generator } from "../index.js";
+import type { GenerateOffscreenOptions, Generator } from "../types.js";
 import chalk from "chalk";
-
-export type GenerateOffscreenOptions = {} | boolean;
 
 export function generateOffscreen(
   generator: Generator,

@@ -1,4 +1,4 @@
-import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../index.js";
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../types.js";
 
 export function generateUnbuild(generator: Generator) {
   generator.addDevDependency("unbuild", "^3.5.0");

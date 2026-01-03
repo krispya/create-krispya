@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateGithubPagesOptions = {} | boolean;
+import type { GenerateGithubPagesOptions, Generator } from "../types.js";
 
 export function generateGithubPages(
   generator: Generator,

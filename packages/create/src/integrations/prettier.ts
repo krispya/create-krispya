@@ -1,5 +1,5 @@
 import { defaultFormatterConfig } from "../constants.js";
-import type { Generator } from "../index.js";
+import type { Generator } from "../types.js";
 
 export type GeneratePrettierOptions = {} | boolean;
 

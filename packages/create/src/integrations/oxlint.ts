@@ -1,5 +1,5 @@
 import { defaultLinterConfig } from "../constants.js";
-import { getBaseTemplate, type Generator } from "../index.js";
+import { getBaseTemplate, type Generator } from "../types.js";
 
 export type GenerateOxlintOptions = {} | boolean;
 

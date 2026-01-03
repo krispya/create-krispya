@@ -1,7 +1,5 @@
-import type { Generator } from "../index.js";
+import type { GenerateTriplexOptions, Generator } from "../types.js";
 import { unique } from "../lib/array.js";
-
-export type GenerateTriplexOptions = {} | boolean;
 
 export type PropValue = {
   declaredPropDefaultValue: unknown;

@@ -1,4 +1,4 @@
-import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../index.js";
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../types.js";
 
 export function generateTsdown(generator: Generator) {
   generator.addDevDependency("tsdown", "^0.12.0");

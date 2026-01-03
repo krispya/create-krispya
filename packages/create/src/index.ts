@@ -1,175 +1,55 @@
+import { GitAttributes } from "./constants.js";
 import {
-  GitAttributes,
-  HtmlContent,
-  IndexContent,
-  ViteHtmlContent,
-  ViteIndexContent,
-  ViteStyleContent,
-} from "./constants.js";
+  generatePackageJson,
+  generateReadme,
+  generateSourceFiles,
+  generateTestFiles,
+  generateTypescriptConfig,
+  generateViteConfig,
+  generateVscodeFiles,
+} from "./generators/index.js";
 import { generateBiome } from "./integrations/biome.js";
-import { GenerateDreiOptions, generateDrei } from "./integrations/drei.js";
+import { generateDrei } from "./integrations/drei.js";
 import { generateEslint } from "./integrations/eslint.js";
-import { generateFiber, GenerateFiberOptions } from "./integrations/fiber.js";
-import {
-  generateGithubPages,
-  GenerateGithubPagesOptions,
-} from "./integrations/github-pages.js";
-import {
-  generateHandle,
-  GenerateHandleOptions,
-} from "./integrations/handle.js";
-import { generateKoota, GenerateKootaOptions } from "./integrations/koota.js";
-import { generateLeva, GenerateLevaOptions } from "./integrations/leva.js";
-import {
-  generateOffscreen,
-  GenerateOffscreenOptions,
-} from "./integrations/offscreen.js";
+import { generateFiber } from "./integrations/fiber.js";
+import { generateGithubPages } from "./integrations/github-pages.js";
+import { generateHandle } from "./integrations/handle.js";
+import { generateKoota } from "./integrations/koota.js";
+import { generateLeva } from "./integrations/leva.js";
+import { generateOffscreen } from "./integrations/offscreen.js";
 import { generateOxfmt } from "./integrations/oxfmt.js";
 import { generateOxlint } from "./integrations/oxlint.js";
-import {
-  generatePostprocessing,
-  GeneratePostprocessingOptions,
-} from "./integrations/postprocessing.js";
+import { generatePostprocessing } from "./integrations/postprocessing.js";
 import { generatePrettier } from "./integrations/prettier.js";
-import {
-  generateRapier,
-  GenerateRapierOptions,
-} from "./integrations/rapier.js";
-import { generateUikit, GenerateUikitOptions } from "./integrations/uikit.js";
-import { generateXr, GenerateXrOptions } from "./integrations/xr.js";
-import {
-  generateZustand,
-  GenerateZustandOptions,
-} from "./integrations/zustand.js";
-import {
-  generateTriplex,
-  GenerateTriplexOptions,
-} from "./integrations/triplex.js";
+import { generateRapier } from "./integrations/rapier.js";
+import { generateTriplex } from "./integrations/triplex.js";
 import { generateTsdown } from "./integrations/tsdown.js";
+import { generateUikit } from "./integrations/uikit.js";
 import { generateUnbuild } from "./integrations/unbuild.js";
 import { generateVitest } from "./integrations/vitest.js";
+import { generateViverse } from "./integrations/viverse.js";
+import { generateXr } from "./integrations/xr.js";
+import { generateZustand } from "./integrations/zustand.js";
 import { merge } from "./merge.js";
 import {
-  generateViverse,
-  GenerateViverseOptions,
-} from "./integrations/viverse.js";
+  type CodeInjectionLocation,
+  type File,
+  type GenerateOptions,
+  type Generator,
+  type PackageVersions,
+  getBaseTemplate,
+  getLanguageFromTemplate,
+} from "./types.js";
 
+// Re-export types and utilities
+export * from "./types.js";
 export * from "./utils.js";
 
-export type Template =
-  | "vanilla"
-  | "vanilla-js"
-  | "react"
-  | "react-js"
-  | "r3f"
-  | "r3f-js";
-
-export type BaseTemplate = "vanilla" | "react" | "r3f";
-
-export function getLanguageFromTemplate(
-  template: Template
-): "javascript" | "typescript" {
-  return template.endsWith("-js") ? "javascript" : "typescript";
-}
-
-export function getBaseTemplate(template: Template): BaseTemplate {
-  return template.replace("-js", "") as BaseTemplate;
-}
-
-export type PackageVersions = {
-  vite?: string;
-  vitest?: string;
-  eslint?: string;
-  oxlint?: string;
-  oxfmt?: string;
-  prettier?: string;
-  biome?: string;
-};
-
-export type ProjectType = "app" | "library";
-export type LibraryBundler = "unbuild" | "tsdown";
-
-export type GenerateOptions = {
-  githubUserName?: string;
-  githubRepoName?: string;
-  name: string;
-  projectType?: ProjectType;
-  libraryBundler?: LibraryBundler;
-  template?: Template;
-  linter?: Linter;
-  formatter?: Formatter;
-  versions?: PackageVersions;
-  fiber?: GenerateFiberOptions;
-  handle?: GenerateHandleOptions;
-  drei?: GenerateDreiOptions;
-  koota?: GenerateKootaOptions;
-  leva?: GenerateLevaOptions;
-  offscreen?: GenerateOffscreenOptions;
-  postprocessing?: GeneratePostprocessingOptions;
-  rapier?: GenerateRapierOptions;
-  triplex?: GenerateTriplexOptions;
-  viverse?: GenerateViverseOptions;
-  uikit?: GenerateUikitOptions;
-  xr?: GenerateXrOptions;
-  zustand?: GenerateZustandOptions;
-  githubPages?: GenerateGithubPagesOptions;
-  dependencies?: Record<string, string>;
-  files?: Record<string, File>;
-  injections?: Array<{ location: CodeInjectionLocation; code: string }>;
-  replacements?: Array<{ search: string; replace: string }>;
-  packageManager?: string;
-  pnpmVersion?: string;
-  pnpmManageVersions?: boolean;
-  nodeVersion?: string;
-};
-
-export type File =
-  | {
-      type: "text";
-      content: string;
-    }
-  | {
-      type: "remote";
-      url: string;
-    };
-
-export type Linter = "eslint" | "oxlint" | "biome";
-export type Formatter = "prettier" | "oxfmt" | "biome";
-
-export type CodeInjectionLocation =
-  | "vite-config-import"
-  | "import"
-  | "global-start"
-  | "global-end"
-  | "dom-start"
-  | "dom"
-  | "dom-end"
-  | "scene-start"
-  | "scene"
-  | "scene-end"
-  | "readme-start"
-  | "readme-end"
-  | "readme-libraries"
-  | "readme-tools"
-  | "readme-commands"
-  | "vscode-extension-suggestion"
-  | "vscode-setting";
-
-export type Generator = {
-  get options(): GenerateOptions;
-  get versions(): PackageVersions;
-  addDependency(name: string, semver: string): void;
-  addDevDependency(name: string, semver: string): void;
-  addFile(path: string, file: File): void;
-  addScript(name: string, command: string): void;
-  inject(location: CodeInjectionLocation, code: string): void;
-  replace(search: string, replace: string): void;
-  configureVite(object: any): void;
-  addVscodeSetting(key: string, value: unknown): void;
-};
-
+/**
+ * Main generation function that creates all project files.
+ */
 export function generate(options: GenerateOptions) {
-  //deep cloning since integrations might decide to modify the options
+  // Deep cloning since integrations might decide to modify the options
   const clonedOptions = structuredClone(options);
   const template = clonedOptions.template ?? "vanilla";
   const baseTemplate = getBaseTemplate(template);
@@ -225,84 +105,12 @@ export function generate(options: GenerateOptions) {
 
   // TypeScript configuration
   if (language === "typescript") {
-    // Solution file - references app and node configs in .config/
-    const tsConfig = {
-      $schema: "https://json.schemastore.org/tsconfig",
-      files: [],
-      references: [
-        { path: "./.config/tsconfig.app.json" },
-        { path: "./.config/tsconfig.node.json" },
-      ],
-    };
-
-    files["tsconfig.json"] = {
-      type: "text",
-      content: JSON.stringify(tsConfig, null, 2),
-    };
-
-    // App config - browser environment for src/tests
-    const tsConfigApp: any = {
-      $schema: "https://json.schemastore.org/tsconfig",
-      compilerOptions: {
-        target: "ESNext",
-        module: "ESNext",
-        moduleResolution: "bundler",
-        lib: ["DOM", "DOM.Iterable", "ESNext"],
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        strict: true,
-        skipLibCheck: true,
-        composite: true,
-        rewriteRelativeImportExtensions: true,
-        erasableSyntaxOnly: true,
-      },
-      include: ["../src", "../tests"],
-    };
-
-    // Add JSX config for React templates
-    if (isReact || isR3f) {
-      tsConfigApp.compilerOptions.jsx = "react-jsx";
-      devDependencies["@types/react"] = "^19.0.0";
-      devDependencies["@types/react-dom"] = "^19.0.0";
-    }
-
-    // Add Three.js types for r3f
-    if (isR3f) {
-      devDependencies["@types/three"] = "~0.175.0";
-    }
-
-    files[".config/tsconfig.app.json"] = {
-      type: "text",
-      content: JSON.stringify(tsConfigApp, null, 2),
-    };
-
-    // Node config - Node environment for config files
-    const tsConfigNode = {
-      $schema: "https://json.schemastore.org/tsconfig",
-      compilerOptions: {
-        target: "ESNext",
-        module: "ESNext",
-        moduleResolution: "bundler",
-        lib: ["ESNext"],
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        strict: true,
-        skipLibCheck: true,
-        composite: true,
-        rewriteRelativeImportExtensions: true,
-        erasableSyntaxOnly: true,
-      },
-      include: ["../*.config.ts", "./*.ts"],
-    };
-
-    files[".config/tsconfig.node.json"] = {
-      type: "text",
-      content: JSON.stringify(tsConfigNode, null, 2),
-    };
+    const tsResult = generateTypescriptConfig(baseTemplate);
+    Object.assign(files, tsResult.files);
+    Object.assign(devDependencies, tsResult.devDependencies);
   }
 
-  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> =
-    {};
+  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
   const vscodeSettings: Record<string, unknown> = {};
   const scripts: Record<string, string> = isLibrary
     ? {} // Library build scripts are added by bundler integrations
@@ -313,9 +121,7 @@ export function generate(options: GenerateOptions) {
 
   // Setup vite config imports based on template (only for apps)
   if (!isLibrary && (isReact || isR3f)) {
-    codeSnippets["vite-config-import"] = [
-      "import react from '@vitejs/plugin-react'",
-    ];
+    codeSnippets["vite-config-import"] = ["import react from '@vitejs/plugin-react'"];
   }
 
   // Setup R3F-specific imports (only for apps)
@@ -326,12 +132,12 @@ export function generate(options: GenerateOptions) {
   const defaultName = isVanilla
     ? "vanilla-app"
     : isReact
-    ? "react-app"
-    : "react-three-app";
+      ? "react-app"
+      : "react-three-app";
   const name = clonedOptions.name ?? defaultName;
 
   // Build vite config based on template (only for apps)
-  let viteConfig: any = {
+  let viteConfig: Record<string, unknown> = {
     base: "./",
   };
 
@@ -349,16 +155,16 @@ export function generate(options: GenerateOptions) {
     addDependency(name, semver) {
       const existingSemver = dependencies[name];
       if (existingSemver != null) {
-        //TODO: intersect existingSemver with semver and write to semver
-        //TODO: throw error if no overlap
+        // TODO: intersect existingSemver with semver and write to semver
+        // TODO: throw error if no overlap
       }
       dependencies[name] = semver;
     },
     addDevDependency(name, semver) {
       const existingSemver = devDependencies[name];
       if (existingSemver != null) {
-        //TODO: intersect existingSemver with semver and write to semver
-        //TODO: throw error if no overlap
+        // TODO: intersect existingSemver with semver and write to semver
+        // TODO: throw error if no overlap
       }
       devDependencies[name] = semver;
     },
@@ -417,10 +223,7 @@ export function generate(options: GenerateOptions) {
     }
     // Add release script for libraries
     const packageManager = clonedOptions.packageManager ?? "pnpm";
-    generator.addScript(
-      "release",
-      `${packageManager} run build && ${packageManager} publish`
-    );
+    generator.addScript("release", `${packageManager} run build && ${packageManager} publish`);
   }
 
   // Testing - always include vitest
@@ -466,447 +269,74 @@ export function generate(options: GenerateOptions) {
 
   // Generate vite.config.ts (only for apps)
   if (!isLibrary) {
-    const viteConfigContent = [
-      `import { defineConfig } from 'vite'`,
-      ...(codeSnippets["vite-config-import"] ?? []),
-      `export default defineConfig(${JSON.stringify(viteConfig).replace(
-        /"\$raw:([^"]+)"/g,
-        (_, raw) => raw
-      )})`,
-    ].join("\n");
-
-    files["vite.config.ts"] = { type: "text", content: viteConfigContent };
+    files["vite.config.ts"] = generateViteConfig({ viteConfig, codeSnippets });
   }
 
   const packageManager = options.packageManager ?? "pnpm";
-  const isPnpm = packageManager === "pnpm";
 
-  // Build package.json with conditional pnpm-specific fields
-  const ext = language === "typescript" ? "ts" : "js";
-  const jsxExt = language === "typescript" ? "tsx" : "jsx";
-  const packageJson: Record<string, any> = {
+  // Generate README
+  files["README.md"] = generateReadme({
     name,
-    description: "Built with 🌹 create-krispya",
-    type: "module",
-  };
+    baseTemplate,
+    isLibrary,
+    libraryBundler,
+    packageManager,
+    codeSnippets,
+  });
 
-  // Add library-specific fields (ESM-first)
-  if (isLibrary) {
-    packageJson.main = "./dist/index.mjs";
-    packageJson.module = "./dist/index.mjs";
-    if (language === "typescript") {
-      packageJson.types = "./dist/index.d.ts";
-    }
-    packageJson.exports = {
-      ".": {
-        ...(language === "typescript" && { types: "./dist/index.d.ts" }),
-        import: "./dist/index.mjs",
-        require: "./dist/index.cjs",
-      },
-    };
-    packageJson.files = ["dist"];
-  }
+  // Generate source files
+  Object.assign(
+    files,
+    generateSourceFiles({
+      name,
+      baseTemplate,
+      language,
+      isLibrary,
+      codeSnippets,
+      replacements,
+    })
+  );
 
-  packageJson.scripts = scripts;
-  packageJson.dependencies = dependencies;
+  // Generate test files
+  Object.assign(
+    files,
+    generateTestFiles({
+      baseTemplate,
+      language,
+      isLibrary,
+    })
+  );
 
-  if (Object.keys(devDependencies).length > 0) {
-    packageJson.devDependencies = devDependencies;
-  }
+  // Generate package.json
+  Object.assign(
+    files,
+    generatePackageJson({
+      name,
+      baseTemplate,
+      language,
+      isLibrary,
+      dependencies,
+      devDependencies,
+      peerDependencies,
+      scripts,
+      options: clonedOptions,
+    }).files
+  );
 
-  if (isLibrary && Object.keys(peerDependencies).length > 0) {
-    packageJson.peerDependencies = peerDependencies;
-  }
+  // Generate VS Code files
+  Object.assign(files, generateVscodeFiles({ codeSnippets, vscodeSettings }));
 
-  // Add engines field if needed
-  const engines: Record<string, string> = {};
-
-  if (isPnpm) {
-    const pnpmVersion = options.pnpmVersion ?? "10.11.0";
-    const majorVersion = pnpmVersion.split(".")[0];
-    engines.pnpm = `>=${majorVersion}.0.0`;
-    packageJson.packageManager = `pnpm@${pnpmVersion}`;
-  }
-
-  if (options.nodeVersion) {
-    const majorVersion = options.nodeVersion.split(".")[0];
-    engines.node = `>=${majorVersion}.0.0`;
-  }
-
-  if (Object.keys(engines).length > 0) {
-    packageJson.engines = engines;
-  }
-
-  files["package.json"] = {
-    type: "text",
-    content: JSON.stringify(packageJson, null, 2),
-  };
-
-  // Add pnpm-workspace.yaml when pnpm is selected
-  if (isPnpm) {
-    const manageVersions = options.pnpmManageVersions ?? true;
-    const workspaceLines: string[] = [];
-
-    if (manageVersions) {
-      workspaceLines.push("manage-package-manager-versions: true", "");
-    }
-
-    workspaceLines.push("onlyBuiltDependencies:", "  - esbuild");
-
-    files["pnpm-workspace.yaml"] = {
-      type: "text",
-      content: workspaceLines.join("\n"),
-    };
-  }
-
+  // Git files
   files[".gitignore"] = {
     type: "text",
     content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
   };
   files[".gitattributes"] = { type: "text", content: GitAttributes };
 
-  codeSnippets["readme-libraries"] ??= [];
-  codeSnippets["readme-commands"] ??= [];
-
-  // Add library descriptions based on template
-  if (isLibrary) {
-    // Libraries don't mention vite, they mention their bundler
-  } else if (isVanilla) {
-    codeSnippets["readme-libraries"].unshift(
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
-    );
-  } else if (isReact) {
-    codeSnippets["readme-libraries"].unshift(
-      `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
-    );
-  } else {
-    codeSnippets["readme-libraries"].unshift(
-      `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
-      `[Three.js](https://threejs.org/) - JavaScript 3D library`,
-      `[@react-three/fiber](https://docs.pmnd.rs/react-three-fiber) - lets you create Three.js scenes using React components`
-    );
-  }
-
-  if (isLibrary) {
-    codeSnippets["readme-commands"].unshift(
-      `\`${packageManager} install\` to install the dependencies`,
-      `\`${packageManager} run build\` to build the library into the \`dist\` folder`,
-      `\`${packageManager} run test\` to run the tests`,
-      `\`${packageManager} run release\` to build and publish to npm`
-    );
-  } else {
-    codeSnippets["readme-commands"].unshift(
-      `\`${packageManager} install\` to install the dependencies`,
-      `\`${packageManager} run dev\` to run the development server and preview the app with live updates`,
-      `\`${packageManager} run build\` to build the app into the \`dist\` folder`,
-      `\`${packageManager} run test\` to run the tests`
-    );
-  }
-
-  // Generate template-specific architecture description
-  let architectureDesc: string[];
-  if (isLibrary) {
-    architectureDesc = [
-      `- \`src/index.${
-        isReact || isR3f ? jsxExt : ext
-      }\` is the main entry point for your library exports`,
-      `- Add your library code in the \`src\` folder`,
-      `- \`tests/\` contains your test files`,
-    ];
-  } else if (isVanilla) {
-    architectureDesc = [
-      `- \`src/main.${ext}\` is the entry point for your application`,
-      `- \`tests/\` contains your test files`,
-      `- Static assets can be placed in the \`public\` folder`,
-    ];
-  } else if (isReact) {
-    architectureDesc = [
-      `- \`src/app.${jsxExt}\` defines the main application component`,
-      `- \`src/index.${jsxExt}\` renders the React app into the DOM`,
-      `- \`tests/\` contains your test files`,
-      `- Static assets can be placed in the \`public\` folder`,
-    ];
-  } else {
-    architectureDesc = [
-      `- \`app.${jsxExt}\` defines the main application component containing your 3D content`,
-      `- Modify the content inside the \`<Canvas>\` component to change what is visible on screen`,
-      `- \`tests/\` contains your test files`,
-      `- Static assets can be placed in the \`public\` folder`,
-    ];
-  }
-
-  const bundlerDescription = isLibrary
-    ? libraryBundler === "unbuild"
-      ? `This library uses [unbuild](https://github.com/unjs/unbuild) for building.`
-      : `This library uses [tsdown](https://github.com/nicepkg/tsdown) for building.`
-    : `This project uses [Vite](https://vitejs.dev/) as the bundler for fast development and optimized production builds.`;
-
-  files[`README.md`] = {
-    type: "text",
-    content: [
-      `# ${name}`,
-      `This ${
-        isLibrary ? "library" : "project"
-      } was generated with create-krispya`,
-      ...(codeSnippets["readme-start"] ?? []),
-      "\n",
-      `## Project Architecture`,
-      bundlerDescription,
-      ...architectureDesc,
-      "\n",
-      `## Libraries`,
-      `The following libraries are used - checkout the linked docs to learn more`,
-      ...(codeSnippets["readme-libraries"] ?? []).map(
-        (library) => `- ${library}`
-      ),
-      "\n",
-      codeSnippets["readme-tools"] && `## Tools`,
-      ...(codeSnippets["readme-tools"] ?? []).map((tool) => `- ${tool}`),
-      codeSnippets["readme-tools"] && `\n`,
-      `## Development Commands`,
-      ...(codeSnippets["readme-commands"] ?? []).map(
-        (command) => `- ${command}`
-      ),
-      ...(codeSnippets["readme-end"] ?? []),
-    ]
-      .filter(Boolean)
-      .join("\n"),
-  };
-
-  // Generate template-specific source files
-  if (isLibrary) {
-    // Library entry point
-    const libExt = isReact || isR3f ? jsxExt : ext;
-    let libContent: string;
-
-    if (isVanilla) {
-      libContent = [
-        `// Library entry point`,
-        `export function hello(name: string = "world"): string {`,
-        `  return \`Hello, \${name}!\``,
-        `}`,
-      ].join("\n");
-    } else if (isReact) {
-      libContent = [
-        `// Library entry point`,
-        `export function MyComponent({ message = "Hello from library!" }: { message?: string }) {`,
-        `  return <div>{message}</div>`,
-        `}`,
-      ].join("\n");
-    } else {
-      // R3F library
-      libContent = [
-        `// Library entry point`,
-        `export function MyMesh({ color = "orange" }: { color?: string }) {`,
-        `  return (`,
-        `    <mesh>`,
-        `      <boxGeometry />`,
-        `      <meshStandardMaterial color={color} />`,
-        `    </mesh>`,
-        `  )`,
-        `}`,
-      ].join("\n");
-    }
-
-    files[`src/index.${libExt}`] = { type: "text", content: libContent };
-  } else if (isVanilla) {
-    // Vanilla template
-    files[`src/main.${ext}`] = { type: "text", content: ViteIndexContent };
-    files["src/style.css"] = { type: "text", content: ViteStyleContent };
-    const indexHtml = ViteHtmlContent.replace(
-      "$indexPath",
-      `./src/main.${ext}`
-    ).replace("$title", name);
-    files["index.html"] = { type: "text", content: indexHtml };
-  } else {
-    // React and R3F templates
-    files[`src/index.tsx`] = { type: "text", content: IndexContent };
-
-    const indexHtml = HtmlContent.replace(
-      "$indexPath",
-      language === "javascript" ? "./src/index.jsx" : "./src/index.tsx"
-    ).replace("$title", name);
-    files["index.html"] = { type: "text", content: indexHtml };
-
-    // Generate app.tsx
-    codeSnippets["dom-end"]?.reverse();
-    codeSnippets["global-end"]?.reverse();
-    codeSnippets["scene-end"]?.reverse();
-
-    let appCode: string;
-    if (isReact) {
-      // Simple React app without Canvas
-      appCode = [
-        ...(codeSnippets["import"] ?? []),
-        ...(codeSnippets["global-start"] ?? []),
-        `export function App() {`,
-        "  return (",
-        '    <div style={{ padding: "2rem" }}>',
-        "      <h1>Hello React!</h1>",
-        "      <p>Edit src/app.tsx and save to see changes.</p>",
-        "    </div>",
-        "  )",
-        "}",
-        ...(codeSnippets["global-end"] ?? []),
-      ].join("\n");
-    } else {
-      // R3F app with Canvas
-      appCode = [
-        ...(codeSnippets["import"] ?? []),
-        ...(codeSnippets["global-start"] ?? []),
-        `export function App() {`,
-        " return <>",
-        ...(codeSnippets["dom-start"] ?? []),
-        ...(codeSnippets["dom"] ?? []),
-        "   <Canvas>",
-        ...(codeSnippets["scene-start"] ?? []),
-        ...(codeSnippets["scene"] ?? []),
-        ...(codeSnippets["scene-end"] ?? []),
-        "   </Canvas>",
-        ...(codeSnippets["dom-end"] ?? []),
-        " </>",
-        "}",
-        ...(codeSnippets["global-end"] ?? []),
-      ].join("\n");
-    }
-
-    for (const { search, replace } of replacements) {
-      appCode = appCode.replace(search, replace);
-    }
-    files[`src/app.tsx`] = { type: "text", content: appCode };
-  }
-
-  // Generate sample test files
-  if (isLibrary) {
-    // Library test
-    const testExt = isReact || isR3f ? jsxExt : ext;
-    let testContent: string;
-
-    if (isVanilla) {
-      testContent = [
-        `import { describe, it, expect } from "vitest"`,
-        `import { hello } from "../src/index.js"`,
-        ``,
-        `describe("hello", () => {`,
-        `  it("returns greeting with default name", () => {`,
-        `    expect(hello()).toBe("Hello, world!")`,
-        `  })`,
-        ``,
-        `  it("returns greeting with custom name", () => {`,
-        `    expect(hello("vitest")).toBe("Hello, vitest!")`,
-        `  })`,
-        `})`,
-      ].join("\n");
-    } else if (isReact) {
-      testContent = [
-        `import { describe, it, expect } from "vitest"`,
-        `import { render, screen } from "@testing-library/react"`,
-        `import { MyComponent } from "../src/index.js"`,
-        ``,
-        `describe("MyComponent", () => {`,
-        `  it("renders with default message", () => {`,
-        `    render(<MyComponent />)`,
-        `    expect(screen.getByText("Hello from library!")).toBeDefined()`,
-        `  })`,
-        ``,
-        `  it("renders with custom message", () => {`,
-        `    render(<MyComponent message="Custom message" />)`,
-        `    expect(screen.getByText("Custom message")).toBeDefined()`,
-        `  })`,
-        `})`,
-      ].join("\n");
-    } else {
-      // R3F library - basic test without rendering Canvas
-      testContent = [
-        `import { describe, it, expect } from "vitest"`,
-        `import { MyMesh } from "../src/index.js"`,
-        ``,
-        `describe("MyMesh", () => {`,
-        `  it("is defined", () => {`,
-        `    expect(MyMesh).toBeDefined()`,
-        `  })`,
-        `})`,
-      ].join("\n");
-    }
-
-    files[`tests/index.test.${testExt}`] = {
-      type: "text",
-      content: testContent,
-    };
-  } else if (isVanilla) {
-    // Vanilla app test
-    const testContent = [
-      `import { describe, it, expect } from "vitest"`,
-      ``,
-      `describe("example", () => {`,
-      `  it("works", () => {`,
-      `    expect(1 + 1).toBe(2)`,
-      `  })`,
-      `})`,
-    ].join("\n");
-
-    files[`tests/main.test.${ext}`] = { type: "text", content: testContent };
-  } else if (isReact) {
-    // React app test
-    const testContent = [
-      `import { describe, it, expect } from "vitest"`,
-      `import { render, screen } from "@testing-library/react"`,
-      `import { App } from "../src/app.js"`,
-      ``,
-      `describe("App", () => {`,
-      `  it("renders heading", () => {`,
-      `    render(<App />)`,
-      `    expect(screen.getByText("Hello React!")).toBeDefined()`,
-      `  })`,
-      `})`,
-    ].join("\n");
-
-    files[`tests/app.test.${jsxExt}`] = { type: "text", content: testContent };
-  } else {
-    // R3F app test - basic test without rendering Canvas
-    const testContent = [
-      `import { describe, it, expect } from "vitest"`,
-      `import { App } from "../src/app.js"`,
-      ``,
-      `describe("App", () => {`,
-      `  it("is defined", () => {`,
-      `    expect(App).toBeDefined()`,
-      `  })`,
-      `})`,
-    ].join("\n");
-
-    files[`tests/app.test.${jsxExt}`] = { type: "text", content: testContent };
-  }
-
-  if (codeSnippets["vscode-extension-suggestion"]?.length) {
-    // Deduplicate extension recommendations
-    const uniqueRecommendations = [
-      ...new Set(codeSnippets["vscode-extension-suggestion"]),
-    ];
-    files[".vscode/extensions.json"] = {
-      type: "text",
-      content: JSON.stringify(
-        {
-          recommendations: uniqueRecommendations,
-        },
-        null,
-        2
-      ),
-    };
-  }
-
-  if (Object.keys(vscodeSettings).length > 0) {
-    files[".vscode/settings.json"] = {
-      type: "text",
-      content: JSON.stringify(vscodeSettings, null, "\t"),
-    };
-  }
-
   if (language === "javascript") {
-    //TODO: transpile tsx? to jsx? files}
+    // TODO: transpile tsx? to jsx? files
   }
-  //TODO: execute prettier on ts(x), js(x), and json files``
+  // TODO: execute prettier on ts(x), js(x), and json files
 
   return files;
 }

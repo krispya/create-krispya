@@ -1,5 +1,5 @@
 import { defaultFormatterConfig, defaultLinterConfig } from "../constants.js";
-import type { Generator } from "../index.js";
+import type { Generator } from "../types.js";
 
 export type GenerateBiomeOptions = {
   /** Whether biome is used as a linter */

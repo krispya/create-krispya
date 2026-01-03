@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateUikitOptions = {} | boolean;
+import type { GenerateUikitOptions, Generator } from "../types.js";
 
 export function generateUikit(generator: Generator, options: GenerateUikitOptions | undefined) {
   if (options == null) {

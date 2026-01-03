@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateHandleOptions = {} | boolean;
+import type { GenerateHandleOptions, Generator } from "../types.js";
 
 export function generateHandle(generator: Generator, options: GenerateHandleOptions | undefined) {
   if (options == null) {

@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateRapierOptions = {} | boolean;
+import type { GenerateRapierOptions, Generator } from "../types.js";
 
 export function generateRapier(generator: Generator, options: GenerateRapierOptions | undefined) {
   if (options == null) {

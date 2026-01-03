@@ -1,5 +1,5 @@
 import { defaultLinterConfig } from "../constants.js";
-import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../index.js";
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../types.js";
 
 export type GenerateEslintOptions = {} | boolean;
 

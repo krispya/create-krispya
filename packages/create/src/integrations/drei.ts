@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateDreiOptions = {} | boolean;
+import type { GenerateDreiOptions, Generator } from "../types.js";
 
 export function generateDrei(generator: Generator, options: GenerateDreiOptions | undefined) {
   if (options == null) {

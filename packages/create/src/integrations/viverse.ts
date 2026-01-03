@@ -1,6 +1,4 @@
-import type { Generator } from "../index.js";
-
-export type GenerateViverseOptions = {} | boolean;
+import type { GenerateViverseOptions, Generator } from "../types.js";
 
 export function generateViverse(generator: Generator, options: GenerateViverseOptions | undefined) {
   if (options == null || (generator.options.packageManager ?? "npm") != "npm") {
