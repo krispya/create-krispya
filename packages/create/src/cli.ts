@@ -21,6 +21,14 @@ import * as p from "@clack/prompts";
 import color from "chalk";
 import { fetch } from "undici";
 import { spawn } from "child_process";
+import {
+  clearConfig,
+  EditorChoice,
+  getPreferredEditor,
+  getReuseWindow,
+  setPreferredEditor,
+  setReuseWindow,
+} from "./config.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -482,22 +490,28 @@ interface CliOptions {
   packageManager?: string;
   nodeVersion?: string;
   yes?: boolean;
+  clearConfig?: boolean;
 }
+
+const editorNames: Record<string, string> = {
+  cursor: "Cursor",
+  code: "VS Code",
+  webstorm: "WebStorm",
+};
 
 function openInEditor(
   editor: "cursor" | "code" | "webstorm",
-  path: string
+  path: string,
+  reuseWindow: boolean
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === "win32";
-    // Reuse current window if running inside VS Code/Cursor terminal
-    const reuseWindow =
-      (editor === "cursor" || editor === "code") &&
-      process.env.TERM_PROGRAM === "vscode";
-    const args = reuseWindow ? ["-r", path] : [path];
+    // Only VS Code and Cursor support the -r flag
+    const useReuseFlag = reuseWindow && (editor === "cursor" || editor === "code");
+    const args = useReuseFlag ? ["-r", path] : [path];
 
     const child = isWindows
-      ? spawn(`${editor} ${reuseWindow ? "-r " : ""}"${path}"`, {
+      ? spawn(`${editor} ${useReuseFlag ? "-r " : ""}"${path}"`, {
           detached: true,
           stdio: "ignore",
           shell: true,
@@ -568,7 +582,15 @@ async function main() {
       'set Node.js version for engines.node field (default: "latest")'
     )
     .option("-y, --yes", "Skip prompts and use default values")
+    .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
     .action(async (name: string | undefined, options: CliOptions) => {
+      // Handle --clear-config flag
+      if (options.clearConfig) {
+        clearConfig();
+        console.log("Configuration cleared.");
+        process.exit(0);
+      }
+
       console.clear();
       p.intro(color.bgCyan(color.black(` create-krispya v${pkg.version} `)));
 
@@ -735,34 +757,74 @@ async function main() {
 
         p.note(nextSteps, "Next steps");
 
-        const openEditor = await p.select({
-          message: "Open project in editor?",
-          options: [
-            { value: "skip", label: "Skip" },
-            { value: "cursor", label: "Cursor" },
-            { value: "code", label: "VS Code" },
-            { value: "webstorm", label: "WebStorm" },
-          ],
-          initialValue: "skip",
-        });
+        const savedEditor = getPreferredEditor();
+        let selectedEditor: EditorChoice | undefined;
 
-        if (!p.isCancel(openEditor) && openEditor !== "skip") {
-          const editorNames = {
-            cursor: "Cursor",
-            code: "VS Code",
-            webstorm: "WebStorm",
-          };
+        if (savedEditor && savedEditor !== "skip") {
+          // Saved preference exists - show confirm prompt
+          const useDefault = await p.confirm({
+            message: `Open in editor? ${color.dim(`(${editorNames[savedEditor]})`)}`,
+            initialValue: true,
+          });
+
+          if (p.isCancel(useDefault)) {
+            selectedEditor = undefined;
+          } else if (useDefault) {
+            selectedEditor = savedEditor;
+          } else {
+            selectedEditor = "skip";
+          }
+        } else {
+          // No saved preference - show full selection
+          const openEditor = await p.select({
+            message: "Open project in editor?",
+            options: [
+              { value: "skip", label: "Skip" },
+              { value: "cursor", label: "Cursor" },
+              { value: "code", label: "VS Code" },
+              { value: "webstorm", label: "WebStorm" },
+            ],
+            initialValue: "skip",
+          });
+
+          if (!p.isCancel(openEditor)) {
+            selectedEditor = openEditor as EditorChoice;
+
+            // Ask to save preference
+            const saveChoice = await p.confirm({
+              message: `Save ${editorNames[selectedEditor] ?? "Skip"} as default editor?`,
+              initialValue: true,
+            });
+
+            if (!p.isCancel(saveChoice) && saveChoice) {
+              setPreferredEditor(selectedEditor);
+
+              // Ask about window preference (only for editors that support it)
+              if (selectedEditor === "cursor" || selectedEditor === "code") {
+                const reuseChoice = await p.confirm({
+                  message: "Reuse current window when opening projects?",
+                  initialValue: false,
+                });
+
+                if (!p.isCancel(reuseChoice)) {
+                  setReuseWindow(reuseChoice);
+                }
+              }
+            }
+          }
+        }
+
+        if (selectedEditor && selectedEditor !== "skip") {
           try {
             await openInEditor(
-              openEditor as "cursor" | "code" | "webstorm",
-              basePath
+              selectedEditor as "cursor" | "code" | "webstorm",
+              basePath,
+              getReuseWindow()
             );
-            p.log.success(
-              `Opening in ${editorNames[openEditor as keyof typeof editorNames]}...`
-            );
+            p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
           } catch {
             p.log.warn(
-              `Could not open ${editorNames[openEditor as keyof typeof editorNames]}. Make sure the CLI command is in your PATH.`
+              `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
             );
           }
         }
