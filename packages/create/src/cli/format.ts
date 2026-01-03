@@ -1,6 +1,15 @@
 import color from "chalk";
-import type { GenerateOptions, Template } from "../types.js";
+import type { GenerateOptions } from "../types.js";
 import { getBaseTemplate, getLanguageFromTemplate } from "../types.js";
+
+export type MonorepoConfigOptions = {
+  name: string;
+  nodeVersion: string;
+  packageManager: string;
+  pnpmManageVersions?: boolean;
+  linter: string;
+  formatter: string;
+};
 
 /**
  * Formats the configuration summary for display in the CLI.
@@ -93,6 +102,44 @@ export function formatConfigSummary(options: GenerateOptions): string {
       lines.push(`  ${left}${spacing}${right}`);
     }
   }
+
+  return lines.join("\n");
+}
+
+/**
+ * Formats the monorepo configuration summary for display in the CLI.
+ */
+export function formatMonorepoConfigSummary(options: MonorepoConfigOptions): string {
+  const lines: string[] = [];
+  const VALUE_COL = 27;
+
+  const formatRow = (label: string, value: string, indent = "") => {
+    const fullLabel = indent + label;
+    const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1);
+    const dots = color.gray(".".repeat(dotCount));
+    return `${indent}${label} ${dots} ${value}`;
+  };
+
+  // Node version
+  lines.push(formatRow("Node version", options.nodeVersion || "latest"));
+
+  // Package manager
+  lines.push(formatRow("Package manager", options.packageManager || "pnpm"));
+
+  // pnpm-specific options
+  if (options.packageManager === "pnpm") {
+    const versionManaged = options.pnpmManageVersions ? "yes" : "no";
+    lines.push(formatRow("↳ Version managed", versionManaged, ""));
+  }
+
+  // Linter
+  lines.push(formatRow("Linter", options.linter));
+
+  // Formatter
+  lines.push(formatRow("Formatter", options.formatter));
+
+  // Testing
+  lines.push(formatRow("Testing", "vitest"));
 
   return lines.join("\n");
 }

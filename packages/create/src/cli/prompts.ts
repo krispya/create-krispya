@@ -7,7 +7,7 @@ import type {
 } from "../types.js";
 import { getBaseTemplate } from "../types.js";
 import { generateRandomName } from "../utils.js";
-import { formatConfigSummary } from "./format.js";
+import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
 
 /**
  * Gets default options for a given template and project type.
@@ -275,6 +275,173 @@ export async function promptForCustomization(
 }
 
 /**
+ * Prompts for initial package in a monorepo.
+ */
+export async function promptForInitialPackage(): Promise<"app" | "library" | "skip"> {
+  const choice = await p.select({
+    message: "Add an initial package?",
+    options: [
+      { value: "app", label: "Application" },
+      { value: "library", label: "Library" },
+      { value: "skip", label: "Skip" },
+    ],
+    initialValue: "app",
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return choice as "app" | "library" | "skip";
+}
+
+/**
+ * Gets default options for a monorepo workspace.
+ */
+export function getDefaultMonorepoOptions(name: string): GenerateOptions {
+  return {
+    name,
+    projectType: "monorepo",
+    packageManager: "pnpm",
+    pnpmManageVersions: true,
+    nodeVersion: "latest",
+    linter: "oxlint",
+    formatter: "oxfmt",
+  };
+}
+
+/**
+ * Prompts for monorepo customization.
+ */
+async function promptForMonorepoCustomization(name: string): Promise<GenerateOptions> {
+  const nodeVersion = await p.text({
+    message: "Node.js version",
+    placeholder: "latest",
+    defaultValue: "latest",
+    validate: (value) => {
+      if (!value.length) return "Required";
+      if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
+      }
+    },
+  });
+
+  if (p.isCancel(nodeVersion)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const packageManager = await p.select({
+    message: "Package manager",
+    options: [
+      { value: "pnpm", label: "pnpm" },
+      { value: "npm", label: "npm" },
+      { value: "yarn", label: "yarn" },
+    ],
+    initialValue: "pnpm",
+  });
+
+  if (p.isCancel(packageManager)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  let pnpmManageVersions = true;
+  if (packageManager === "pnpm") {
+    const managePnpm = await p.confirm({
+      message: "Enable manage-package-manager-versions?",
+      initialValue: true,
+    });
+    if (p.isCancel(managePnpm)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    pnpmManageVersions = managePnpm;
+  }
+
+  const linter = await p.select({
+    message: "Linter",
+    options: [
+      { value: "oxlint", label: "Oxlint", hint: "fast, from OXC" },
+      { value: "eslint", label: "ESLint", hint: "classic" },
+      { value: "biome", label: "Biome", hint: "all-in-one" },
+    ],
+    initialValue: "oxlint",
+  });
+
+  if (p.isCancel(linter)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const formatter = await p.select({
+    message: "Formatter",
+    options: [
+      { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
+      { value: "prettier", label: "Prettier", hint: "classic" },
+      { value: "biome", label: "Biome", hint: "all-in-one" },
+    ],
+    initialValue: "oxfmt",
+  });
+
+  if (p.isCancel(formatter)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return {
+    name,
+    projectType: "monorepo",
+    nodeVersion,
+    packageManager: packageManager as string,
+    pnpmManageVersions,
+    linter: linter as "eslint" | "oxlint" | "biome",
+    formatter: formatter as "prettier" | "oxfmt" | "biome",
+  };
+}
+
+/**
+ * Main prompt flow for creating a monorepo workspace.
+ */
+async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions> {
+  const defaultOptions = getDefaultMonorepoOptions(workspaceName);
+
+  // Show summary and ask confirm/customize
+  p.note(
+    formatMonorepoConfigSummary({
+      name: defaultOptions.name,
+      nodeVersion: defaultOptions.nodeVersion ?? "latest",
+      packageManager: defaultOptions.packageManager ?? "pnpm",
+      pnpmManageVersions: defaultOptions.pnpmManageVersions,
+      linter: defaultOptions.linter ?? "oxlint",
+      formatter: defaultOptions.formatter ?? "oxfmt",
+    }),
+    "Workspace Configuration"
+  );
+
+  const action = await p.select({
+    message: "Proceed with these settings?",
+    options: [
+      { value: "confirm", label: "Yes, create workspace" },
+      { value: "customize", label: "No, let me customize" },
+    ],
+    initialValue: "confirm",
+  });
+
+  if (p.isCancel(action)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  if (action === "confirm") {
+    return defaultOptions;
+  }
+
+  return promptForMonorepoCustomization(workspaceName);
+}
+
+/**
  * Main prompt flow for gathering project options.
  */
 export async function promptForOptions(
@@ -298,12 +465,13 @@ export async function promptForOptions(
     projectName = nameResult;
   }
 
-  // Step 2: Select project type (app or library)
+  // Step 2: Select project type (app, library, or monorepo)
   const projectType = await p.select({
     message: "Project type",
     options: [
       { value: "app", label: "Application" },
       { value: "library", label: "Library" },
+      { value: "monorepo", label: "Monorepo" },
     ],
     initialValue: "app",
   });
@@ -313,7 +481,23 @@ export async function promptForOptions(
     process.exit(0);
   }
 
-  // Step 3: Select template (TypeScript by default, customize for JavaScript)
+  // If monorepo, handle differently
+  if (projectType === "monorepo") {
+    return promptForMonorepo(projectName);
+  }
+
+  return promptForPackageOptions(projectName, projectType as "app" | "library");
+}
+
+/**
+ * Prompt flow for package options when project type is already known.
+ * Used when adding packages to a monorepo.
+ */
+export async function promptForPackageOptions(
+  projectName: string,
+  projectType: "app" | "library"
+): Promise<GenerateOptions> {
+  // Select template (TypeScript by default, customize for JavaScript)
   const template = await p.select({
     message: "Select a template",
     options: [
@@ -332,10 +516,10 @@ export async function promptForOptions(
   const defaultOptions = getDefaultOptions(
     template as Template,
     projectName,
-    projectType as ProjectType
+    projectType
   );
 
-  // Step 4: Show summary and ask confirm/customize
+  // Show summary and ask confirm/customize
   p.note(formatConfigSummary(defaultOptions), "Template Configuration");
 
   const action = await p.select({
@@ -356,11 +540,11 @@ export async function promptForOptions(
     return defaultOptions;
   }
 
-  // Step 5: Customize
+  // Customize
   return promptForCustomization(
     template as Template,
     projectName,
-    projectType as ProjectType
+    projectType
   );
 }
 

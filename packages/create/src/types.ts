@@ -9,7 +9,7 @@ export type Template =
 
 export type BaseTemplate = "vanilla" | "react" | "r3f";
 
-export type ProjectType = "app" | "library";
+export type ProjectType = "app" | "library" | "monorepo";
 export type LibraryBundler = "unbuild" | "tsdown";
 
 // Package versions for dynamic fetching
@@ -132,6 +132,7 @@ export type GenerateOptions = {
   pnpmVersion?: string;
   pnpmManageVersions?: boolean;
   nodeVersion?: string;
+  workspaceRoot?: string; // relative path to workspace root (e.g., "../..")
 };
 
 // Generator interface for integrations

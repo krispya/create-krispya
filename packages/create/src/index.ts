@@ -8,6 +8,7 @@ import {
   generateViteConfig,
   generateVscodeFiles,
 } from "./generators/index.js";
+import { generateMonorepo } from "./generators/monorepo.js";
 import { generateBiome } from "./integrations/biome.js";
 import { generateDrei } from "./integrations/drei.js";
 import { generateEslint } from "./integrations/eslint.js";
@@ -44,6 +45,9 @@ import {
 // Re-export types and utilities
 export * from "./types.js";
 export * from "./utils.js";
+
+// Re-export generators
+export { generateMonorepo } from "./generators/monorepo.js";
 
 /**
  * Main generation function that creates all project files.
@@ -105,7 +109,10 @@ export function generate(options: GenerateOptions) {
 
   // TypeScript configuration
   if (language === "typescript") {
-    const tsResult = generateTypescriptConfig(baseTemplate);
+    const tsResult = generateTypescriptConfig({
+      baseTemplate,
+      workspaceRoot: clonedOptions.workspaceRoot,
+    });
     Object.assign(files, tsResult.files);
     Object.assign(devDependencies, tsResult.devDependencies);
   }

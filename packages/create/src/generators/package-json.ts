@@ -99,8 +99,8 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     content: JSON.stringify(packageJson, null, 2),
   };
 
-  // Add pnpm-workspace.yaml when pnpm is selected
-  if (isPnpm) {
+  // Add pnpm-workspace.yaml when pnpm is selected (but not in a workspace package)
+  if (isPnpm && !options.workspaceRoot) {
     const manageVersions = options.pnpmManageVersions ?? true;
     const workspaceLines: string[] = [];
 
