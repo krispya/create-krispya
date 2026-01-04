@@ -31,4 +31,8 @@ export function clearConfig(): void {
   config.clear();
 }
 
+export function getConfigPath(): string {
+  return config.path;
+}
+
 

@@ -20,6 +20,7 @@ import {
 import {
   clearConfig,
   EditorChoice,
+  getConfigPath,
   getPreferredEditor,
   getReuseWindow,
   setPreferredEditor,
@@ -64,6 +65,8 @@ interface CliOptions {
   nodeVersion?: string;
   yes?: boolean;
   clearConfig?: boolean;
+  configPath?: boolean;
+  openConfig?: boolean;
 }
 
 /**
@@ -135,11 +138,31 @@ async function main() {
     )
     .option("-y, --yes", "Skip prompts and use default values")
     .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
+    .option("--config-path", "Print the path to the config file")
+    .option("--open-config", "Open the config folder in file explorer")
     .action(async (name: string | undefined, options: CliOptions) => {
-      // Handle --clear-config flag
+      // Short-circuit: config management flags exit immediately
       if (options.clearConfig) {
         clearConfig();
         console.log("Configuration cleared.");
+        process.exit(0);
+      }
+
+      if (options.configPath) {
+        console.log(getConfigPath());
+        process.exit(0);
+      }
+
+      if (options.openConfig) {
+        const configDir = dirname(getConfigPath());
+        const { exec } = await import("child_process");
+        const cmd =
+          process.platform === "win32"
+            ? `start "" "${configDir}"`
+            : process.platform === "darwin"
+              ? `open "${configDir}"`
+              : `xdg-open "${configDir}"`;
+        exec(cmd);
         process.exit(0);
       }
 
