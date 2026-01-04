@@ -1,0 +1,12 @@
+{
+	"oxc.enable": true,
+	"eslint.enable": false,
+	"biome.enabled": false,
+	"editor.defaultFormatter": "oxc.oxc-vscode",
+	"[json]": {
+		"editor.defaultFormatter": "vscode.json-language-features"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "vscode.json-language-features"
+	}
+}

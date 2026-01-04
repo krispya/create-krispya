@@ -1,0 +1,23 @@
+{
+  "name": "root",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo workspace built with 🌹 create-krispya",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter './apps/*' run dev",
+    "build": "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
+    "test": "pnpm -r run test",
+    "lint": "oxlint .",
+    "format": "oxfmt ."
+  },
+  "devDependencies": {
+    "oxlint": "^1.36.0",
+    "oxfmt": "^0.21.0"
+  },
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "pnpm": ">=10.0.0",
+    "node": ">=24.0.0"
+  }
+}

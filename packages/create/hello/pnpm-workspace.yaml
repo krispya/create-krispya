@@ -1,0 +1,9 @@
+manage-package-manager-versions: true
+
+packages:
+  - ".config/*"
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - esbuild

@@ -111,7 +111,7 @@ export function generate(options: GenerateOptions) {
   if (language === "typescript") {
     const tsResult = generateTypescriptConfig({
       baseTemplate,
-      workspaceRoot: clonedOptions.workspaceRoot,
+      useConfigPackage: clonedOptions.workspaceRoot != null,
     });
     Object.assign(files, tsResult.files);
     Object.assign(devDependencies, tsResult.devDependencies);
@@ -155,6 +155,9 @@ export function generate(options: GenerateOptions) {
   if (!isLibrary && isR3f) {
     viteConfig.resolve = { dedupe: ["three"] };
   }
+
+  // Check if we're in a monorepo context (sub-package)
+  const isMonorepoPackage = clonedOptions.workspaceRoot != null;
 
   const generator: Generator = {
     options: clonedOptions,
@@ -330,15 +333,19 @@ export function generate(options: GenerateOptions) {
     }).files
   );
 
-  // Generate VS Code files
-  Object.assign(files, generateVscodeFiles({ codeSnippets, vscodeSettings }));
+  // Generate VS Code files (skip for monorepo sub-packages - use workspace root config)
+  if (!isMonorepoPackage) {
+    Object.assign(files, generateVscodeFiles({ codeSnippets, vscodeSettings }));
+  }
 
-  // Git files
-  files[".gitignore"] = {
-    type: "text",
-    content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
-  };
-  files[".gitattributes"] = { type: "text", content: GitAttributes };
+  // Git files (skip for monorepo sub-packages - use workspace root config)
+  if (!isMonorepoPackage) {
+    files[".gitignore"] = {
+      type: "text",
+      content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
+    };
+    files[".gitattributes"] = { type: "text", content: GitAttributes };
+  }
 
   if (language === "javascript") {
     // TODO: transpile tsx? to jsx? files

@@ -9,6 +9,9 @@ export function generateUnbuild(generator: Generator) {
   const isReact = baseTemplate === "react" || baseTemplate === "r3f";
   const ext = language === "typescript" ? "ts" : "js";
 
+  // Check if we're in a monorepo context (workspaceRoot is set)
+  const isMonorepo = generator.options.workspaceRoot != null;
+
   // Build config
   const buildConfigLines = [
     `import { defineBuildConfig } from "unbuild"`,
@@ -31,15 +34,24 @@ export function generateUnbuild(generator: Generator) {
   buildConfigLines.push(`  },`);
   buildConfigLines.push(`})`);
 
-  generator.addFile(`.config/build.config.${ext}`, {
-    type: "text",
-    content: buildConfigLines.join("\n"),
-  });
+  if (isMonorepo) {
+    // Monorepo: place config at package root
+    generator.addFile(`build.config.${ext}`, {
+      type: "text",
+      content: buildConfigLines.join("\n"),
+    });
+    generator.addScript("build", "unbuild");
+  } else {
+    // Standalone: place config in .config/
+    generator.addFile(`.config/build.config.${ext}`, {
+      type: "text",
+      content: buildConfigLines.join("\n"),
+    });
+    generator.addScript("build", `unbuild --config .config/build.config.${ext}`);
+  }
 
-  generator.addScript("build", `unbuild --config .config/build.config.${ext}`);
   generator.inject(
     "readme-libraries",
     "[unbuild](https://github.com/unjs/unbuild) - Unified JavaScript build system",
   );
 }
-
