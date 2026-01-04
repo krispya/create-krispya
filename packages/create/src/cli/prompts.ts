@@ -234,20 +234,7 @@ export async function promptForCustomization(
         { value: "triplex", label: "Triplex" },
         { value: "viverse", label: "Viverse" },
       ],
-      initialValues: [
-        "drei",
-        "handle",
-        "leva",
-        "postprocessing",
-        "rapier",
-        "xr",
-        "uikit",
-        "offscreen",
-        "zustand",
-        "koota",
-        "triplex",
-        "viverse",
-      ],
+      initialValues: ["drei"],
       required: false,
     });
     if (p.isCancel(selected)) {
