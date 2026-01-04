@@ -33,8 +33,16 @@ export function formatConfigSummary(options: GenerateOptions): string {
         : lang;
   };
 
-  // Language (derived from template)
+  // Template info (React, R3F, etc.)
   const projectType = options.projectType ?? "app";
+  const baseTemplate = options.template ? getBaseTemplate(options.template) : "vanilla";
+  if (baseTemplate === "react") {
+    lines.push(formatRow("Framework", "React"));
+  } else if (baseTemplate === "r3f") {
+    lines.push(formatRow("Framework", "React Three Fiber"));
+  }
+
+  // Language (derived from template)
   const language = options.template
     ? getLanguageFromTemplate(options.template)
     : "typescript";
@@ -69,8 +77,9 @@ export function formatConfigSummary(options: GenerateOptions): string {
     lines.push(formatRow("Formatter", options.formatter));
   }
 
-  // Testing (always vitest)
-  lines.push(formatRow("Testing", "vitest"));
+  // Testing
+  const testing = options.testing ?? (projectType === "library" ? "vitest" : "none");
+  lines.push(formatRow("Testing", testing));
 
   // R3F integrations
   if (options.template && getBaseTemplate(options.template) === "r3f") {
@@ -137,9 +146,6 @@ export function formatMonorepoConfigSummary(options: MonorepoConfigOptions): str
 
   // Formatter
   lines.push(formatRow("Formatter", options.formatter));
-
-  // Testing
-  lines.push(formatRow("Testing", "vitest"));
 
   return lines.join("\n");
 }

@@ -236,8 +236,11 @@ export function generate(options: GenerateOptions) {
     generator.addScript("release", `${packageManager} run build && ${packageManager} publish`);
   }
 
-  // Testing - always include vitest
-  generateVitest(generator);
+  // Testing - only if enabled (libraries default to vitest, apps default to none)
+  const testing = clonedOptions.testing ?? (isLibrary ? "vitest" : "none");
+  if (testing === "vitest") {
+    generateVitest(generator);
+  }
 
   // Linter and formatter integrations
   const linter = clonedOptions.linter;
@@ -307,15 +310,17 @@ export function generate(options: GenerateOptions) {
     })
   );
 
-  // Generate test files
-  Object.assign(
-    files,
-    generateTestFiles({
-      baseTemplate,
-      language,
-      isLibrary,
-    })
-  );
+  // Generate test files (only if testing is enabled)
+  if (testing === "vitest") {
+    Object.assign(
+      files,
+      generateTestFiles({
+        baseTemplate,
+        language,
+        isLibrary,
+      })
+    );
+  }
 
   // Generate package.json
   Object.assign(

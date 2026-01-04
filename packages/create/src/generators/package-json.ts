@@ -64,15 +64,19 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     packageJson.files = ["dist"];
   }
 
+  // Helper to sort object keys alphabetically
+  const sortKeys = <T extends Record<string, string>>(obj: T): T =>
+    Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))) as T;
+
   packageJson.scripts = scripts;
-  packageJson.dependencies = dependencies;
+  packageJson.dependencies = sortKeys(dependencies);
 
   if (Object.keys(devDependencies).length > 0) {
-    packageJson.devDependencies = devDependencies;
+    packageJson.devDependencies = sortKeys(devDependencies);
   }
 
   if (isLibrary && Object.keys(peerDependencies).length > 0) {
-    packageJson.peerDependencies = peerDependencies;
+    packageJson.peerDependencies = sortKeys(peerDependencies);
   }
 
   // Add packageManager and engines fields (skip for monorepo sub-packages - use root config)

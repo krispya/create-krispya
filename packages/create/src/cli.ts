@@ -213,13 +213,20 @@ async function main() {
 
           // Fetch package versions
           const versions: PackageVersions = {};
-          const versionPromises: Promise<void>[] = [
-            getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-              versions.vitest = v;
-            }),
-          ];
+          const versionPromises: Promise<void>[] = [];
 
-          if (packageOptions.projectType !== "library") {
+          // Only fetch vitest version if testing is enabled
+          const pkgIsLibrary = packageOptions.projectType === "library";
+          const pkgTesting = packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
+          if (pkgTesting === "vitest") {
+            versionPromises.push(
+              getLatestNpmVersion("vitest", "4.0.0").then((v) => {
+                versions.vitest = v;
+              })
+            );
+          }
+
+          if (!pkgIsLibrary) {
             versionPromises.push(
               getLatestNpmVersion("vite", "6.3.4").then((v) => {
                 versions.vite = v;
@@ -429,13 +436,20 @@ async function main() {
               // Fetch versions for the package
               const pkgManager = packageOptions.packageManager || "pnpm";
               const versions: PackageVersions = {};
-              const versionPromises: Promise<void>[] = [
-                getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-                  versions.vitest = v;
-                }),
-              ];
+              const versionPromises: Promise<void>[] = [];
 
-              if (packageOptions.projectType !== "library") {
+              // Only fetch vitest version if testing is enabled
+              const initPkgIsLibrary = packageOptions.projectType === "library";
+              const initPkgTesting = packageOptions.testing ?? (initPkgIsLibrary ? "vitest" : "none");
+              if (initPkgTesting === "vitest") {
+                versionPromises.push(
+                  getLatestNpmVersion("vitest", "4.0.0").then((v) => {
+                    versions.vitest = v;
+                  })
+                );
+              }
+
+              if (!initPkgIsLibrary) {
                 versionPromises.push(
                   getLatestNpmVersion("vite", "6.3.4").then((v) => {
                     versions.vite = v;
@@ -505,14 +519,21 @@ async function main() {
 
       // Fetch latest package versions in parallel
       const versions: PackageVersions = {};
-      const versionPromises: Promise<void>[] = [
-        getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-          versions.vitest = v;
-        }),
-      ];
+      const versionPromises: Promise<void>[] = [];
+
+      // Only fetch vitest version if testing is enabled
+      const isLibrary = generateOptions.projectType === "library";
+      const testing = generateOptions.testing ?? (isLibrary ? "vitest" : "none");
+      if (testing === "vitest") {
+        versionPromises.push(
+          getLatestNpmVersion("vitest", "4.0.0").then((v) => {
+            versions.vitest = v;
+          })
+        );
+      }
 
       // Only fetch vite version for apps
-      if (generateOptions.projectType !== "library") {
+      if (!isLibrary) {
         versionPromises.push(
           getLatestNpmVersion("vite", "6.3.4").then((v) => {
             versions.vite = v;

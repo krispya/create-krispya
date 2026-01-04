@@ -29,6 +29,8 @@ export function getDefaultOptions(
     nodeVersion: "latest",
     linter: "oxlint",
     formatter: "oxfmt",
+    // Libraries get vitest by default, apps don't
+    testing: projectType === "library" ? "vitest" : "none",
   };
 
   if (baseTemplate === "r3f") {
@@ -185,6 +187,21 @@ export async function promptForCustomization(
     process.exit(0);
   }
 
+  // Testing - default to vitest for libraries, none for apps
+  const testing = await p.select({
+    message: "Testing",
+    options: [
+      { value: "vitest", label: "Vitest", hint: "fast, Vite-native" },
+      { value: "none", label: "None" },
+    ],
+    initialValue: projectType === "library" ? "vitest" : "none",
+  });
+
+  if (p.isCancel(testing)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
   const language = await p.select({
     message: "Language",
     options: [
@@ -257,6 +274,7 @@ export async function promptForCustomization(
     pnpmManageVersions,
     linter: linter as "eslint" | "oxlint" | "biome",
     formatter: formatter as "prettier" | "oxfmt" | "biome",
+    testing: testing as "vitest" | "none",
     ...(baseTemplate === "r3f" && {
       drei: integrations.includes("drei") ? {} : undefined,
       handle: integrations.includes("handle") ? {} : undefined,

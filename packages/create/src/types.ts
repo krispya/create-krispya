@@ -37,6 +37,7 @@ export type File =
 // Linter and formatter choices
 export type Linter = "eslint" | "oxlint" | "biome";
 export type Formatter = "prettier" | "oxfmt" | "biome";
+export type Testing = "vitest" | "none";
 
 // Code injection locations for template assembly
 export type CodeInjectionLocation =
@@ -109,6 +110,7 @@ export type GenerateOptions = {
   template?: Template;
   linter?: Linter;
   formatter?: Formatter;
+  testing?: Testing;
   versions?: PackageVersions;
   fiber?: GenerateFiberOptions;
   handle?: GenerateHandleOptions;
