@@ -1,10 +1,5 @@
 import * as p from "@clack/prompts";
-import type {
-  GenerateOptions,
-  LibraryBundler,
-  ProjectType,
-  Template,
-} from "../types.js";
+import type { GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
 import { getBaseTemplate } from "../types.js";
 import { generateRandomName } from "../utils.js";
 import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
@@ -16,7 +11,7 @@ export function getDefaultOptions(
   template: Template,
   name: string,
   projectType: ProjectType = "app",
-  libraryBundler?: LibraryBundler
+  libraryBundler?: LibraryBundler,
 ): GenerateOptions {
   const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
@@ -75,7 +70,7 @@ export function getDefaultProjectName(template: Template): string {
 export async function promptForCustomization(
   template: Template,
   name: string,
-  projectType: ProjectType
+  projectType: ProjectType,
 ): Promise<GenerateOptions> {
   // Library bundler selection (only for libraries)
   let libraryBundler: LibraryBundler | undefined;
@@ -219,9 +214,7 @@ export async function promptForCustomization(
   // Derive final template based on language selection
   const baseTemplate = getBaseTemplate(template);
   const finalTemplate: Template =
-    language === "javascript"
-      ? (`${baseTemplate}-js` as Template)
-      : (baseTemplate as Template);
+    language === "javascript" ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
 
   let integrations: string[] = [];
   if (baseTemplate === "r3f") {
@@ -435,7 +428,7 @@ async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions
       linter: defaultOptions.linter ?? "oxlint",
       formatter: defaultOptions.formatter ?? "oxfmt",
     }),
-    "Workspace Configuration"
+    "Workspace Configuration",
   );
 
   const action = await p.select({
@@ -462,9 +455,7 @@ async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions
 /**
  * Main prompt flow for gathering project options.
  */
-export async function promptForOptions(
-  name: string | undefined
-): Promise<GenerateOptions> {
+export async function promptForOptions(name: string | undefined): Promise<GenerateOptions> {
   // Step 1: Project Name (if not provided via argument)
   let projectName = name;
   if (!projectName) {
@@ -513,7 +504,7 @@ export async function promptForOptions(
  */
 export async function promptForPackageOptions(
   projectName: string,
-  projectType: "app" | "library"
+  projectType: "app" | "library",
 ): Promise<GenerateOptions> {
   // Select template (TypeScript by default, customize for JavaScript)
   const template = await p.select({
@@ -531,11 +522,7 @@ export async function promptForPackageOptions(
     process.exit(0);
   }
 
-  const defaultOptions = getDefaultOptions(
-    template as Template,
-    projectName,
-    projectType
-  );
+  const defaultOptions = getDefaultOptions(template as Template, projectName, projectType);
 
   // Show summary and ask confirm/customize
   p.note(formatConfigSummary(defaultOptions), "Template Configuration");
@@ -559,10 +546,5 @@ export async function promptForPackageOptions(
   }
 
   // Customize
-  return promptForCustomization(
-    template as Template,
-    projectName,
-    projectType
-  );
+  return promptForCustomization(template as Template, projectName, projectType);
 }
-

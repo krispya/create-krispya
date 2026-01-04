@@ -22,7 +22,7 @@ export function generateVscodeFiles(params: VscodeParams): Record<string, File> 
           recommendations: uniqueRecommendations,
         },
         null,
-        2
+        2,
       ),
     };
   }
@@ -36,5 +36,3 @@ export function generateVscodeFiles(params: VscodeParams): Record<string, File> 
 
   return files;
 }
-
-

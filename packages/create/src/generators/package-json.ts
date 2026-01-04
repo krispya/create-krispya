@@ -125,4 +125,3 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
 
   return { files };
 }
-

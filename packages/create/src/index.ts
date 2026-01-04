@@ -67,8 +67,7 @@ export function generate(options: GenerateOptions) {
   const files: Record<string, File> = {
     ...clonedOptions.files,
   };
-  const replacements: Array<{ search: string; replace: string }> =
-    clonedOptions.replacements ?? [];
+  const replacements: Array<{ search: string; replace: string }> = clonedOptions.replacements ?? [];
 
   // Base dependencies
   const versions = clonedOptions.versions ?? {};
@@ -136,11 +135,7 @@ export function generate(options: GenerateOptions) {
     codeSnippets["import"] = [`import { Canvas } from "@react-three/fiber"`];
   }
 
-  const defaultName = isVanilla
-    ? "vanilla-app"
-    : isReact
-      ? "react-app"
-      : "react-three-app";
+  const defaultName = isVanilla ? "vanilla-app" : isReact ? "react-app" : "react-three-app";
   const name = clonedOptions.name ?? defaultName;
 
   // Build vite config based on template (only for apps)
@@ -307,7 +302,7 @@ export function generate(options: GenerateOptions) {
       isLibrary,
       codeSnippets,
       replacements,
-    })
+    }),
   );
 
   // Generate test files (only if testing is enabled)
@@ -318,7 +313,7 @@ export function generate(options: GenerateOptions) {
         baseTemplate,
         language,
         isLibrary,
-      })
+      }),
     );
   }
 
@@ -335,7 +330,7 @@ export function generate(options: GenerateOptions) {
       peerDependencies,
       scripts,
       options: clonedOptions,
-    }).files
+    }).files,
   );
 
   // Generate VS Code files (skip for monorepo sub-packages - use workspace root config)

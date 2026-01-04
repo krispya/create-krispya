@@ -13,14 +13,7 @@ export type ReadmeParams = {
  * Generates the README.md file for the project.
  */
 export function generateReadme(params: ReadmeParams): File {
-  const {
-    name,
-    baseTemplate,
-    isLibrary,
-    libraryBundler,
-    packageManager,
-    codeSnippets,
-  } = params;
+  const { name, baseTemplate, isLibrary, libraryBundler, packageManager, codeSnippets } = params;
 
   const isVanilla = baseTemplate === "vanilla";
   const isReact = baseTemplate === "react";
@@ -38,18 +31,18 @@ export function generateReadme(params: ReadmeParams): File {
     // Libraries don't mention vite, they mention their bundler
   } else if (isVanilla) {
     codeSnippets["readme-libraries"].unshift(
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
+      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
     );
   } else if (isReact) {
     codeSnippets["readme-libraries"].unshift(
       `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
-      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`
+      `[Vite](https://vitejs.dev/) - Next generation frontend tooling`,
     );
   } else {
     codeSnippets["readme-libraries"].unshift(
       `[React](https://react.dev/) - A JavaScript library for building user interfaces`,
       `[Three.js](https://threejs.org/) - JavaScript 3D library`,
-      `[@react-three/fiber](https://docs.pmnd.rs/react-three-fiber) - lets you create Three.js scenes using React components`
+      `[@react-three/fiber](https://docs.pmnd.rs/react-three-fiber) - lets you create Three.js scenes using React components`,
     );
   }
 
@@ -58,14 +51,14 @@ export function generateReadme(params: ReadmeParams): File {
       `\`${packageManager} install\` to install the dependencies`,
       `\`${packageManager} run build\` to build the library into the \`dist\` folder`,
       `\`${packageManager} run test\` to run the tests`,
-      `\`${packageManager} run release\` to build and publish to npm`
+      `\`${packageManager} run release\` to build and publish to npm`,
     );
   } else {
     codeSnippets["readme-commands"].unshift(
       `\`${packageManager} install\` to install the dependencies`,
       `\`${packageManager} run dev\` to run the development server and preview the app with live updates`,
       `\`${packageManager} run build\` to build the app into the \`dist\` folder`,
-      `\`${packageManager} run test\` to run the tests`
+      `\`${packageManager} run test\` to run the tests`,
     );
   }
 
@@ -130,5 +123,3 @@ export function generateReadme(params: ReadmeParams): File {
 
   return { type: "text", content };
 }
-
-

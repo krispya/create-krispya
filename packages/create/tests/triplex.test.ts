@@ -18,7 +18,7 @@ describe("triplex integration", () => {
         addVscodeSetting: vi.fn(),
         versions: {},
       },
-      {}
+      {},
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
@@ -86,7 +86,7 @@ describe("triplex integration", () => {
         addVscodeSetting: vi.fn(),
         versions: {},
       },
-      {}
+      {},
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`
@@ -160,7 +160,7 @@ describe("triplex integration", () => {
         addVscodeSetting: vi.fn(),
         versions: {},
       },
-      {}
+      {},
     );
 
     expect(addFile.mock.calls[0]).toMatchInlineSnapshot(`

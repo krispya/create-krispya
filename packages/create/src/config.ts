@@ -34,5 +34,3 @@ export function clearConfig(): void {
 export function getConfigPath(): string {
   return config.path;
 }
-
-

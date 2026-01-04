@@ -69,10 +69,7 @@ export function generateTypescriptConfig(
   const tsConfig = {
     $schema: "https://json.schemastore.org/tsconfig",
     files: [],
-    references: [
-      { path: "./.config/tsconfig.app.json" },
-      { path: "./.config/tsconfig.node.json" },
-    ],
+    references: [{ path: "./.config/tsconfig.app.json" }, { path: "./.config/tsconfig.node.json" }],
   };
 
   files["tsconfig.json"] = {

@@ -15,7 +15,7 @@ export const editorNames: Record<EditorType | "skip", string> = {
 export function openInEditor(
   editor: EditorType,
   path: string,
-  reuseWindow: boolean
+  reuseWindow: boolean,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === "win32";
@@ -38,5 +38,3 @@ export function openInEditor(
     setTimeout(resolve, 100);
   });
 }
-
-

@@ -26,11 +26,7 @@ export function formatConfigSummary(options: GenerateOptions): string {
   };
 
   const formatLanguage = (lang: string) => {
-    return lang === "typescript"
-      ? "TypeScript"
-      : lang === "javascript"
-        ? "JavaScript"
-        : lang;
+    return lang === "typescript" ? "TypeScript" : lang === "javascript" ? "JavaScript" : lang;
   };
 
   // Template info (React, R3F, etc.)
@@ -43,9 +39,7 @@ export function formatConfigSummary(options: GenerateOptions): string {
   }
 
   // Language (derived from template)
-  const language = options.template
-    ? getLanguageFromTemplate(options.template)
-    : "typescript";
+  const language = options.template ? getLanguageFromTemplate(options.template) : "typescript";
   lines.push(formatRow("Language", formatLanguage(language)));
 
   // Bundler
@@ -104,9 +98,7 @@ export function formatConfigSummary(options: GenerateOptions): string {
     // Two-column layout
     for (let i = 0; i < integrationNames.length; i += 2) {
       const left = `${color.green("●")} ${integrationNames[i]}`;
-      const right = integrationNames[i + 1]
-        ? `${color.green("●")} ${integrationNames[i + 1]}`
-        : "";
+      const right = integrationNames[i + 1] ? `${color.green("●")} ${integrationNames[i + 1]}` : "";
       const spacing = " ".repeat(Math.max(1, 16 - integrationNames[i]!.length));
       lines.push(`  ${left}${spacing}${right}`);
     }
@@ -149,4 +141,3 @@ export function formatMonorepoConfigSummary(options: MonorepoConfigOptions): str
 
   return lines.join("\n");
 }
-

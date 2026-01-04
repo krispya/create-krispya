@@ -103,11 +103,11 @@ async function main() {
     .option("--type <type>", "project type: app or library (default: app)")
     .option(
       "--bundler <bundler>",
-      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)"
+      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)",
     )
     .option(
       "--template <type>",
-      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
+      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)",
     )
     .option("--linter <type>", "linter: eslint, oxlint, or biome (default: oxlint)")
     .option("--formatter <type>", "formatter: prettier, oxfmt, or biome (default: oxfmt)")
@@ -126,15 +126,15 @@ async function main() {
     .option("--package-manager <manager>", "specify package manager (e.g. npm, yarn, pnpm)")
     .option(
       "--pnpm-manage-versions",
-      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)"
+      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)",
     )
     .option(
       "--no-pnpm-manage-versions",
-      "disable manage-package-manager-versions in pnpm-workspace.yaml"
+      "disable manage-package-manager-versions in pnpm-workspace.yaml",
     )
     .option(
       "--node-version <version>",
-      'set Node.js version for engines.node field (default: "latest")'
+      'set Node.js version for engines.node field (default: "latest")',
     )
     .option("-y, --yes", "Skip prompts and use default values")
     .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
@@ -190,7 +190,7 @@ async function main() {
         if (choice === "add") {
           // Add package to workspace flow
           const packageType = await promptForInitialPackage();
-          
+
           if (packageType === "skip") {
             p.cancel("Operation cancelled.");
             process.exit(0);
@@ -213,7 +213,7 @@ async function main() {
           // Determine target directory
           const targetDir = packageType === "app" ? "apps" : "packages";
           const packagePath = join(targetDir, packageName as string);
-          
+
           // Calculate workspace root relative path from package location
           const workspaceRoot = "../..";
 
@@ -245,7 +245,7 @@ async function main() {
             versionPromises.push(
               getLatestNpmVersion("vitest", "4.0.0").then((v) => {
                 versions.vitest = v;
-              })
+              }),
             );
           }
 
@@ -253,7 +253,7 @@ async function main() {
             versionPromises.push(
               getLatestNpmVersion("vite", "6.3.4").then((v) => {
                 versions.vite = v;
-              })
+              }),
             );
           }
 
@@ -262,19 +262,19 @@ async function main() {
             versionPromises.push(
               getLatestNpmVersion("eslint", "9.17.0").then((v) => {
                 versions.eslint = v;
-              })
+              }),
             );
           } else if (linter === "oxlint") {
             versionPromises.push(
               getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
                 versions.oxlint = v;
-              })
+              }),
             );
           } else if (linter === "biome") {
             versionPromises.push(
               getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
                 versions.biome = v;
-              })
+              }),
             );
           }
 
@@ -283,19 +283,19 @@ async function main() {
             versionPromises.push(
               getLatestNpmVersion("prettier", "3.4.2").then((v) => {
                 versions.prettier = v;
-              })
+              }),
             );
           } else if (formatter === "oxfmt") {
             versionPromises.push(
               getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
                 versions.oxfmt = v;
-              })
+              }),
             );
           } else if (formatter === "biome" && linter !== "biome") {
             versionPromises.push(
               getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
                 versions.biome = v;
-              })
+              }),
             );
           }
 
@@ -449,9 +449,12 @@ async function main() {
             if (!p.isCancel(packageName)) {
               const targetDir = initialPackage === "app" ? "apps" : "packages";
               const packagePath = join(targetDir, packageName as string);
-              
+
               // Prompt for template and other options for the initial package
-              const packageOptions = await promptForPackageOptions(packageName as string, initialPackage);
+              const packageOptions = await promptForPackageOptions(
+                packageName as string,
+                initialPackage,
+              );
               packageOptions.workspaceRoot = "../..";
               // Keep package name as just the name (not the full path)
               packageOptions.name = packageName as string;
@@ -463,12 +466,13 @@ async function main() {
 
               // Only fetch vitest version if testing is enabled
               const initPkgIsLibrary = packageOptions.projectType === "library";
-              const initPkgTesting = packageOptions.testing ?? (initPkgIsLibrary ? "vitest" : "none");
+              const initPkgTesting =
+                packageOptions.testing ?? (initPkgIsLibrary ? "vitest" : "none");
               if (initPkgTesting === "vitest") {
                 versionPromises.push(
                   getLatestNpmVersion("vitest", "4.0.0").then((v) => {
                     versions.vitest = v;
-                  })
+                  }),
                 );
               }
 
@@ -476,7 +480,7 @@ async function main() {
                 versionPromises.push(
                   getLatestNpmVersion("vite", "6.3.4").then((v) => {
                     versions.vite = v;
-                  })
+                  }),
                 );
               }
 
@@ -551,7 +555,7 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("vitest", "4.0.0").then((v) => {
             versions.vitest = v;
-          })
+          }),
         );
       }
 
@@ -560,7 +564,7 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("vite", "6.3.4").then((v) => {
             versions.vite = v;
-          })
+          }),
         );
       }
 
@@ -570,19 +574,19 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("eslint", "9.17.0").then((v) => {
             versions.eslint = v;
-          })
+          }),
         );
       } else if (linter === "oxlint") {
         versionPromises.push(
           getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
             versions.oxlint = v;
-          })
+          }),
         );
       } else if (linter === "biome") {
         versionPromises.push(
           getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
             versions.biome = v;
-          })
+          }),
         );
       }
 
@@ -592,20 +596,20 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("prettier", "3.4.2").then((v) => {
             versions.prettier = v;
-          })
+          }),
         );
       } else if (formatter === "oxfmt") {
         versionPromises.push(
           getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
             versions.oxfmt = v;
-          })
+          }),
         );
       } else if (formatter === "biome" && linter !== "biome") {
         // Only fetch if not already fetched for linter
         versionPromises.push(
           getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
             versions.biome = v;
-          })
+          }),
         );
       }
 
@@ -712,12 +716,12 @@ async function main() {
             await openInEditor(
               selectedEditor as "cursor" | "code" | "webstorm",
               basePath,
-              getReuseWindow()
+              getReuseWindow(),
             );
             p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
           } catch {
             p.log.warn(
-              `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
+              `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`,
             );
           }
         }

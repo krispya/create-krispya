@@ -19,15 +19,8 @@ export type MonorepoResult = {
  * Generates a monorepo workspace root structure with shared config packages.
  */
 export function generateMonorepo(params: MonorepoParams): MonorepoResult {
-  const {
-    name,
-    linter,
-    formatter,
-    packageManager,
-    pnpmVersion,
-    pnpmManageVersions,
-    nodeVersion,
-  } = params;
+  const { name, linter, formatter, packageManager, pnpmVersion, pnpmManageVersions, nodeVersion } =
+    params;
 
   const files: Record<string, File> = {};
   const isPnpm = packageManager === "pnpm";
@@ -103,13 +96,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
       workspaceLines.push("manage-package-manager-versions: true", "");
     }
 
-    workspaceLines.push(
-      "packages:",
-      '  - ".config/*"',
-      '  - "apps/*"',
-      '  - "packages/*"',
-      "",
-    );
+    workspaceLines.push("packages:", '  - ".config/*"', '  - "apps/*"', '  - "packages/*"', "");
     workspaceLines.push("onlyBuiltDependencies:", "  - esbuild");
 
     files["pnpm-workspace.yaml"] = {

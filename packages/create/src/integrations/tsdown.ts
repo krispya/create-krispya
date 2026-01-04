@@ -39,4 +39,3 @@ export function generateTsdown(generator: Generator) {
     "[tsdown](https://github.com/nicepkg/tsdown) - Fast TypeScript bundler powered by esbuild",
   );
 }
-

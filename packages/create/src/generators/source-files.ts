@@ -70,7 +70,7 @@ export function generateSourceFiles(params: SourceFilesParams): Record<string, F
     files["src/style.css"] = { type: "text", content: ViteStyleContent };
     const indexHtml = ViteHtmlContent.replace("$indexPath", `./src/main.${ext}`).replace(
       "$title",
-      name
+      name,
     );
     files["index.html"] = { type: "text", content: indexHtml };
   } else {
@@ -79,7 +79,7 @@ export function generateSourceFiles(params: SourceFilesParams): Record<string, F
 
     const indexHtml = HtmlContent.replace(
       "$indexPath",
-      language === "javascript" ? "./src/index.jsx" : "./src/index.tsx"
+      language === "javascript" ? "./src/index.jsx" : "./src/index.tsx",
     ).replace("$title", name);
     files["index.html"] = { type: "text", content: indexHtml };
 
@@ -133,5 +133,3 @@ export function generateSourceFiles(params: SourceFilesParams): Record<string, F
 
   return files;
 }
-
-

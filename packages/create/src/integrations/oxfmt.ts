@@ -3,10 +3,7 @@ import type { Generator } from "../types.js";
 
 export type GenerateOxfmtOptions = {} | boolean;
 
-export function generateOxfmt(
-  generator: Generator,
-  options: GenerateOxfmtOptions | undefined,
-) {
+export function generateOxfmt(generator: Generator, options: GenerateOxfmtOptions | undefined) {
   if (options == null) {
     return;
   }

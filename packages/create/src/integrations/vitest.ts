@@ -26,4 +26,3 @@ export function generateVitest(generator: Generator) {
     "[Vitest](https://vitest.dev/) - Fast unit test framework powered by Vite",
   );
 }
-

@@ -2,12 +2,9 @@ import type { GenerateGithubPagesOptions, Generator } from "../types.js";
 
 export function generateGithubPages(
   generator: Generator,
-  options: GenerateGithubPagesOptions | undefined
+  options: GenerateGithubPagesOptions | undefined,
 ) {
-  if (
-    options === false ||
-    (generator.options.packageManager ?? "npm") != "npm"
-  ) {
+  if (options === false || (generator.options.packageManager ?? "npm") != "npm") {
     return;
   }
   generator.addFile(".github/workflows/gh-pages.yml", {
@@ -57,18 +54,12 @@ jobs:
 `,
   });
 
-  generator.inject(
-    "readme-start",
-    `A github pages deployment action is configurd.`
-  );
-  if (
-    generator.options.githubUserName != null &&
-    generator.options.githubRepoName != null
-  ) {
+  generator.inject("readme-start", `A github pages deployment action is configurd.`);
+  if (generator.options.githubUserName != null && generator.options.githubRepoName != null) {
     const address = `${generator.options.githubUserName}.github.io/${generator.options.githubRepoName}`;
     generator.inject(
       "readme-start",
-      `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`
+      `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`,
     );
   }
 }

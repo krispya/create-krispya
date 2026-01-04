@@ -39,7 +39,7 @@ function formatValue(value: unknown, indent: number): string {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) return "{}";
     const props = entries.map(
-      ([key, val]) => `${innerSpaces}${key}: ${formatValue(val, indent + 1)}`
+      ([key, val]) => `${innerSpaces}${key}: ${formatValue(val, indent + 1)}`,
     );
     return `{\n${props.join(",\n")}\n${spaces}}`;
   }
