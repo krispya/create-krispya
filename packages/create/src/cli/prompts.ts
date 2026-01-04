@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts";
-import type { GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
+import { getCustomTemplates, saveCustomTemplate, type CustomTemplate } from "../config.js";
+import type { BaseTemplate, GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
 import { getBaseTemplate } from "../types.js";
 import { generateRandomName } from "../utils.js";
 import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
@@ -486,6 +487,115 @@ export async function promptForOptions(name: string | undefined): Promise<Genera
 }
 
 /**
+ * Extracts integrations from GenerateOptions for R3F templates.
+ */
+function extractIntegrations(options: GenerateOptions): string[] {
+  const integrations: string[] = [];
+  if (options.drei) integrations.push("drei");
+  if (options.handle) integrations.push("handle");
+  if (options.leva) integrations.push("leva");
+  if (options.postprocessing) integrations.push("postprocessing");
+  if (options.rapier) integrations.push("rapier");
+  if (options.xr) integrations.push("xr");
+  if (options.uikit) integrations.push("uikit");
+  if (options.offscreen) integrations.push("offscreen");
+  if (options.zustand) integrations.push("zustand");
+  if (options.koota) integrations.push("koota");
+  if (options.triplex) integrations.push("triplex");
+  if (options.viverse) integrations.push("viverse");
+  return integrations;
+}
+
+/**
+ * Prompts user to save their customized configuration as a template.
+ */
+async function promptToSaveTemplate(options: GenerateOptions): Promise<void> {
+  const saveAsTemplate = await p.confirm({
+    message: "Save this configuration as a template?",
+    initialValue: false,
+  });
+
+  if (p.isCancel(saveAsTemplate) || !saveAsTemplate) {
+    return;
+  }
+
+  const templateName = await p.text({
+    message: "Template name",
+    placeholder: "my-template",
+    validate: (value) => {
+      if (!value.length) return "Template name is required";
+      if (!/^[a-z0-9-]+$/i.test(value)) return "Use only letters, numbers, and hyphens";
+      const existing = getCustomTemplates();
+      if (existing[value]) return "A template with this name already exists";
+    },
+  });
+
+  if (p.isCancel(templateName)) {
+    return;
+  }
+
+  const baseTemplate = options.template ? getBaseTemplate(options.template) : "vanilla";
+  const customTemplate: CustomTemplate = {
+    baseTemplate,
+    linter: options.linter ?? "oxlint",
+    formatter: options.formatter ?? "oxfmt",
+    testing: options.testing ?? "none",
+  };
+
+  if (baseTemplate === "r3f") {
+    customTemplate.integrations = extractIntegrations(options);
+  }
+
+  saveCustomTemplate(templateName, customTemplate);
+  p.log.success(`Template "${templateName}" saved!`);
+}
+
+/**
+ * Converts a custom template to GenerateOptions.
+ */
+function customTemplateToOptions(
+  customTemplate: CustomTemplate,
+  name: string,
+  projectType: "app" | "library",
+): GenerateOptions {
+  const baseTemplate = customTemplate.baseTemplate;
+  const template: Template = baseTemplate; // TypeScript by default for custom templates
+
+  const base: GenerateOptions = {
+    name,
+    template,
+    projectType,
+    packageManager: "pnpm",
+    pnpmManageVersions: true,
+    nodeVersion: "latest",
+    linter: customTemplate.linter,
+    formatter: customTemplate.formatter,
+    testing: customTemplate.testing,
+  };
+
+  if (baseTemplate === "r3f" && customTemplate.integrations) {
+    const integrations = customTemplate.integrations;
+    return {
+      ...base,
+      drei: integrations.includes("drei") ? {} : undefined,
+      handle: integrations.includes("handle") ? {} : undefined,
+      leva: integrations.includes("leva") ? {} : undefined,
+      postprocessing: integrations.includes("postprocessing") ? {} : undefined,
+      rapier: integrations.includes("rapier") ? {} : undefined,
+      xr: integrations.includes("xr") ? {} : undefined,
+      uikit: integrations.includes("uikit") ? {} : undefined,
+      offscreen: integrations.includes("offscreen") ? {} : undefined,
+      zustand: integrations.includes("zustand") ? {} : undefined,
+      koota: integrations.includes("koota") ? {} : undefined,
+      triplex: integrations.includes("triplex") ? {} : undefined,
+      viverse: integrations.includes("viverse") ? {} : undefined,
+    };
+  }
+
+  return base;
+}
+
+/**
  * Prompt flow for package options when project type is already known.
  * Used when adding packages to a monorepo.
  */
@@ -493,23 +603,76 @@ export async function promptForPackageOptions(
   projectName: string,
   projectType: "app" | "library",
 ): Promise<GenerateOptions> {
+  // Build template options including custom templates
+  const builtInOptions = [
+    { value: "vanilla", label: "Vanilla" },
+    { value: "react", label: "React" },
+    { value: "r3f", label: "React Three Fiber" },
+  ];
+
+  const customTemplates = getCustomTemplates();
+  const customOptions = Object.keys(customTemplates).map((name) => ({
+    value: `custom:${name}`,
+    label: name,
+    hint: "saved template",
+  }));
+
+  const allOptions = [...builtInOptions, ...customOptions];
+
   // Select template (TypeScript by default, customize for JavaScript)
-  const template = await p.select({
+  const templateSelection = await p.select({
     message: "Select a template",
-    options: [
-      { value: "vanilla", label: "Vanilla" },
-      { value: "react", label: "React" },
-      { value: "r3f", label: "React Three Fiber" },
-    ],
+    options: allOptions,
     initialValue: "vanilla",
   });
 
-  if (p.isCancel(template)) {
+  if (p.isCancel(templateSelection)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
   }
 
-  const defaultOptions = getDefaultOptions(template as Template, projectName, projectType);
+  const selection = templateSelection as string;
+
+  // Handle custom template selection
+  if (selection.startsWith("custom:")) {
+    const customName = selection.slice(7); // Remove "custom:" prefix
+    const customTemplate = customTemplates[customName]!;
+    const defaultOptions = customTemplateToOptions(customTemplate, projectName, projectType);
+
+    // Show summary and ask confirm/customize
+    p.note(formatConfigSummary(defaultOptions), `Template: ${customName}`);
+
+    const action = await p.select({
+      message: "Proceed with these settings?",
+      options: [
+        { value: "confirm", label: "Yes, create project" },
+        { value: "customize", label: "No, let me customize" },
+      ],
+      initialValue: "confirm",
+    });
+
+    if (p.isCancel(action)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    if (action === "confirm") {
+      return defaultOptions;
+    }
+
+    // Customize starting from the custom template's base
+    const customizedOptions = await promptForCustomization(
+      customTemplate.baseTemplate as Template,
+      projectName,
+      projectType,
+    );
+    await promptToSaveTemplate(customizedOptions);
+    return customizedOptions;
+  }
+
+  // Handle built-in template selection
+  const template = selection as Template;
+  const defaultOptions = getDefaultOptions(template, projectName, projectType);
 
   // Show summary and ask confirm/customize
   p.note(formatConfigSummary(defaultOptions), "Template Configuration");
@@ -533,5 +696,7 @@ export async function promptForPackageOptions(
   }
 
   // Customize
-  return promptForCustomization(template as Template, projectName, projectType);
+  const customizedOptions = await promptForCustomization(template, projectName, projectType);
+  await promptToSaveTemplate(customizedOptions);
+  return customizedOptions;
 }
