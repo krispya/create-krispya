@@ -330,6 +330,7 @@ export function generate(options: GenerateOptions) {
       peerDependencies,
       scripts,
       options: clonedOptions,
+      workspaceDependencies: clonedOptions.workspaceDependencies,
     }).files,
   );
 

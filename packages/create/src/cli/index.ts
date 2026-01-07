@@ -9,4 +9,5 @@ export {
   getDefaultProjectName,
   promptForInitialPackage,
   getDefaultMonorepoOptions,
+  type InheritedTooling,
 } from "./prompts.js";

@@ -1,18 +1,22 @@
 import * as p from "@clack/prompts";
-import { getCustomTemplates, saveCustomTemplate, type CustomTemplate } from "../config.js";
-import type { BaseTemplate, GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
+import { getCustomTemplates, type CustomTemplate } from "../config.js";
+import type { GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
 import { getBaseTemplate } from "../types.js";
 import { generateRandomName } from "../utils.js";
 import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
 
 /**
  * Gets default options for a given template and project type.
+ * For R3F templates, pass integrations array to specify which integrations to include.
+ * When inheritedTooling is provided, uses those values instead of defaults.
  */
 export function getDefaultOptions(
   template: Template,
   name: string,
   projectType: ProjectType = "app",
   libraryBundler?: LibraryBundler,
+  integrations?: string[],
+  inheritedTooling?: InheritedTooling,
 ): GenerateOptions {
   const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
@@ -23,27 +27,27 @@ export function getDefaultOptions(
     packageManager: "pnpm",
     pnpmManageVersions: true,
     nodeVersion: "latest",
-    linter: "oxlint",
-    formatter: "oxfmt",
+    linter: inheritedTooling?.linter ?? "oxlint",
+    formatter: inheritedTooling?.formatter ?? "oxfmt",
     // Libraries get vitest by default, apps don't
     testing: projectType === "library" ? "vitest" : "none",
   };
 
-  if (baseTemplate === "r3f") {
+  if (baseTemplate === "r3f" && integrations) {
     return {
       ...base,
-      drei: {},
-      handle: {},
-      leva: {},
-      postprocessing: {},
-      rapier: {},
-      xr: {},
-      uikit: {},
-      offscreen: {},
-      zustand: {},
-      koota: {},
-      triplex: {},
-      viverse: {},
+      drei: integrations.includes("drei") ? {} : undefined,
+      handle: integrations.includes("handle") ? {} : undefined,
+      leva: integrations.includes("leva") ? {} : undefined,
+      postprocessing: integrations.includes("postprocessing") ? {} : undefined,
+      rapier: integrations.includes("rapier") ? {} : undefined,
+      xr: integrations.includes("xr") ? {} : undefined,
+      uikit: integrations.includes("uikit") ? {} : undefined,
+      offscreen: integrations.includes("offscreen") ? {} : undefined,
+      zustand: integrations.includes("zustand") ? {} : undefined,
+      koota: integrations.includes("koota") ? {} : undefined,
+      triplex: integrations.includes("triplex") ? {} : undefined,
+      viverse: integrations.includes("viverse") ? {} : undefined,
     };
   }
 
@@ -66,12 +70,48 @@ export function getDefaultProjectName(template: Template): string {
 }
 
 /**
+ * Prompts for R3F integrations selection.
+ */
+async function promptForR3fIntegrations(): Promise<string[]> {
+  const selected = await p.multiselect({
+    message: "R3F integrations",
+    options: [
+      { value: "drei", label: "Drei" },
+      { value: "handle", label: "Handle" },
+      { value: "leva", label: "Leva" },
+      { value: "postprocessing", label: "Postprocessing" },
+      { value: "rapier", label: "Rapier" },
+      { value: "xr", label: "XR" },
+      { value: "uikit", label: "UIKit" },
+      { value: "offscreen", label: "Offscreen" },
+      { value: "zustand", label: "Zustand" },
+      { value: "koota", label: "Koota" },
+      { value: "triplex", label: "Triplex" },
+      { value: "viverse", label: "Viverse" },
+    ],
+    initialValues: ["drei"],
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return selected as string[];
+}
+
+/**
  * Prompts user for customization options.
+ * For R3F templates, integrations should be passed in (already selected upfront).
+ * When inheritedTooling is provided, linter/formatter prompts are skipped.
  */
 export async function promptForCustomization(
   template: Template,
   name: string,
   projectType: ProjectType,
+  integrations?: string[],
+  inheritedTooling?: InheritedTooling,
 ): Promise<GenerateOptions> {
   // Library bundler selection (only for libraries)
   let libraryBundler: LibraryBundler | undefined;
@@ -153,34 +193,44 @@ export async function promptForCustomization(
     pnpmManageVersions = managePnpm;
   }
 
-  const linter = await p.select({
-    message: "Linter",
-    options: [
-      { value: "oxlint", label: "Oxlint", hint: "fast, from OXC" },
-      { value: "eslint", label: "ESLint", hint: "classic" },
-      { value: "biome", label: "Biome", hint: "all-in-one" },
-    ],
-    initialValue: "oxlint",
-  });
+  // Skip linter/formatter prompts if inherited from workspace
+  let linter: "oxlint" | "eslint" | "biome" = inheritedTooling?.linter ?? "oxlint";
+  let formatter: "oxfmt" | "prettier" | "biome" = inheritedTooling?.formatter ?? "oxfmt";
 
-  if (p.isCancel(linter)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
+  if (!inheritedTooling?.linter) {
+    const linterChoice = await p.select({
+      message: "Linter",
+      options: [
+        { value: "oxlint", label: "Oxlint", hint: "fast, from OXC" },
+        { value: "eslint", label: "ESLint", hint: "classic" },
+        { value: "biome", label: "Biome", hint: "all-in-one" },
+      ],
+      initialValue: "oxlint",
+    });
+
+    if (p.isCancel(linterChoice)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    linter = linterChoice as "oxlint" | "eslint" | "biome";
   }
 
-  const formatter = await p.select({
-    message: "Formatter",
-    options: [
-      { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
-      { value: "prettier", label: "Prettier", hint: "classic" },
-      { value: "biome", label: "Biome", hint: "all-in-one" },
-    ],
-    initialValue: "oxfmt",
-  });
+  if (!inheritedTooling?.formatter) {
+    const formatterChoice = await p.select({
+      message: "Formatter",
+      options: [
+        { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
+        { value: "prettier", label: "Prettier", hint: "classic" },
+        { value: "biome", label: "Biome", hint: "all-in-one" },
+      ],
+      initialValue: "oxfmt",
+    });
 
-  if (p.isCancel(formatter)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
+    if (p.isCancel(formatterChoice)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    formatter = formatterChoice as "oxfmt" | "prettier" | "biome";
   }
 
   // Testing - default to vitest for libraries, none for apps
@@ -217,35 +267,7 @@ export async function promptForCustomization(
   const finalTemplate: Template =
     language === "javascript" ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
 
-  let integrations: string[] = [];
-  if (baseTemplate === "r3f") {
-    const selected = await p.multiselect({
-      message: "R3F integrations",
-      options: [
-        { value: "drei", label: "Drei" },
-        { value: "handle", label: "Handle" },
-        { value: "leva", label: "Leva" },
-        { value: "postprocessing", label: "Postprocessing" },
-        { value: "rapier", label: "Rapier" },
-        { value: "xr", label: "XR" },
-        { value: "uikit", label: "UIKit" },
-        { value: "offscreen", label: "Offscreen" },
-        { value: "zustand", label: "Zustand" },
-        { value: "koota", label: "Koota" },
-        { value: "triplex", label: "Triplex" },
-        { value: "viverse", label: "Viverse" },
-      ],
-      initialValues: ["drei"],
-      required: false,
-    });
-    if (p.isCancel(selected)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    integrations = selected as string[];
-  }
-
-  return {
+  const base: GenerateOptions = {
     name,
     template: finalTemplate,
     projectType,
@@ -253,10 +275,15 @@ export async function promptForCustomization(
     nodeVersion,
     packageManager: finalPackageManager,
     pnpmManageVersions,
-    linter: linter as "eslint" | "oxlint" | "biome",
-    formatter: formatter as "prettier" | "oxfmt" | "biome",
+    linter,
+    formatter,
     testing: testing as "vitest" | "none",
-    ...(baseTemplate === "r3f" && {
+  };
+
+  // For R3F, use the integrations passed in (already selected upfront)
+  if (baseTemplate === "r3f" && integrations) {
+    return {
+      ...base,
       drei: integrations.includes("drei") ? {} : undefined,
       handle: integrations.includes("handle") ? {} : undefined,
       leva: integrations.includes("leva") ? {} : undefined,
@@ -269,8 +296,10 @@ export async function promptForCustomization(
       koota: integrations.includes("koota") ? {} : undefined,
       triplex: integrations.includes("triplex") ? {} : undefined,
       viverse: integrations.includes("viverse") ? {} : undefined,
-    }),
-  };
+    };
+  }
+
+  return base;
 }
 
 /**
@@ -419,21 +448,17 @@ async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions
     "Workspace Configuration",
   );
 
-  const action = await p.select({
+  const proceed = await p.confirm({
     message: "Proceed with these settings?",
-    options: [
-      { value: "confirm", label: "Yes, create workspace" },
-      { value: "customize", label: "No, let me customize" },
-    ],
-    initialValue: "confirm",
+    initialValue: true,
   });
 
-  if (p.isCancel(action)) {
+  if (p.isCancel(proceed)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
   }
 
-  if (action === "confirm") {
+  if (proceed) {
     return defaultOptions;
   }
 
@@ -487,70 +512,6 @@ export async function promptForOptions(name: string | undefined): Promise<Genera
 }
 
 /**
- * Extracts integrations from GenerateOptions for R3F templates.
- */
-function extractIntegrations(options: GenerateOptions): string[] {
-  const integrations: string[] = [];
-  if (options.drei) integrations.push("drei");
-  if (options.handle) integrations.push("handle");
-  if (options.leva) integrations.push("leva");
-  if (options.postprocessing) integrations.push("postprocessing");
-  if (options.rapier) integrations.push("rapier");
-  if (options.xr) integrations.push("xr");
-  if (options.uikit) integrations.push("uikit");
-  if (options.offscreen) integrations.push("offscreen");
-  if (options.zustand) integrations.push("zustand");
-  if (options.koota) integrations.push("koota");
-  if (options.triplex) integrations.push("triplex");
-  if (options.viverse) integrations.push("viverse");
-  return integrations;
-}
-
-/**
- * Prompts user to save their customized configuration as a template.
- */
-async function promptToSaveTemplate(options: GenerateOptions): Promise<void> {
-  const saveAsTemplate = await p.confirm({
-    message: "Save this configuration as a template?",
-    initialValue: false,
-  });
-
-  if (p.isCancel(saveAsTemplate) || !saveAsTemplate) {
-    return;
-  }
-
-  const templateName = await p.text({
-    message: "Template name",
-    placeholder: "my-template",
-    validate: (value) => {
-      if (!value.length) return "Template name is required";
-      if (!/^[a-z0-9-]+$/i.test(value)) return "Use only letters, numbers, and hyphens";
-      const existing = getCustomTemplates();
-      if (existing[value]) return "A template with this name already exists";
-    },
-  });
-
-  if (p.isCancel(templateName)) {
-    return;
-  }
-
-  const baseTemplate = options.template ? getBaseTemplate(options.template) : "vanilla";
-  const customTemplate: CustomTemplate = {
-    baseTemplate,
-    linter: options.linter ?? "oxlint",
-    formatter: options.formatter ?? "oxfmt",
-    testing: options.testing ?? "none",
-  };
-
-  if (baseTemplate === "r3f") {
-    customTemplate.integrations = extractIntegrations(options);
-  }
-
-  saveCustomTemplate(templateName, customTemplate);
-  p.log.success(`Template "${templateName}" saved!`);
-}
-
-/**
  * Converts a custom template to GenerateOptions.
  */
 function customTemplateToOptions(
@@ -595,13 +556,20 @@ function customTemplateToOptions(
   return base;
 }
 
+export type InheritedTooling = {
+  linter?: "oxlint" | "eslint" | "biome";
+  formatter?: "oxfmt" | "prettier" | "biome";
+};
+
 /**
  * Prompt flow for package options when project type is already known.
  * Used when adding packages to a monorepo.
+ * When inheritedTooling is provided, linter/formatter prompts are skipped.
  */
 export async function promptForPackageOptions(
   projectName: string,
   projectType: "app" | "library",
+  inheritedTooling?: InheritedTooling,
 ): Promise<GenerateOptions> {
   // Build template options including custom templates
   const builtInOptions = [
@@ -639,64 +607,83 @@ export async function promptForPackageOptions(
     const customTemplate = customTemplates[customName]!;
     const defaultOptions = customTemplateToOptions(customTemplate, projectName, projectType);
 
-    // Show summary and ask confirm/customize
-    p.note(formatConfigSummary(defaultOptions), `Template: ${customName}`);
+    // Override with inherited tooling if provided
+    if (inheritedTooling?.linter) {
+      defaultOptions.linter = inheritedTooling.linter;
+    }
+    if (inheritedTooling?.formatter) {
+      defaultOptions.formatter = inheritedTooling.formatter;
+    }
 
-    const action = await p.select({
+    // Show summary and ask confirm/customize
+    const configTitle = inheritedTooling
+      ? `Template: ${customName} (using workspace tooling)`
+      : `Template: ${customName}`;
+    p.note(formatConfigSummary(defaultOptions), configTitle);
+
+    const proceed = await p.confirm({
       message: "Proceed with these settings?",
-      options: [
-        { value: "confirm", label: "Yes, create project" },
-        { value: "customize", label: "No, let me customize" },
-      ],
-      initialValue: "confirm",
+      initialValue: true,
     });
 
-    if (p.isCancel(action)) {
+    if (p.isCancel(proceed)) {
       p.cancel("Operation cancelled.");
       process.exit(0);
     }
 
-    if (action === "confirm") {
+    if (proceed) {
       return defaultOptions;
     }
 
-    // Customize starting from the custom template's base
-    const customizedOptions = await promptForCustomization(
+    // Customize starting from the custom template's base (preserve integrations)
+    return promptForCustomization(
       customTemplate.baseTemplate as Template,
       projectName,
       projectType,
+      customTemplate.integrations,
+      inheritedTooling,
     );
-    await promptToSaveTemplate(customizedOptions);
-    return customizedOptions;
   }
 
   // Handle built-in template selection
   const template = selection as Template;
-  const defaultOptions = getDefaultOptions(template, projectName, projectType);
+  const baseTemplate = getBaseTemplate(template);
+
+  // For R3F, immediately prompt for integrations
+  let integrations: string[] | undefined;
+  if (baseTemplate === "r3f") {
+    integrations = await promptForR3fIntegrations();
+  }
+
+  const defaultOptions = getDefaultOptions(
+    template,
+    projectName,
+    projectType,
+    undefined,
+    integrations,
+    inheritedTooling,
+  );
 
   // Show summary and ask confirm/customize
-  p.note(formatConfigSummary(defaultOptions), "Template Configuration");
+  const configTitle = inheritedTooling
+    ? "Template Configuration (using workspace tooling)"
+    : "Template Configuration";
+  p.note(formatConfigSummary(defaultOptions), configTitle);
 
-  const action = await p.select({
+  const proceed = await p.confirm({
     message: "Proceed with these settings?",
-    options: [
-      { value: "confirm", label: "Yes, create project" },
-      { value: "customize", label: "No, let me customize" },
-    ],
-    initialValue: "confirm",
+    initialValue: true,
   });
 
-  if (p.isCancel(action)) {
+  if (p.isCancel(proceed)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
   }
 
-  if (action === "confirm") {
+  if (proceed) {
     return defaultOptions;
   }
 
-  // Customize
-  const customizedOptions = await promptForCustomization(template, projectName, projectType);
-  await promptToSaveTemplate(customizedOptions);
-  return customizedOptions;
+  // Customize (pass integrations for R3F so they're preserved)
+  return promptForCustomization(template, projectName, projectType, integrations, inheritedTooling);
 }

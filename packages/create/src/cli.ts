@@ -94,6 +94,358 @@ async function detectMonorepoRoot(): Promise<string | null> {
   return null;
 }
 
+type WorkspaceTooling = {
+  linter?: "oxlint" | "eslint" | "biome";
+  formatter?: "oxfmt" | "prettier" | "biome";
+};
+
+/**
+ * Detects linter and formatter from the monorepo root package.json.
+ */
+async function detectWorkspaceTooling(monorepoRoot: string): Promise<WorkspaceTooling> {
+  try {
+    const pkgPath = join(monorepoRoot, "package.json");
+    const content = await readFile(pkgPath, "utf-8");
+    const pkg = JSON.parse(content) as { devDependencies?: Record<string, string> };
+    const devDeps = pkg.devDependencies ?? {};
+
+    const linter = devDeps.oxlint
+      ? "oxlint"
+      : devDeps.eslint
+        ? "eslint"
+        : devDeps["@biomejs/biome"]
+          ? "biome"
+          : undefined;
+
+    const formatter = devDeps.oxfmt
+      ? "oxfmt"
+      : devDeps.prettier
+        ? "prettier"
+        : devDeps["@biomejs/biome"]
+          ? "biome"
+          : undefined;
+
+    return { linter, formatter };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Gets the monorepo scope name from root package.json name field or directory name.
+ */
+async function getMonorepoScope(monorepoRoot: string): Promise<string> {
+  try {
+    const pkgPath = join(monorepoRoot, "package.json");
+    const content = await readFile(pkgPath, "utf-8");
+    const pkg = JSON.parse(content) as { name?: string };
+    // Use package.json name if it exists, otherwise use directory name
+    if (pkg.name) {
+      // Strip any existing @ prefix and /root suffix
+      return pkg.name.replace(/^@/, "").replace(/\/.*$/, "");
+    }
+  } catch {
+    // Fall through to directory name
+  }
+  // Use the directory name as fallback
+  return monorepoRoot.split(/[/\\]/).pop() ?? "workspace";
+}
+
+type WorkspacePackage = {
+  name: string;
+  path: string;
+};
+
+/**
+ * Scans the packages/ directory for existing workspace packages.
+ */
+async function getWorkspacePackages(monorepoRoot: string): Promise<WorkspacePackage[]> {
+  const packagesDir = join(monorepoRoot, "packages");
+  const packages: WorkspacePackage[] = [];
+
+  try {
+    const { readdir } = await import("fs/promises");
+    const entries = await readdir(packagesDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        try {
+          const pkgJsonPath = join(packagesDir, entry.name, "package.json");
+          const content = await readFile(pkgJsonPath, "utf-8");
+          const pkg = JSON.parse(content) as { name?: string };
+          if (pkg.name) {
+            packages.push({ name: pkg.name, path: `packages/${entry.name}` });
+          }
+        } catch {
+          // No package.json or invalid, skip
+        }
+      }
+    }
+  } catch {
+    // packages/ doesn't exist yet
+  }
+
+  return packages;
+}
+
+/**
+ * Creates a single package in a monorepo workspace.
+ * Returns true if another package should be added, false otherwise.
+ */
+async function createPackageInWorkspace(
+  monorepoRoot: string,
+  packageManager: string,
+  inheritedTooling: WorkspaceTooling,
+  scope: string,
+): Promise<boolean> {
+  // Prompt for package type
+  const packageType = await promptForInitialPackage();
+
+  if (packageType === "skip") {
+    return false;
+  }
+
+  // Prompt for package name (without scope - we'll add it)
+  const packageNameInput = await p.text({
+    message: "Package name?",
+    placeholder: `Scoped to @${scope}/`,
+    validate: (value) => {
+      if (!value.length) return "Package name is required";
+    },
+  });
+
+  if (p.isCancel(packageNameInput)) {
+    return false;
+  }
+
+  // Build scoped package name
+  const shortName = packageNameInput as string;
+  const scopedName = `@${scope}/${shortName}`;
+
+  // Determine target directory (use short name for folder)
+  const targetDir = packageType === "app" ? "apps" : "packages";
+  const packagePath = join(targetDir, shortName);
+  const workspaceRoot = "../..";
+
+  // Continue with package prompt flow (with inherited tooling)
+  const packageOptions = await promptForPackageOptions(
+    scopedName,
+    packageType,
+    inheritedTooling,
+  );
+  packageOptions.workspaceRoot = workspaceRoot;
+  packageOptions.name = scopedName;
+
+  // Fetch versions
+  if (packageManager === "pnpm") {
+    packageOptions.pnpmVersion = await getLatestPnpmVersion();
+  }
+
+  const nodeVersion = packageOptions.nodeVersion ?? "latest";
+  if (nodeVersion === "latest") {
+    packageOptions.nodeVersion = await getLatestNodeVersion();
+  }
+
+  // Fetch package versions
+  const versions: PackageVersions = {};
+  const versionPromises: Promise<void>[] = [];
+
+  const pkgIsLibrary = packageOptions.projectType === "library";
+  const pkgTesting = packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
+  if (pkgTesting === "vitest") {
+    versionPromises.push(
+      getLatestNpmVersion("vitest", "4.0.0").then((v) => {
+        versions.vitest = v;
+      }),
+    );
+  }
+
+  if (!pkgIsLibrary) {
+    versionPromises.push(
+      getLatestNpmVersion("vite", "6.3.4").then((v) => {
+        versions.vite = v;
+      }),
+    );
+  }
+
+  const linter = packageOptions.linter ?? "oxlint";
+  if (linter === "eslint") {
+    versionPromises.push(
+      getLatestNpmVersion("eslint", "9.17.0").then((v) => {
+        versions.eslint = v;
+      }),
+    );
+  } else if (linter === "oxlint") {
+    versionPromises.push(
+      getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
+        versions.oxlint = v;
+      }),
+    );
+  } else if (linter === "biome") {
+    versionPromises.push(
+      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
+        versions.biome = v;
+      }),
+    );
+  }
+
+  const formatter = packageOptions.formatter ?? "oxfmt";
+  if (formatter === "prettier") {
+    versionPromises.push(
+      getLatestNpmVersion("prettier", "3.4.2").then((v) => {
+        versions.prettier = v;
+      }),
+    );
+  } else if (formatter === "oxfmt") {
+    versionPromises.push(
+      getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
+        versions.oxfmt = v;
+      }),
+    );
+  } else if (formatter === "biome" && linter !== "biome") {
+    versionPromises.push(
+      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
+        versions.biome = v;
+      }),
+    );
+  }
+
+  await Promise.all(versionPromises);
+  packageOptions.versions = versions;
+
+  // For apps, prompt for workspace dependencies
+  if (packageType === "app") {
+    const workspacePackages = await getWorkspacePackages(monorepoRoot);
+    if (workspacePackages.length > 0) {
+      const selectedDeps = await p.multiselect({
+        message: "Add workspace dependencies?",
+        options: workspacePackages.map((pkg) => ({
+          value: pkg.name,
+          label: pkg.name.replace(/^@[^/]+\//, ""),
+        })),
+        required: false,
+      });
+
+      if (!p.isCancel(selectedDeps) && selectedDeps.length > 0) {
+        packageOptions.workspaceDependencies = selectedDeps as string[];
+      }
+    }
+  }
+
+  const basePath = join(monorepoRoot, packagePath);
+  const s = p.spinner();
+  s.start("Creating package...");
+
+  try {
+    const files = generate(packageOptions);
+    const filePaths = Object.keys(files).sort();
+
+    for (const filePath of filePaths) {
+      const fullFilePath = join(basePath, filePath);
+      await mkdir(dirname(fullFilePath), { recursive: true });
+      const file = files[filePath]!;
+
+      if (file.type === "text") {
+        await writeFile(fullFilePath, file.content);
+      } else {
+        const response = await fetch(file.url);
+        await writeFile(fullFilePath, response.body!);
+      }
+    }
+
+    s.stop(color.green.inverse(` ✓ Package created at ${packagePath}! `));
+
+    // Ask if user wants to add another package
+    const addAnother = await p.select({
+      message: "Add another package?",
+      options: [
+        { value: "no", label: "No, I'm done" },
+        { value: "yes", label: "Yes, add another" },
+      ],
+      initialValue: "no",
+    });
+
+    return !p.isCancel(addAnother) && addAnother === "yes";
+  } catch (error) {
+    s.stop("Failed to create package");
+    p.log.error(String(error));
+    return false;
+  }
+}
+
+/**
+ * Shows editor prompt and opens project if selected.
+ */
+async function promptAndOpenEditor(basePath: string): Promise<void> {
+  const savedEditor = getPreferredEditor();
+  let selectedEditor: EditorChoice | undefined;
+
+  if (savedEditor && savedEditor !== "skip") {
+    const useDefault = await p.confirm({
+      message: `Open in editor? ${color.dim(`(${editorNames[savedEditor]})`)}`,
+      initialValue: true,
+    });
+
+    if (p.isCancel(useDefault)) {
+      selectedEditor = undefined;
+    } else if (useDefault) {
+      selectedEditor = savedEditor;
+    } else {
+      selectedEditor = "skip";
+    }
+  } else {
+    const openEditor = await p.select({
+      message: "Open project in editor?",
+      options: [
+        { value: "skip", label: "Skip" },
+        { value: "cursor", label: "Cursor" },
+        { value: "code", label: "VS Code" },
+        { value: "webstorm", label: "WebStorm" },
+      ],
+      initialValue: "skip",
+    });
+
+    if (!p.isCancel(openEditor)) {
+      selectedEditor = openEditor as EditorChoice;
+
+      const saveChoice = await p.confirm({
+        message: `Save ${editorNames[selectedEditor] ?? "Skip"} as default editor?`,
+        initialValue: true,
+      });
+
+      if (!p.isCancel(saveChoice) && saveChoice) {
+        setPreferredEditor(selectedEditor);
+
+        if (selectedEditor === "cursor" || selectedEditor === "code") {
+          const reuseChoice = await p.confirm({
+            message: "Reuse current window when opening projects?",
+            initialValue: false,
+          });
+
+          if (!p.isCancel(reuseChoice)) {
+            setReuseWindow(reuseChoice);
+          }
+        }
+      }
+    }
+  }
+
+  if (selectedEditor && selectedEditor !== "skip") {
+    try {
+      await openInEditor(
+        selectedEditor as "cursor" | "code" | "webstorm",
+        basePath,
+        getReuseWindow(),
+      );
+      p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
+    } catch {
+      p.log.warn(
+        `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`,
+      );
+    }
+  }
+}
+
 async function main() {
   const program = new Command()
     .name("create-krispya")
@@ -173,164 +525,38 @@ async function main() {
         }
 
         if (choice === "add") {
-          // Add package to workspace flow
-          const packageType = await promptForInitialPackage();
-
-          if (packageType === "skip") {
-            p.cancel("Operation cancelled.");
-            process.exit(0);
+          // Detect workspace tooling for inherited settings
+          const inheritedTooling = await detectWorkspaceTooling(monorepoRoot);
+          if (inheritedTooling.linter || inheritedTooling.formatter) {
+            const toolingInfo = [
+              inheritedTooling.linter && `linter: ${inheritedTooling.linter}`,
+              inheritedTooling.formatter && `formatter: ${inheritedTooling.formatter}`,
+            ]
+              .filter(Boolean)
+              .join(", ");
+            p.log.info(`Using workspace tooling (${toolingInfo})`);
           }
 
-          // Prompt for package name
-          const packageName = await p.text({
-            message: "Package name?",
-            placeholder: packageType === "app" ? "my-app" : "my-package",
-            validate: (value) => {
-              if (!value.length) return "Package name is required";
-            },
-          });
+          // Get monorepo scope for package naming
+          const scope = await getMonorepoScope(monorepoRoot);
 
-          if (p.isCancel(packageName)) {
-            p.cancel("Operation cancelled.");
-            process.exit(0);
+          // Package creation loop
+          let addMore = true;
+          while (addMore) {
+            addMore = await createPackageInWorkspace(monorepoRoot, "pnpm", inheritedTooling, scope);
           }
 
-          // Determine target directory
-          const targetDir = packageType === "app" ? "apps" : "packages";
-          const packagePath = join(targetDir, packageName as string);
+          // Show next steps
+          p.note(
+            [`cd ${monorepoRoot}`, "pnpm install", "pnpm run dev"].join("\n"),
+            "Next steps",
+          );
 
-          // Calculate workspace root relative path from package location
-          const workspaceRoot = "../..";
+          // Offer to open in editor
+          await promptAndOpenEditor(monorepoRoot);
 
-          // Continue with package prompt flow (project type already known)
-          const packageOptions = await promptForPackageOptions(packageName as string, packageType);
-          packageOptions.workspaceRoot = workspaceRoot;
-          // Keep package name as just the name (not the full path)
-          packageOptions.name = packageName as string;
-
-          // Fetch versions and continue with generation
-          const packageManager = packageOptions.packageManager || "pnpm";
-          if (packageManager === "pnpm") {
-            packageOptions.pnpmVersion = await getLatestPnpmVersion();
-          }
-
-          const nodeVersion = packageOptions.nodeVersion ?? "latest";
-          if (nodeVersion === "latest") {
-            packageOptions.nodeVersion = await getLatestNodeVersion();
-          }
-
-          // Fetch package versions
-          const versions: PackageVersions = {};
-          const versionPromises: Promise<void>[] = [];
-
-          // Only fetch vitest version if testing is enabled
-          const pkgIsLibrary = packageOptions.projectType === "library";
-          const pkgTesting = packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
-          if (pkgTesting === "vitest") {
-            versionPromises.push(
-              getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-                versions.vitest = v;
-              }),
-            );
-          }
-
-          if (!pkgIsLibrary) {
-            versionPromises.push(
-              getLatestNpmVersion("vite", "6.3.4").then((v) => {
-                versions.vite = v;
-              }),
-            );
-          }
-
-          const linter = packageOptions.linter ?? "oxlint";
-          if (linter === "eslint") {
-            versionPromises.push(
-              getLatestNpmVersion("eslint", "9.17.0").then((v) => {
-                versions.eslint = v;
-              }),
-            );
-          } else if (linter === "oxlint") {
-            versionPromises.push(
-              getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
-                versions.oxlint = v;
-              }),
-            );
-          } else if (linter === "biome") {
-            versionPromises.push(
-              getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-                versions.biome = v;
-              }),
-            );
-          }
-
-          const formatter = packageOptions.formatter ?? "oxfmt";
-          if (formatter === "prettier") {
-            versionPromises.push(
-              getLatestNpmVersion("prettier", "3.4.2").then((v) => {
-                versions.prettier = v;
-              }),
-            );
-          } else if (formatter === "oxfmt") {
-            versionPromises.push(
-              getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
-                versions.oxfmt = v;
-              }),
-            );
-          } else if (formatter === "biome" && linter !== "biome") {
-            versionPromises.push(
-              getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-                versions.biome = v;
-              }),
-            );
-          }
-
-          await Promise.all(versionPromises);
-          packageOptions.versions = versions;
-
-          const basePath = join(monorepoRoot, packagePath);
-          const s = p.spinner();
-          s.start("Creating package...");
-
-          try {
-            const files = generate(packageOptions);
-            const filePaths = Object.keys(files).sort();
-
-            for (const filePath of filePaths) {
-              const fullFilePath = join(basePath, filePath);
-              await mkdir(dirname(fullFilePath), { recursive: true });
-              const file = files[filePath]!;
-
-              if (file.type === "text") {
-                await writeFile(fullFilePath, file.content);
-              } else {
-                const response = await fetch(file.url);
-                await writeFile(fullFilePath, response.body!);
-              }
-            }
-
-            s.stop("Package created!");
-
-            const isLibrary = packageOptions.projectType === "library";
-            const nextSteps = isLibrary
-              ? [
-                  `cd ${packagePath}`,
-                  `${packageManager} install`,
-                  `${packageManager} run build`,
-                ].join("\n")
-              : [
-                  `cd ${packagePath}`,
-                  `${packageManager} install`,
-                  `${packageManager} run dev`,
-                ].join("\n");
-
-            p.note(nextSteps, "Next steps");
-            p.outro(color.green("Happy coding! ✨"));
-            process.exit(0);
-          } catch (error) {
-            s.stop("Failed to create package");
-            p.log.error(String(error));
-            process.exit(1);
-          }
+          p.outro(color.green("Happy coding! ✨"));
+          process.exit(0);
         }
         // If standalone, continue with normal flow below
       }
@@ -416,84 +642,21 @@ async function main() {
             }
           }
 
-          s.stop("Monorepo workspace created!");
+          s.stop(color.green.inverse(" ✓ Monorepo workspace created! "));
 
-          // Ask if user wants to add an initial package
-          const initialPackage = await promptForInitialPackage();
+          // For new monorepos, tooling comes from generate options (no inheritance needed yet)
+          const newMonorepoTooling: WorkspaceTooling = {
+            linter: generateOptions.linter,
+            formatter: generateOptions.formatter,
+          };
 
-          if (initialPackage !== "skip") {
-            // Prompt for package name
-            const packageName = await p.text({
-              message: "Package name?",
-              placeholder: initialPackage === "app" ? "my-app" : "my-package",
-              validate: (value) => {
-                if (!value.length) return "Package name is required";
-              },
-            });
+          // Use the monorepo name as the scope
+          const scope = generateOptions.name;
 
-            if (!p.isCancel(packageName)) {
-              const targetDir = initialPackage === "app" ? "apps" : "packages";
-              const packagePath = join(targetDir, packageName as string);
-
-              // Prompt for template and other options for the initial package
-              const packageOptions = await promptForPackageOptions(
-                packageName as string,
-                initialPackage,
-              );
-              packageOptions.workspaceRoot = "../..";
-              // Keep package name as just the name (not the full path)
-              packageOptions.name = packageName as string;
-
-              // Fetch versions for the package
-              const pkgManager = packageOptions.packageManager || "pnpm";
-              const versions: PackageVersions = {};
-              const versionPromises: Promise<void>[] = [];
-
-              // Only fetch vitest version if testing is enabled
-              const initPkgIsLibrary = packageOptions.projectType === "library";
-              const initPkgTesting =
-                packageOptions.testing ?? (initPkgIsLibrary ? "vitest" : "none");
-              if (initPkgTesting === "vitest") {
-                versionPromises.push(
-                  getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-                    versions.vitest = v;
-                  }),
-                );
-              }
-
-              if (!initPkgIsLibrary) {
-                versionPromises.push(
-                  getLatestNpmVersion("vite", "6.3.4").then((v) => {
-                    versions.vite = v;
-                  }),
-                );
-              }
-
-              await Promise.all(versionPromises);
-              packageOptions.versions = versions;
-
-              s.start("Creating initial package...");
-
-              const packageFiles = generate(packageOptions);
-              const packageFilePaths = Object.keys(packageFiles).sort();
-
-              // Write package files to the correct subdirectory
-              const packageBasePath = join(basePath, packagePath);
-              for (const filePath of packageFilePaths) {
-                const fullFilePath = join(packageBasePath, filePath);
-                await mkdir(dirname(fullFilePath), { recursive: true });
-                const file = packageFiles[filePath]!;
-
-                if (file.type === "text") {
-                  await writeFile(fullFilePath, file.content);
-                } else {
-                  const response = await fetch(file.url);
-                  await writeFile(fullFilePath, response.body!);
-                }
-              }
-
-              s.stop("Initial package created!");
-            }
+          // Package creation loop
+          let addMore = true;
+          while (addMore) {
+            addMore = await createPackageInWorkspace(basePath, packageManager, newMonorepoTooling, scope);
           }
 
           const nextSteps = [
@@ -503,6 +666,10 @@ async function main() {
           ].join("\n");
 
           p.note(nextSteps, "Next steps");
+
+          // Offer to open in editor
+          await promptAndOpenEditor(basePath);
+
           p.outro(color.green("Happy coding! ✨"));
           process.exit(0);
         } catch (error) {
@@ -622,7 +789,7 @@ async function main() {
           }
         }
 
-        s.stop("Project created!");
+        s.stop(color.green.inverse(" ✓ Project created! "));
 
         const isLibrary = generateOptions.projectType === "library";
         const nextSteps = isLibrary

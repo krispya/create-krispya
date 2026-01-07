@@ -129,6 +129,7 @@ export type GenerateOptions = {
   pnpmManageVersions?: boolean;
   nodeVersion?: string;
   workspaceRoot?: string; // relative path to workspace root (e.g., "../..")
+  workspaceDependencies?: string[]; // workspace package names to add as dependencies
 };
 
 // Generator interface for integrations

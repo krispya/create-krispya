@@ -14,6 +14,8 @@ export type PackageJsonParams = {
   peerDependencies: Record<string, string>;
   scripts: Record<string, string>;
   options: GenerateOptions;
+  /** Workspace package names to add as dependencies (for monorepo apps) */
+  workspaceDependencies?: string[];
 };
 
 /**
@@ -30,6 +32,7 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     peerDependencies,
     scripts,
     options,
+    workspaceDependencies,
   } = params;
 
   const files: Record<string, File> = {};
@@ -68,8 +71,16 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
   const sortKeys = <T extends Record<string, string>>(obj: T): T =>
     Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))) as T;
 
+  // Add workspace dependencies (monorepo packages)
+  const allDependencies = { ...dependencies };
+  if (workspaceDependencies && workspaceDependencies.length > 0) {
+    for (const pkgName of workspaceDependencies) {
+      allDependencies[pkgName] = "workspace:*";
+    }
+  }
+
   packageJson.scripts = scripts;
-  packageJson.dependencies = sortKeys(dependencies);
+  packageJson.dependencies = sortKeys(allDependencies);
 
   if (Object.keys(devDependencies).length > 0) {
     packageJson.devDependencies = sortKeys(devDependencies);
