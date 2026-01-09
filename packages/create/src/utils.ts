@@ -44,6 +44,45 @@ export async function getLatestNodeVersion(): Promise<string> {
 }
 
 /**
+ * Validates a package name for use in a monorepo workspace.
+ * Returns an error message if invalid, undefined if valid.
+ *
+ * Rules:
+ * - Must be lowercase
+ * - Only alphanumeric characters and hyphens allowed
+ * - Cannot start or end with a hyphen
+ * - Cannot contain path traversal sequences
+ * - Cannot be empty
+ */
+export function validatePackageName(name: string): string | undefined {
+  if (!name.length) {
+    return "Package name is required";
+  }
+
+  // Check for path traversal attempts
+  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
+    return "Package name cannot contain path separators or '..'";
+  }
+
+  // Check for valid characters (lowercase alphanumeric and hyphens)
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    return "Package name must be lowercase and contain only letters, numbers, and hyphens";
+  }
+
+  // Cannot start or end with hyphen
+  if (name.startsWith("-") || name.endsWith("-")) {
+    return "Package name cannot start or end with a hyphen";
+  }
+
+  // Cannot have consecutive hyphens
+  if (name.includes("--")) {
+    return "Package name cannot contain consecutive hyphens";
+  }
+
+  return undefined;
+}
+
+/**
  * Generates a random name in the format "adjective-noun"
  * @returns A randomly generated name string
  */

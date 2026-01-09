@@ -32,6 +32,7 @@ import {
   getLatestNodeVersion,
   getLatestNpmVersion,
   getLatestPnpmVersion,
+  validatePackageName,
   type GenerateOptions,
   type LibraryBundler,
   type PackageVersions,
@@ -205,12 +206,27 @@ async function createPackageInWorkspace(
     return false;
   }
 
+  // Determine target directory (use short name for folder)
+  const targetDir = packageType === "app" ? "apps" : "packages";
+
   // Prompt for package name (without scope - we'll add it)
   const packageNameInput = await p.text({
     message: "Package name?",
     placeholder: `Scoped to @${scope}/`,
     validate: (value) => {
-      if (!value.length) return "Package name is required";
+      // Validate package name format
+      const validationError = validatePackageName(value);
+      if (validationError) return validationError;
+
+      // Check if directory already exists
+      const targetPath = join(monorepoRoot, targetDir, value);
+      try {
+        const { statSync } = require("fs");
+        statSync(targetPath);
+        return `Directory ${targetDir}/${value} already exists`;
+      } catch {
+        // Directory doesn't exist, which is what we want
+      }
     },
   });
 
@@ -222,8 +238,6 @@ async function createPackageInWorkspace(
   const shortName = packageNameInput as string;
   const scopedName = `@${scope}/${shortName}`;
 
-  // Determine target directory (use short name for folder)
-  const targetDir = packageType === "app" ? "apps" : "packages";
   const packagePath = join(targetDir, shortName);
   const workspaceRoot = "../..";
 
