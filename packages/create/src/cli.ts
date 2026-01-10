@@ -32,6 +32,7 @@ import {
   getLatestNodeVersion,
   getLatestNpmVersion,
   getLatestPnpmVersion,
+  parseWorkspaceYamlContent,
   validatePackageName,
   type GenerateOptions,
   type LibraryBundler,
@@ -93,6 +94,19 @@ async function detectMonorepoRoot(): Promise<string | null> {
   }
 
   return null;
+}
+
+/**
+ * Parses pnpm-workspace.yaml to extract workspace directories.
+ */
+async function parseWorkspaceDirectories(monorepoRoot: string): Promise<string[]> {
+  try {
+    const workspaceFile = join(monorepoRoot, "pnpm-workspace.yaml");
+    const content = await readFile(workspaceFile, "utf-8");
+    return parseWorkspaceYamlContent(content);
+  } catch {
+    return [];
+  }
 }
 
 type WorkspaceTooling = {
@@ -199,6 +213,13 @@ async function createPackageInWorkspace(
   inheritedTooling: WorkspaceTooling,
   scope: string,
 ): Promise<boolean> {
+  // Parse workspace directories to check for custom directories
+  const workspaceDirectories = await parseWorkspaceDirectories(monorepoRoot);
+  const defaultDirectories = ["apps", "packages"];
+  const hasCustomDirectories =
+    workspaceDirectories.length > 0 &&
+    !workspaceDirectories.every((dir) => defaultDirectories.includes(dir));
+
   // Prompt for package type
   const packageType = await promptForInitialPackage();
 
@@ -206,10 +227,11 @@ async function createPackageInWorkspace(
     return false;
   }
 
-  // Determine target directory (use short name for folder)
-  const targetDir = packageType === "app" ? "apps" : "packages";
+  // Default directory based on package type
+  const defaultDir = packageType === "app" ? "apps" : "packages";
 
   // Prompt for package name (without scope - we'll add it)
+  // Directory validation happens after directory selection
   const packageNameInput = await p.text({
     message: "Package name?",
     placeholder: `Scoped to @${scope}/`,
@@ -218,14 +240,17 @@ async function createPackageInWorkspace(
       const validationError = validatePackageName(value);
       if (validationError) return validationError;
 
-      // Check if directory already exists
-      const targetPath = join(monorepoRoot, targetDir, value);
-      try {
-        const { statSync } = require("fs");
-        statSync(targetPath);
-        return `Directory ${targetDir}/${value} already exists`;
-      } catch {
-        // Directory doesn't exist, which is what we want
+      // Check if directory already exists in the default directory
+      // (Full validation after directory selection if custom directories exist)
+      if (!hasCustomDirectories) {
+        const targetPath = join(monorepoRoot, defaultDir, value);
+        try {
+          const { statSync } = require("fs");
+          statSync(targetPath);
+          return `Directory ${defaultDir}/${value} already exists`;
+        } catch {
+          // Directory doesn't exist, which is what we want
+        }
       }
     },
   });
@@ -238,15 +263,45 @@ async function createPackageInWorkspace(
   const shortName = packageNameInput as string;
   const scopedName = `@${scope}/${shortName}`;
 
-  const packagePath = join(targetDir, shortName);
-  const workspaceRoot = "../..";
-
   // Continue with package prompt flow (with inherited tooling)
   const packageOptions = await promptForPackageOptions(
     scopedName,
     packageType,
     inheritedTooling,
   );
+
+  // Determine target directory - prompt if custom directories exist
+  let targetDir = defaultDir;
+  if (hasCustomDirectories && workspaceDirectories.length > 0) {
+    const dirChoice = await p.select({
+      message: "Target directory",
+      options: workspaceDirectories.map((dir) => ({
+        value: dir,
+        label: dir,
+      })),
+      initialValue: workspaceDirectories.includes(defaultDir) ? defaultDir : workspaceDirectories[0],
+    });
+
+    if (p.isCancel(dirChoice)) {
+      return false;
+    }
+    targetDir = dirChoice as string;
+
+    // Validate that directory doesn't already exist for selected target
+    const targetPath = join(monorepoRoot, targetDir, shortName);
+    try {
+      const { statSync } = require("fs");
+      statSync(targetPath);
+      p.log.error(`Directory ${targetDir}/${shortName} already exists`);
+      return false;
+    } catch {
+      // Directory doesn't exist, which is what we want
+    }
+  }
+
+  const packagePath = join(targetDir, shortName);
+  const workspaceRoot = "../..";
+
   packageOptions.workspaceRoot = workspaceRoot;
   packageOptions.name = scopedName;
 

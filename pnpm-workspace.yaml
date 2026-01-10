@@ -1,6 +1,7 @@
 packages:
   - ./packages/**/*
   - ./apps/**/*
+  - ./examples/**/*
 
 manage-package-manager-versions: true
 

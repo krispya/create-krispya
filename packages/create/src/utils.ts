@@ -83,6 +83,46 @@ export function validatePackageName(name: string): string | undefined {
 }
 
 /**
+ * Parses pnpm-workspace.yaml content to extract workspace directory names.
+ * Filters out hidden directories (starting with .).
+ */
+export function parseWorkspaceYamlContent(content: string): string[] {
+  const directories: string[] = [];
+  let inPackagesSection = false;
+
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+
+    if (trimmed === "packages:") {
+      inPackagesSection = true;
+      continue;
+    }
+
+    // Stop at next top-level key
+    if (inPackagesSection && trimmed && !line.startsWith(" ") && !line.startsWith("\t") && !trimmed.startsWith("-")) {
+      break;
+    }
+
+    // Parse package entries (e.g., '  - "apps/*"', '  - ./packages/**/*')
+    if (inPackagesSection && trimmed.startsWith("-")) {
+      const entry = trimmed
+        .slice(1) // Remove leading -
+        .trim()
+        .replace(/^["']|["']$/g, "") // Remove quotes
+        .replace(/^\.\//, "") // Remove ./ prefix
+        .replace(/\/\*.*$/, ""); // Remove /* or /**/* suffix
+
+      // Skip hidden directories
+      if (entry && !entry.startsWith(".")) {
+        directories.push(entry);
+      }
+    }
+  }
+
+  return directories;
+}
+
+/**
  * Generates a random name in the format "adjective-noun"
  * @returns A randomly generated name string
  */
