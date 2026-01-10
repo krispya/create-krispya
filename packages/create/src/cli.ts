@@ -2,7 +2,7 @@
 import { createRequire } from "module";
 import { cwd } from "process";
 import { dirname, join, resolve } from "path";
-import { mkdir, writeFile, readFile, access } from "fs/promises";
+import { mkdir, writeFile, readFile, access, unlink } from "fs/promises";
 import { constants } from "fs";
 import { Command } from "commander";
 import * as p from "@clack/prompts";
@@ -69,6 +69,7 @@ interface CliOptions {
   clearConfig?: boolean;
   configPath?: boolean;
   check?: boolean;
+  fix?: boolean;
 }
 
 /**
@@ -113,6 +114,13 @@ async function parseWorkspaceDirectories(
 }
 
 import { validateWorkspace } from "./validate.js";
+import {
+  generateTypescriptConfigPackage,
+  generateOxlintConfigPackage,
+  generateEslintConfigPackage,
+  generateOxfmtConfigPackage,
+  generatePrettierConfigPackage,
+} from "./generators/monorepo.js";
 
 type WorkspaceTooling = {
   linter?: "oxlint" | "eslint" | "biome";
@@ -153,6 +161,274 @@ async function detectWorkspaceTooling(
   } catch {
     return {};
   }
+}
+
+/**
+ * Helper to check if a file exists.
+ */
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path, constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+interface ExistingConfigs {
+  linter?: "eslint" | "biome";
+  formatter?: "prettier" | "biome";
+  eslintConfigPath?: string;
+  prettierConfigPath?: string;
+  biomeConfigPath?: string;
+}
+
+/**
+ * Detects existing root config files that may need migration.
+ */
+async function detectExistingConfigs(
+  monorepoRoot: string
+): Promise<ExistingConfigs> {
+  const configs: ExistingConfigs = {};
+
+  // Check for eslint config
+  const eslintPath = join(monorepoRoot, "eslint.config.js");
+  if (await fileExists(eslintPath)) {
+    configs.linter = "eslint";
+    configs.eslintConfigPath = eslintPath;
+  }
+
+  // Check for prettier config
+  const prettierPath = join(monorepoRoot, ".prettierrc.json");
+  if (await fileExists(prettierPath)) {
+    configs.formatter = "prettier";
+    configs.prettierConfigPath = prettierPath;
+  }
+
+  // Check for biome config
+  const biomePath = join(monorepoRoot, "biome.json");
+  if (await fileExists(biomePath)) {
+    configs.biomeConfigPath = biomePath;
+    // Biome can be both linter and formatter
+    if (!configs.linter) configs.linter = "biome";
+    if (!configs.formatter) configs.formatter = "biome";
+  }
+
+  return configs;
+}
+
+/**
+ * Migrates an existing eslint.config.js to .config/eslint package.
+ */
+async function migrateEslintConfig(
+  monorepoRoot: string,
+  files: Record<string, { type: "text"; content: string }>
+): Promise<void> {
+  const basePath = ".config/eslint";
+  const existingConfigPath = join(monorepoRoot, "eslint.config.js");
+
+  // Read existing config
+  let existingContent: string;
+  try {
+    existingContent = await readFile(existingConfigPath, "utf-8");
+  } catch {
+    // If we can't read it, generate a fresh one
+    generateEslintConfigPackage(files);
+    return;
+  }
+
+  // package.json
+  files[`${basePath}/package.json`] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        name: "@config/eslint",
+        version: "0.1.0",
+        private: true,
+        type: "module",
+        exports: {
+          "./base": "./base.js",
+          "./react": "./react.js",
+        },
+      },
+      null,
+      2
+    ),
+  };
+
+  // README.md
+  files[`${basePath}/README.md`] = {
+    type: "text",
+    content: `# \`@config/eslint\`
+
+Shared ESLint configurations.
+
+## Usage
+
+In your package's \`eslint.config.js\`:
+
+\`\`\`js
+import base from "@config/eslint/base";
+
+export default [...base];
+\`\`\`
+
+## Available Configs
+
+- \`base\` - Base ESLint rules (migrated from root)
+- \`react\` - React-specific rules
+`,
+  };
+
+  // Migrate existing config as base.js
+  files[`${basePath}/base.js`] = {
+    type: "text",
+    content: existingContent,
+  };
+
+  // Add a react.js config
+  files[`${basePath}/react.js`] = {
+    type: "text",
+    content: `import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+
+export default [
+  {
+    plugins: {
+      react,
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      ...react.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      "react/react-in-jsx-scope": "off",
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
+  },
+];
+`,
+  };
+}
+
+/**
+ * Migrates an existing .prettierrc.json to .config/prettier package.
+ */
+async function migratePrettierConfig(
+  monorepoRoot: string,
+  files: Record<string, { type: "text"; content: string }>
+): Promise<void> {
+  const basePath = ".config/prettier";
+  const existingConfigPath = join(monorepoRoot, ".prettierrc.json");
+
+  // Read existing config
+  let existingContent: string;
+  try {
+    existingContent = await readFile(existingConfigPath, "utf-8");
+  } catch {
+    // If we can't read it, generate a fresh one
+    generatePrettierConfigPackage(files);
+    return;
+  }
+
+  // package.json
+  files[`${basePath}/package.json`] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        name: "@config/prettier",
+        version: "0.1.0",
+        private: true,
+        exports: {
+          "./base": "./base.json",
+        },
+      },
+      null,
+      2
+    ),
+  };
+
+  // README.md
+  files[`${basePath}/README.md`] = {
+    type: "text",
+    content: `# \`@config/prettier\`
+
+Shared Prettier configurations.
+
+## Usage
+
+In your package's \`.prettierrc\`:
+
+\`\`\`json
+"@config/prettier/base"
+\`\`\`
+
+Or in \`package.json\`:
+
+\`\`\`json
+{
+  "prettier": "@config/prettier/base"
+}
+\`\`\`
+
+## Available Configs
+
+- \`base\` - Base Prettier rules (migrated from root)
+`,
+  };
+
+  // Migrate existing config as base.json
+  files[`${basePath}/base.json`] = {
+    type: "text",
+    content: existingContent,
+  };
+}
+
+/**
+ * Ensures .config/* is in pnpm-workspace.yaml packages array.
+ */
+async function ensureConfigInWorkspace(monorepoRoot: string): Promise<void> {
+  const workspacePath = join(monorepoRoot, "pnpm-workspace.yaml");
+
+  let content: string;
+  try {
+    content = await readFile(workspacePath, "utf-8");
+  } catch {
+    // Create new workspace file if it doesn't exist
+    content = `packages:
+  - ".config/*"
+  - "packages/*"
+`;
+    await writeFile(workspacePath, content);
+    return;
+  }
+
+  // Check if .config/* is already present
+  if (content.includes(".config/*") || content.includes('".config/*"')) {
+    return;
+  }
+
+  // Add .config/* to packages
+  const lines = content.split("\n");
+  const packagesIndex = lines.findIndex((line) =>
+    line.trim().startsWith("packages:")
+  );
+
+  if (packagesIndex === -1) {
+    // No packages section, add one
+    content = `packages:
+  - ".config/*"
+${content}`;
+  } else {
+    // Insert .config/* after packages:
+    lines.splice(packagesIndex + 1, 0, '  - ".config/*"');
+    content = lines.join("\n");
+  }
+
+  await writeFile(workspacePath, content);
 }
 
 /**
@@ -590,6 +866,7 @@ async function main() {
       "--check",
       "Check if current directory is in a valid monorepo workspace"
     )
+    .option("--fix", "Fix monorepo by generating missing .config packages")
     .action(async (name: string | undefined, options: CliOptions) => {
       // Short-circuit: config management flags exit immediately
       if (options.clearConfig) {
@@ -634,6 +911,184 @@ async function main() {
           }
           process.exit(valid ? 0 : 1);
         },
+        "--fix": async () => {
+          const monorepoRoot = await detectMonorepoRoot();
+          if (!monorepoRoot) {
+            console.log(color.red("✗") + " Not a monorepo workspace");
+            console.log(color.dim("  Run this command from within a monorepo"));
+            process.exit(1);
+          }
+
+          // Check current validation status
+          const { valid, errors } = await validateWorkspace(monorepoRoot);
+          if (valid) {
+            console.log(color.green("✓") + " Workspace is already valid");
+            console.log(color.dim(`  ${monorepoRoot}`));
+            process.exit(0);
+          }
+
+          console.log(color.yellow("!") + " Invalid monorepo workspace");
+          for (const error of errors) {
+            console.log(color.dim(`  • ${error}`));
+          }
+          console.log();
+
+          // Detect installed tooling and existing configs
+          const tooling = await detectWorkspaceTooling(monorepoRoot);
+          const existingConfigs = await detectExistingConfigs(monorepoRoot);
+
+          // Determine default selections based on detection
+          const detectedLinter = tooling.linter ?? existingConfigs.linter ?? "oxlint";
+          const detectedFormatter = tooling.formatter ?? existingConfigs.formatter ?? "oxfmt";
+
+          // Prompt for linter
+          const linterChoice = await p.select({
+            message: "Linter",
+            options: [
+              {
+                value: "oxlint",
+                label: "oxlint" + (tooling.linter === "oxlint" ? color.dim(" (installed)") : ""),
+              },
+              {
+                value: "eslint",
+                label: "eslint" + (tooling.linter === "eslint" || existingConfigs.linter === "eslint" ? color.dim(" (installed)") : ""),
+              },
+              {
+                value: "biome",
+                label: "biome" + (tooling.linter === "biome" ? color.dim(" (installed)") : ""),
+              },
+            ],
+            initialValue: detectedLinter,
+          });
+
+          if (p.isCancel(linterChoice)) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+
+          // Prompt for formatter
+          const formatterChoice = await p.select({
+            message: "Formatter",
+            options: [
+              {
+                value: "oxfmt",
+                label: "oxfmt" + (tooling.formatter === "oxfmt" ? color.dim(" (installed)") : ""),
+              },
+              {
+                value: "prettier",
+                label: "prettier" + (tooling.formatter === "prettier" || existingConfigs.formatter === "prettier" ? color.dim(" (installed)") : ""),
+              },
+              {
+                value: "biome",
+                label: "biome" + (tooling.formatter === "biome" ? color.dim(" (installed)") : ""),
+              },
+            ],
+            initialValue: detectedFormatter,
+          });
+
+          if (p.isCancel(formatterChoice)) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+
+          const linter = linterChoice as "oxlint" | "eslint" | "biome";
+          const formatter = formatterChoice as "oxfmt" | "prettier" | "biome";
+
+          console.log();
+          const s = p.spinner();
+          s.start("Fixing workspace...");
+
+          try {
+            const files: Record<string, { type: "text"; content: string }> = {};
+
+            // Generate .config/typescript if missing
+            const tsConfigExists = await fileExists(join(monorepoRoot, ".config/typescript/package.json"));
+            if (!tsConfigExists) {
+              generateTypescriptConfigPackage(files);
+            }
+
+            // Handle linter config
+            if (linter === "oxlint") {
+              const oxlintExists = await fileExists(join(monorepoRoot, ".config/oxlint/package.json"));
+              if (!oxlintExists) {
+                generateOxlintConfigPackage(files);
+              }
+            } else if (linter === "eslint") {
+              const eslintPkgExists = await fileExists(join(monorepoRoot, ".config/eslint/package.json"));
+              if (!eslintPkgExists) {
+                // Check for existing root config to migrate
+                const rootEslintPath = join(monorepoRoot, "eslint.config.js");
+                if (existingConfigs.eslintConfigPath) {
+                  // Migrate existing config
+                  await migrateEslintConfig(monorepoRoot, files);
+                } else {
+                  generateEslintConfigPackage(files);
+                }
+              }
+            }
+            // biome stays at root, no .config package needed
+
+            // Handle formatter config
+            if (formatter === "oxfmt") {
+              const oxfmtExists = await fileExists(join(monorepoRoot, ".config/oxfmt/package.json"));
+              if (!oxfmtExists) {
+                generateOxfmtConfigPackage(files);
+              }
+            } else if (formatter === "prettier") {
+              const prettierPkgExists = await fileExists(join(monorepoRoot, ".config/prettier/package.json"));
+              if (!prettierPkgExists) {
+                // Check for existing root config to migrate
+                if (existingConfigs.prettierConfigPath) {
+                  await migratePrettierConfig(monorepoRoot, files);
+                } else {
+                  generatePrettierConfigPackage(files);
+                }
+              }
+            }
+            // biome stays at root, no .config package needed
+
+            // Write all generated files
+            for (const [filePath, file] of Object.entries(files)) {
+              const fullPath = join(monorepoRoot, filePath);
+              await mkdir(dirname(fullPath), { recursive: true });
+              await writeFile(fullPath, file.content);
+            }
+
+            // Update pnpm-workspace.yaml if needed
+            await ensureConfigInWorkspace(monorepoRoot);
+
+            // Delete migrated root configs
+            if (existingConfigs.eslintConfigPath && linter === "eslint") {
+              try {
+                await unlink(existingConfigs.eslintConfigPath);
+              } catch {
+                // Ignore if already deleted
+              }
+            }
+            if (existingConfigs.prettierConfigPath && formatter === "prettier") {
+              try {
+                await unlink(existingConfigs.prettierConfigPath);
+              } catch {
+                // Ignore if already deleted
+              }
+            }
+
+            s.stop(color.green("✓") + " Workspace fixed!");
+
+            // Show what was done
+            const generated = Object.keys(files).filter((f) => f.endsWith("package.json"));
+            for (const pkg of generated) {
+              const pkgName = pkg.replace("/package.json", "").replace(".config/", ".config/");
+              console.log(color.dim(`  Generated ${pkgName}`));
+            }
+
+            process.exit(0);
+          } catch (error) {
+            s.stop(color.red("✗") + " Failed to fix workspace");
+            console.error(error);
+            process.exit(1);
+          }
+        },
       };
 
       // Handle flags that may have been parsed as the name argument
@@ -650,6 +1105,10 @@ async function main() {
       // Handle flags passed correctly via options
       if (options.check) {
         await flagHandlers["--check"]!();
+      }
+
+      if (options.fix) {
+        await flagHandlers["--fix"]!();
       }
 
       console.clear();

@@ -19,8 +19,15 @@ export type MonorepoResult = {
  * Generates a monorepo workspace root structure with shared config packages.
  */
 export function generateMonorepo(params: MonorepoParams): MonorepoResult {
-  const { name, linter, formatter, packageManager, pnpmVersion, pnpmManageVersions, nodeVersion } =
-    params;
+  const {
+    name,
+    linter,
+    formatter,
+    packageManager,
+    pnpmVersion,
+    pnpmManageVersions,
+    nodeVersion,
+  } = params;
 
   const files: Record<string, File> = {};
   const isPnpm = packageManager === "pnpm";
@@ -52,15 +59,21 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
     type: "module",
     scripts: {
       dev: "pnpm --filter './apps/*' run dev",
-      build: "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
+      build:
+        "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
       test: "pnpm -r run test",
-      lint: linter === "oxlint" ? "oxlint ." : linter === "biome" ? "biome check ." : "eslint .",
+      lint:
+        linter === "oxlint"
+          ? "oxlint ."
+          : linter === "biome"
+          ? "biome check ."
+          : "eslint .",
       format:
         formatter === "oxfmt"
           ? "oxfmt ."
           : formatter === "biome"
-            ? "biome format . --write"
-            : "prettier --write .",
+          ? "biome format . --write"
+          : "prettier --write .",
     },
     devDependencies,
   };
@@ -96,7 +109,13 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
       workspaceLines.push("manage-package-manager-versions: true", "");
     }
 
-    workspaceLines.push("packages:", '  - ".config/*"', '  - "apps/*"', '  - "packages/*"', "");
+    workspaceLines.push(
+      "packages:",
+      '  - ".config/*"',
+      '  - "apps/*"',
+      '  - "packages/*"',
+      ""
+    );
     workspaceLines.push("onlyBuiltDependencies:", "  - esbuild");
 
     files["pnpm-workspace.yaml"] = {
@@ -198,7 +217,9 @@ To add a new package to this workspace, run create-krispya from this directory a
 /**
  * Generates @config/typescript package with base, app, node, and react configs.
  */
-function generateTypescriptConfigPackage(files: Record<string, File>): void {
+export function generateTypescriptConfigPackage(
+  files: Record<string, File>
+): void {
   const basePath = ".config/typescript";
 
   // package.json
@@ -212,7 +233,7 @@ function generateTypescriptConfigPackage(files: Record<string, File>): void {
         files: ["base.json", "app.json", "node.json", "react.json"],
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -263,7 +284,7 @@ In your package's \`tsconfig.json\`:
         },
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -279,7 +300,7 @@ In your package's \`tsconfig.json\`:
         },
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -295,7 +316,7 @@ In your package's \`tsconfig.json\`:
         },
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -311,7 +332,7 @@ In your package's \`tsconfig.json\`:
         },
       },
       null,
-      2,
+      2
     ),
   };
 }
@@ -319,7 +340,7 @@ In your package's \`tsconfig.json\`:
 /**
  * Generates @config/oxlint package with base and react configs.
  */
-function generateOxlintConfigPackage(files: Record<string, File>): void {
+export function generateOxlintConfigPackage(files: Record<string, File>): void {
   const basePath = ".config/oxlint";
   const { rules } = defaultLinterConfig;
 
@@ -334,7 +355,7 @@ function generateOxlintConfigPackage(files: Record<string, File>): void {
         files: ["base.json", "react.json"],
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -373,7 +394,8 @@ oxlint -c node_modules/@config/oxlint/base.json
             {
               argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
               varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
-              caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+              caughtErrorsIgnorePattern:
+                rules.noUnusedVars.caughtErrorsIgnorePattern,
             },
           ],
           "no-useless-escape": "off",
@@ -385,7 +407,7 @@ oxlint -c node_modules/@config/oxlint/base.json
         ignorePatterns: defaultLinterConfig.ignorePatterns,
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -402,7 +424,8 @@ oxlint -c node_modules/@config/oxlint/base.json
             {
               argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
               varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
-              caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+              caughtErrorsIgnorePattern:
+                rules.noUnusedVars.caughtErrorsIgnorePattern,
             },
           ],
           "no-useless-escape": "off",
@@ -414,7 +437,7 @@ oxlint -c node_modules/@config/oxlint/base.json
         ignorePatterns: defaultLinterConfig.ignorePatterns,
       },
       null,
-      2,
+      2
     ),
   };
 }
@@ -425,7 +448,7 @@ oxlint -c node_modules/@config/oxlint/base.json
 function generateVscodeFiles(
   files: Record<string, File>,
   linter: Linter,
-  formatter: Formatter,
+  formatter: Formatter
 ): void {
   const recommendations: string[] = [];
   const settings: Record<string, unknown> = {};
@@ -454,8 +477,12 @@ function generateVscodeFiles(
       recommendations.push("oxc.oxc-vscode");
     }
     settings["editor.defaultFormatter"] = "oxc.oxc-vscode";
-    settings["[json]"] = { "editor.defaultFormatter": "vscode.json-language-features" };
-    settings["[jsonc]"] = { "editor.defaultFormatter": "vscode.json-language-features" };
+    settings["[json]"] = {
+      "editor.defaultFormatter": "vscode.json-language-features",
+    };
+    settings["[jsonc]"] = {
+      "editor.defaultFormatter": "vscode.json-language-features",
+    };
   } else if (formatter === "prettier") {
     recommendations.push("esbenp.prettier-vscode");
     settings["editor.defaultFormatter"] = "esbenp.prettier-vscode";
@@ -482,7 +509,7 @@ function generateVscodeFiles(
 /**
  * Generates @config/eslint package with base and react configs.
  */
-function generateEslintConfigPackage(files: Record<string, File>): void {
+export function generateEslintConfigPackage(files: Record<string, File>): void {
   const basePath = ".config/eslint";
 
   // package.json
@@ -505,7 +532,7 @@ function generateEslintConfigPackage(files: Record<string, File>): void {
         },
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -601,7 +628,9 @@ export default tseslint.config(
 /**
  * Generates @config/prettier package with base config.
  */
-function generatePrettierConfigPackage(files: Record<string, File>): void {
+export function generatePrettierConfigPackage(
+  files: Record<string, File>
+): void {
   const basePath = ".config/prettier";
 
   // package.json
@@ -619,7 +648,7 @@ function generatePrettierConfigPackage(files: Record<string, File>): void {
         files: ["base.json"],
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -667,7 +696,7 @@ Or in \`.prettierrc.json\`:
         arrowParens: defaultFormatterConfig.arrowParens,
       },
       null,
-      2,
+      2
     ),
   };
 }
@@ -675,7 +704,7 @@ Or in \`.prettierrc.json\`:
 /**
  * Generates @config/oxfmt package with base config.
  */
-function generateOxfmtConfigPackage(files: Record<string, File>): void {
+export function generateOxfmtConfigPackage(files: Record<string, File>): void {
   const basePath = ".config/oxfmt";
 
   // package.json
@@ -689,7 +718,7 @@ function generateOxfmtConfigPackage(files: Record<string, File>): void {
         files: ["base.json"],
       },
       null,
-      2,
+      2
     ),
   };
 
@@ -729,7 +758,7 @@ oxfmt -c node_modules/@config/oxfmt/base.json --write .
         arrowParens: defaultFormatterConfig.arrowParens,
       },
       null,
-      2,
+      2
     ),
   };
 }
