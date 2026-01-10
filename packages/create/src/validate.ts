@@ -7,6 +7,21 @@ export type ValidationResult = {
 };
 
 /**
+ * Checks if any of the given paths exist.
+ */
+async function checkAnyExists(paths: string[]): Promise<boolean> {
+  for (const path of paths) {
+    try {
+      await access(path, constants.F_OK);
+      return true;
+    } catch {
+      // Continue checking
+    }
+  }
+  return false;
+}
+
+/**
  * Validates that a monorepo workspace has all required config packages.
  */
 export async function validateWorkspace(
@@ -22,58 +37,33 @@ export async function validateWorkspace(
     errors.push("Missing .config/typescript package");
   }
 
-  // Check for linter config (oxlint package, eslint.config.js, or biome.json)
-  const oxlintPath = join(monorepoRoot, ".config/oxlint/package.json");
-  const eslintPath = join(monorepoRoot, "eslint.config.js");
-  const biomePath = join(monorepoRoot, "biome.json");
+  // Check for linter config
+  const linterPaths = [
+    join(monorepoRoot, ".config/oxlint/package.json"),
+    join(monorepoRoot, ".config/eslint/package.json"),
+    join(monorepoRoot, "eslint.config.js"),
+    join(monorepoRoot, "biome.json"),
+  ];
 
-  let hasLinter = false;
-  try {
-    await access(oxlintPath, constants.F_OK);
-    hasLinter = true;
-  } catch {
-    try {
-      await access(eslintPath, constants.F_OK);
-      hasLinter = true;
-    } catch {
-      try {
-        await access(biomePath, constants.F_OK);
-        hasLinter = true;
-      } catch {
-        // No linter found
-      }
-    }
-  }
+  const hasLinter = await checkAnyExists(linterPaths);
   if (!hasLinter) {
     errors.push(
-      "Missing linter config (.config/oxlint, eslint.config.js, or biome.json)"
+      "Missing linter config (.config/oxlint, .config/eslint, eslint.config.js, or biome.json)"
     );
   }
 
-  // Check for formatter config (oxfmt package, .prettierrc.json, or biome.json)
-  const oxfmtPath = join(monorepoRoot, ".config/oxfmt/package.json");
-  const prettierPath = join(monorepoRoot, ".prettierrc.json");
+  // Check for formatter config
+  const formatterPaths = [
+    join(monorepoRoot, ".config/oxfmt/package.json"),
+    join(monorepoRoot, ".config/prettier/package.json"),
+    join(monorepoRoot, ".prettierrc.json"),
+    join(monorepoRoot, "biome.json"),
+  ];
 
-  let hasFormatter = false;
-  try {
-    await access(oxfmtPath, constants.F_OK);
-    hasFormatter = true;
-  } catch {
-    try {
-      await access(prettierPath, constants.F_OK);
-      hasFormatter = true;
-    } catch {
-      try {
-        await access(biomePath, constants.F_OK);
-        hasFormatter = true;
-      } catch {
-        // No formatter found
-      }
-    }
-  }
+  const hasFormatter = await checkAnyExists(formatterPaths);
   if (!hasFormatter) {
     errors.push(
-      "Missing formatter config (.config/oxfmt, .prettierrc.json, or biome.json)"
+      "Missing formatter config (.config/oxfmt, .config/prettier, .prettierrc.json, or biome.json)"
     );
   }
 

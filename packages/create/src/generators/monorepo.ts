@@ -108,15 +108,11 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
   // Generate @config/typescript package
   generateTypescriptConfigPackage(files);
 
-  // Generate @config/oxlint package (when oxlint is selected)
+  // Generate linter config package
   if (linter === "oxlint") {
     generateOxlintConfigPackage(files);
   } else if (linter === "eslint") {
-    // ESLint config at root (flat config doesn't extend well as a package)
-    files["eslint.config.js"] = {
-      type: "text",
-      content: `export default [\n  // Add your ESLint rules here\n];\n`,
-    };
+    generateEslintConfigPackage(files);
   } else if (linter === "biome") {
     // Biome config at root (handles both linting and formatting when selected)
     const biomeConfig = {
@@ -142,21 +138,11 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
     };
   }
 
-  // Generate @config/oxfmt package (when oxfmt is selected)
+  // Generate formatter config package
   if (formatter === "oxfmt") {
     generateOxfmtConfigPackage(files);
   } else if (formatter === "prettier") {
-    // Prettier config at root
-    const prettierConfig = {
-      semi: true,
-      singleQuote: false,
-      trailingComma: "es5",
-      printWidth: 100,
-    };
-    files[".prettierrc.json"] = {
-      type: "text",
-      content: JSON.stringify(prettierConfig, null, 2),
-    };
+    generatePrettierConfigPackage(files);
   }
   // biome formatter is handled above with linter
 
@@ -490,6 +476,199 @@ function generateVscodeFiles(
   files[".vscode/settings.json"] = {
     type: "text",
     content: JSON.stringify(settings, null, "\t"),
+  };
+}
+
+/**
+ * Generates @config/eslint package with base and react configs.
+ */
+function generateEslintConfigPackage(files: Record<string, File>): void {
+  const basePath = ".config/eslint";
+
+  // package.json
+  files[`${basePath}/package.json`] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        name: "@config/eslint",
+        version: "0.1.0",
+        private: true,
+        type: "module",
+        exports: {
+          "./base": "./base.js",
+          "./react": "./react.js",
+        },
+        files: ["base.js", "react.js"],
+        devDependencies: {
+          "@eslint/js": "^9.17.0",
+          "typescript-eslint": "^8.18.0",
+        },
+      },
+      null,
+      2,
+    ),
+  };
+
+  // README.md
+  files[`${basePath}/README.md`] = {
+    type: "text",
+    content: `# \`@config/eslint\`
+
+Shared ESLint configurations for the monorepo.
+
+## Usage
+
+In your package's \`eslint.config.js\`:
+
+\`\`\`js
+import base from "@config/eslint/base";
+
+export default [...base];
+\`\`\`
+
+Or for React projects:
+
+\`\`\`js
+import react from "@config/eslint/react";
+
+export default [...react];
+\`\`\`
+
+## Available Configs
+
+- \`base\` - Base linting rules for TypeScript projects
+- \`react\` - Extends base with React-specific rules
+`,
+  };
+
+  // base.js - Base ESLint config
+  files[`${basePath}/base.js`] = {
+    type: "text",
+    content: `import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
+  {
+    ignores: ["dist/**", "node_modules/**"],
+  }
+);
+`,
+  };
+
+  // react.js - React ESLint config
+  files[`${basePath}/react.js`] = {
+    type: "text",
+    content: `import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
+  {
+    ignores: ["dist/**", "node_modules/**"],
+  }
+);
+`,
+  };
+}
+
+/**
+ * Generates @config/prettier package with base config.
+ */
+function generatePrettierConfigPackage(files: Record<string, File>): void {
+  const basePath = ".config/prettier";
+
+  // package.json
+  files[`${basePath}/package.json`] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        name: "@config/prettier",
+        version: "0.1.0",
+        private: true,
+        type: "module",
+        exports: {
+          ".": "./base.json",
+        },
+        files: ["base.json"],
+      },
+      null,
+      2,
+    ),
+  };
+
+  // README.md
+  files[`${basePath}/README.md`] = {
+    type: "text",
+    content: `# \`@config/prettier\`
+
+Shared Prettier configuration for the monorepo.
+
+## Usage
+
+In your package's \`package.json\`:
+
+\`\`\`json
+{
+  "prettier": "@config/prettier"
+}
+\`\`\`
+
+Or in \`.prettierrc.json\`:
+
+\`\`\`json
+"@config/prettier"
+\`\`\`
+
+## Available Configs
+
+- Default export - Base formatter settings
+`,
+  };
+
+  // base.json - Base Prettier config
+  files[`${basePath}/base.json`] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        printWidth: defaultFormatterConfig.printWidth,
+        tabWidth: defaultFormatterConfig.tabWidth,
+        useTabs: defaultFormatterConfig.useTabs,
+        semi: defaultFormatterConfig.semi,
+        singleQuote: defaultFormatterConfig.singleQuote,
+        trailingComma: defaultFormatterConfig.trailingComma,
+        bracketSpacing: defaultFormatterConfig.bracketSpacing,
+        arrowParens: defaultFormatterConfig.arrowParens,
+      },
+      null,
+      2,
+    ),
   };
 }
 

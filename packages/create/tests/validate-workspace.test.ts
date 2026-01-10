@@ -62,4 +62,33 @@ describe("validateWorkspace", () => {
     const result = await validateWorkspace(tempDir);
     expect(result.valid).toBe(true);
   });
+
+  it("passes with .config/eslint + .config/prettier packages", async () => {
+    await mkdir(join(tempDir, ".config/typescript"), { recursive: true });
+    await mkdir(join(tempDir, ".config/eslint"), { recursive: true });
+    await mkdir(join(tempDir, ".config/prettier"), { recursive: true });
+    await writeFile(join(tempDir, ".config/typescript/package.json"), "{}");
+    await writeFile(join(tempDir, ".config/eslint/package.json"), "{}");
+    await writeFile(join(tempDir, ".config/prettier/package.json"), "{}");
+
+    const result = await validateWorkspace(tempDir);
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe("generateMonorepo with eslint/prettier", () => {
+  it("generates .config/eslint package when eslint is selected", async () => {
+    const { generateMonorepo } = await import("../src/generators/monorepo.js");
+    const { files } = generateMonorepo({
+      name: "test-workspace",
+      linter: "eslint",
+      formatter: "prettier",
+      packageManager: "pnpm",
+    });
+
+    expect(files[".config/eslint/package.json"]).toBeDefined();
+    expect(files[".config/eslint/base.js"]).toBeDefined();
+    expect(files[".config/prettier/package.json"]).toBeDefined();
+    expect(files[".config/prettier/base.json"]).toBeDefined();
+  });
 });
