@@ -68,6 +68,7 @@ interface CliOptions {
   yes?: boolean;
   clearConfig?: boolean;
   configPath?: boolean;
+  check?: boolean;
 }
 
 /**
@@ -99,7 +100,9 @@ async function detectMonorepoRoot(): Promise<string | null> {
 /**
  * Parses pnpm-workspace.yaml to extract workspace directories.
  */
-async function parseWorkspaceDirectories(monorepoRoot: string): Promise<string[]> {
+async function parseWorkspaceDirectories(
+  monorepoRoot: string
+): Promise<string[]> {
   try {
     const workspaceFile = join(monorepoRoot, "pnpm-workspace.yaml");
     const content = await readFile(workspaceFile, "utf-8");
@@ -109,6 +112,8 @@ async function parseWorkspaceDirectories(monorepoRoot: string): Promise<string[]
   }
 }
 
+import { validateWorkspace } from "./validate.js";
+
 type WorkspaceTooling = {
   linter?: "oxlint" | "eslint" | "biome";
   formatter?: "oxfmt" | "prettier" | "biome";
@@ -117,28 +122,32 @@ type WorkspaceTooling = {
 /**
  * Detects linter and formatter from the monorepo root package.json.
  */
-async function detectWorkspaceTooling(monorepoRoot: string): Promise<WorkspaceTooling> {
+async function detectWorkspaceTooling(
+  monorepoRoot: string
+): Promise<WorkspaceTooling> {
   try {
     const pkgPath = join(monorepoRoot, "package.json");
     const content = await readFile(pkgPath, "utf-8");
-    const pkg = JSON.parse(content) as { devDependencies?: Record<string, string> };
+    const pkg = JSON.parse(content) as {
+      devDependencies?: Record<string, string>;
+    };
     const devDeps = pkg.devDependencies ?? {};
 
     const linter = devDeps.oxlint
       ? "oxlint"
       : devDeps.eslint
-        ? "eslint"
-        : devDeps["@biomejs/biome"]
-          ? "biome"
-          : undefined;
+      ? "eslint"
+      : devDeps["@biomejs/biome"]
+      ? "biome"
+      : undefined;
 
     const formatter = devDeps.oxfmt
       ? "oxfmt"
       : devDeps.prettier
-        ? "prettier"
-        : devDeps["@biomejs/biome"]
-          ? "biome"
-          : undefined;
+      ? "prettier"
+      : devDeps["@biomejs/biome"]
+      ? "biome"
+      : undefined;
 
     return { linter, formatter };
   } catch {
@@ -174,7 +183,9 @@ type WorkspacePackage = {
 /**
  * Scans the packages/ directory for existing workspace packages.
  */
-async function getWorkspacePackages(monorepoRoot: string): Promise<WorkspacePackage[]> {
+async function getWorkspacePackages(
+  monorepoRoot: string
+): Promise<WorkspacePackage[]> {
   const packagesDir = join(monorepoRoot, "packages");
   const packages: WorkspacePackage[] = [];
 
@@ -211,7 +222,7 @@ async function createPackageInWorkspace(
   monorepoRoot: string,
   packageManager: string,
   inheritedTooling: WorkspaceTooling,
-  scope: string,
+  scope: string
 ): Promise<boolean> {
   // Parse workspace directories to check for custom directories
   const workspaceDirectories = await parseWorkspaceDirectories(monorepoRoot);
@@ -267,7 +278,7 @@ async function createPackageInWorkspace(
   const packageOptions = await promptForPackageOptions(
     scopedName,
     packageType,
-    inheritedTooling,
+    inheritedTooling
   );
 
   // Determine target directory - prompt if custom directories exist
@@ -279,7 +290,9 @@ async function createPackageInWorkspace(
         value: dir,
         label: dir,
       })),
-      initialValue: workspaceDirectories.includes(defaultDir) ? defaultDir : workspaceDirectories[0],
+      initialValue: workspaceDirectories.includes(defaultDir)
+        ? defaultDir
+        : workspaceDirectories[0],
     });
 
     if (p.isCancel(dirChoice)) {
@@ -320,12 +333,13 @@ async function createPackageInWorkspace(
   const versionPromises: Promise<void>[] = [];
 
   const pkgIsLibrary = packageOptions.projectType === "library";
-  const pkgTesting = packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
+  const pkgTesting =
+    packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
   if (pkgTesting === "vitest") {
     versionPromises.push(
       getLatestNpmVersion("vitest", "4.0.0").then((v) => {
         versions.vitest = v;
-      }),
+      })
     );
   }
 
@@ -333,7 +347,7 @@ async function createPackageInWorkspace(
     versionPromises.push(
       getLatestNpmVersion("vite", "6.3.4").then((v) => {
         versions.vite = v;
-      }),
+      })
     );
   }
 
@@ -342,19 +356,19 @@ async function createPackageInWorkspace(
     versionPromises.push(
       getLatestNpmVersion("eslint", "9.17.0").then((v) => {
         versions.eslint = v;
-      }),
+      })
     );
   } else if (linter === "oxlint") {
     versionPromises.push(
       getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
         versions.oxlint = v;
-      }),
+      })
     );
   } else if (linter === "biome") {
     versionPromises.push(
       getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
         versions.biome = v;
-      }),
+      })
     );
   }
 
@@ -363,19 +377,19 @@ async function createPackageInWorkspace(
     versionPromises.push(
       getLatestNpmVersion("prettier", "3.4.2").then((v) => {
         versions.prettier = v;
-      }),
+      })
     );
   } else if (formatter === "oxfmt") {
     versionPromises.push(
       getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
         versions.oxfmt = v;
-      }),
+      })
     );
   } else if (formatter === "biome" && linter !== "biome") {
     versionPromises.push(
       getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
         versions.biome = v;
-      }),
+      })
     );
   }
 
@@ -478,7 +492,9 @@ async function promptAndOpenEditor(basePath: string): Promise<void> {
       selectedEditor = openEditor as EditorChoice;
 
       const saveChoice = await p.confirm({
-        message: `Save ${editorNames[selectedEditor] ?? "Skip"} as default editor?`,
+        message: `Save ${
+          editorNames[selectedEditor] ?? "Skip"
+        } as default editor?`,
         initialValue: true,
       });
 
@@ -504,12 +520,12 @@ async function promptAndOpenEditor(basePath: string): Promise<void> {
       await openInEditor(
         selectedEditor as "cursor" | "code" | "webstorm",
         basePath,
-        getReuseWindow(),
+        getReuseWindow()
       );
       p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
     } catch {
       p.log.warn(
-        `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`,
+        `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
       );
     }
   }
@@ -518,19 +534,27 @@ async function promptAndOpenEditor(basePath: string): Promise<void> {
 async function main() {
   const program = new Command()
     .name("create-krispya")
-    .description("CLI for creating Vanilla, React, and React Three Fiber projects")
+    .description(
+      "CLI for creating Vanilla, React, and React Three Fiber projects"
+    )
     .argument("[name]", "name for the project")
     .option("--type <type>", "project type: app or library (default: app)")
     .option(
       "--bundler <bundler>",
-      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)",
+      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)"
     )
     .option(
       "--template <type>",
-      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)",
+      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
     )
-    .option("--linter <type>", "linter: eslint, oxlint, or biome (default: oxlint)")
-    .option("--formatter <type>", "formatter: prettier, oxfmt, or biome (default: oxfmt)")
+    .option(
+      "--linter <type>",
+      "linter: eslint, oxlint, or biome (default: oxlint)"
+    )
+    .option(
+      "--formatter <type>",
+      "formatter: prettier, oxfmt, or biome (default: oxfmt)"
+    )
     .option("--drei", "add @react-three/drei (r3f only)")
     .option("--handle", "add @react-three/handle (r3f only)")
     .option("--leva", "add leva (r3f only)")
@@ -543,22 +567,29 @@ async function main() {
     .option("--koota", "add koota (r3f only)")
     .option("--triplex", "set up triplex development environment (r3f only)")
     .option("--viverse", "set up viverse deployment (r3f only)")
-    .option("--package-manager <manager>", "specify package manager (e.g. npm, yarn, pnpm)")
+    .option(
+      "--package-manager <manager>",
+      "specify package manager (e.g. npm, yarn, pnpm)"
+    )
     .option(
       "--pnpm-manage-versions",
-      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)",
+      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)"
     )
     .option(
       "--no-pnpm-manage-versions",
-      "disable manage-package-manager-versions in pnpm-workspace.yaml",
+      "disable manage-package-manager-versions in pnpm-workspace.yaml"
     )
     .option(
       "--node-version <version>",
-      'set Node.js version for engines.node field (default: "latest")',
+      'set Node.js version for engines.node field (default: "latest")'
     )
     .option("-y, --yes", "Skip prompts and use default values")
     .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
     .option("--config-path", "Print the path to the config file")
+    .option(
+      "--check",
+      "Check if current directory is in a valid monorepo workspace"
+    )
     .action(async (name: string | undefined, options: CliOptions) => {
       // Short-circuit: config management flags exit immediately
       if (options.clearConfig) {
@@ -570,6 +601,52 @@ async function main() {
       if (options.configPath) {
         console.log(getConfigPath());
         process.exit(0);
+      }
+
+      // Handle flags that may have been parsed as the name argument
+      if (name?.startsWith("-")) {
+        if (name === "--check") {
+          const monorepoRoot = await detectMonorepoRoot();
+          if (!monorepoRoot) {
+            console.log(color.red("✗") + " Not a monorepo workspace");
+            process.exit(1);
+          }
+          const { valid, errors } = await validateWorkspace(monorepoRoot);
+          if (valid) {
+            console.log(color.green("✓") + " Valid monorepo workspace");
+            console.log(color.dim(`  ${monorepoRoot}`));
+          } else {
+            console.log(color.red("✗") + " Invalid monorepo workspace");
+            console.log(color.dim(`  ${monorepoRoot}`));
+            for (const error of errors) {
+              console.log(color.red(`  • ${error}`));
+            }
+          }
+          process.exit(valid ? 0 : 1);
+        }
+        // Unknown flag parsed as name - show help
+        console.error(color.red(`Unknown option: ${name}`));
+        process.exit(1);
+      }
+
+      if (options.check) {
+        const monorepoRoot = await detectMonorepoRoot();
+        if (!monorepoRoot) {
+          console.log(color.red("✗") + " Not a monorepo workspace");
+          process.exit(1);
+        }
+        const { valid, errors } = await validateWorkspace(monorepoRoot);
+        if (valid) {
+          console.log(color.green("✓") + " Valid monorepo workspace");
+          console.log(color.dim(`  ${monorepoRoot}`));
+        } else {
+          console.log(color.red("✗") + " Invalid monorepo workspace");
+          console.log(color.dim(`  ${monorepoRoot}`));
+          for (const error of errors) {
+            console.log(color.red(`  • ${error}`));
+          }
+        }
+        process.exit(valid ? 0 : 1);
       }
 
       console.clear();
@@ -599,7 +676,8 @@ async function main() {
           if (inheritedTooling.linter || inheritedTooling.formatter) {
             const toolingInfo = [
               inheritedTooling.linter && `linter: ${inheritedTooling.linter}`,
-              inheritedTooling.formatter && `formatter: ${inheritedTooling.formatter}`,
+              inheritedTooling.formatter &&
+                `formatter: ${inheritedTooling.formatter}`,
             ]
               .filter(Boolean)
               .join(", ");
@@ -612,13 +690,18 @@ async function main() {
           // Package creation loop
           let addMore = true;
           while (addMore) {
-            addMore = await createPackageInWorkspace(monorepoRoot, "pnpm", inheritedTooling, scope);
+            addMore = await createPackageInWorkspace(
+              monorepoRoot,
+              "pnpm",
+              inheritedTooling,
+              scope
+            );
           }
 
           // Show next steps
           p.note(
             [`cd ${monorepoRoot}`, "pnpm install", "pnpm run dev"].join("\n"),
-            "Next steps",
+            "Next steps"
           );
 
           // Offer to open in editor
@@ -641,7 +724,10 @@ async function main() {
         generateOptions = {
           name: name || defaultName,
           projectType,
-          libraryBundler: projectType === "library" ? (options.bundler ?? "unbuild") : undefined,
+          libraryBundler:
+            projectType === "library"
+              ? options.bundler ?? "unbuild"
+              : undefined,
           template,
           linter: options.linter ?? "oxlint",
           formatter: options.formatter ?? "oxfmt",
@@ -725,7 +811,12 @@ async function main() {
           // Package creation loop
           let addMore = true;
           while (addMore) {
-            addMore = await createPackageInWorkspace(basePath, packageManager, newMonorepoTooling, scope);
+            addMore = await createPackageInWorkspace(
+              basePath,
+              packageManager,
+              newMonorepoTooling,
+              scope
+            );
           }
 
           const nextSteps = [
@@ -748,9 +839,15 @@ async function main() {
         }
       }
 
-      const base = generateOptions.template ? getBaseTemplate(generateOptions.template) : "vanilla";
+      const base = generateOptions.template
+        ? getBaseTemplate(generateOptions.template)
+        : "vanilla";
       const defaultFallbackName =
-        base === "vanilla" ? "vanilla-app" : base === "react" ? "react-app" : "react-three-app";
+        base === "vanilla"
+          ? "vanilla-app"
+          : base === "react"
+          ? "react-app"
+          : "react-three-app";
       generateOptions.name ??= defaultFallbackName;
 
       // Fetch latest pnpm version if pnpm is selected
@@ -771,12 +868,13 @@ async function main() {
 
       // Only fetch vitest version if testing is enabled
       const isLibrary = generateOptions.projectType === "library";
-      const testing = generateOptions.testing ?? (isLibrary ? "vitest" : "none");
+      const testing =
+        generateOptions.testing ?? (isLibrary ? "vitest" : "none");
       if (testing === "vitest") {
         versionPromises.push(
           getLatestNpmVersion("vitest", "4.0.0").then((v) => {
             versions.vitest = v;
-          }),
+          })
         );
       }
 
@@ -785,7 +883,7 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("vite", "6.3.4").then((v) => {
             versions.vite = v;
-          }),
+          })
         );
       }
 
@@ -795,19 +893,19 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("eslint", "9.17.0").then((v) => {
             versions.eslint = v;
-          }),
+          })
         );
       } else if (linter === "oxlint") {
         versionPromises.push(
           getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
             versions.oxlint = v;
-          }),
+          })
         );
       } else if (linter === "biome") {
         versionPromises.push(
           getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
             versions.biome = v;
-          }),
+          })
         );
       }
 
@@ -817,20 +915,20 @@ async function main() {
         versionPromises.push(
           getLatestNpmVersion("prettier", "3.4.2").then((v) => {
             versions.prettier = v;
-          }),
+          })
         );
       } else if (formatter === "oxfmt") {
         versionPromises.push(
           getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
             versions.oxfmt = v;
-          }),
+          })
         );
       } else if (formatter === "biome" && linter !== "biome") {
         // Only fetch if not already fetched for linter
         versionPromises.push(
           getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
             versions.biome = v;
-          }),
+          })
         );
       }
 
@@ -881,7 +979,9 @@ async function main() {
         if (savedEditor && savedEditor !== "skip") {
           // Saved preference exists - show confirm prompt
           const useDefault = await p.confirm({
-            message: `Open in editor? ${color.dim(`(${editorNames[savedEditor]})`)}`,
+            message: `Open in editor? ${color.dim(
+              `(${editorNames[savedEditor]})`
+            )}`,
             initialValue: true,
           });
 
@@ -910,7 +1010,9 @@ async function main() {
 
             // Ask to save preference
             const saveChoice = await p.confirm({
-              message: `Save ${editorNames[selectedEditor] ?? "Skip"} as default editor?`,
+              message: `Save ${
+                editorNames[selectedEditor] ?? "Skip"
+              } as default editor?`,
               initialValue: true,
             });
 
@@ -937,12 +1039,12 @@ async function main() {
             await openInEditor(
               selectedEditor as "cursor" | "code" | "webstorm",
               basePath,
-              getReuseWindow(),
+              getReuseWindow()
             );
             p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
           } catch {
             p.log.warn(
-              `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`,
+              `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
             );
           }
         }

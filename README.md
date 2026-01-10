@@ -71,11 +71,35 @@ pnpm create krispya
 # Select "Add new package to this workspace"
 ```
 
+The CLI automatically detects workspace directories from `pnpm-workspace.yaml`. If you have custom directories beyond `apps/` and `packages/` (e.g., `examples/`, `modules/`), you'll be prompted to select where to place the new package.
+
 Sub-packages automatically:
 
 - Extend shared configs via `@config/*` workspace dependencies
 - Skip redundant files (`.gitignore`, `.vscode/`, etc.)
 - Use root-level dev tools (oxlint, oxfmt)
+
+### Validating a Workspace
+
+Check if a monorepo is properly configured:
+
+```bash
+pnpm create krispya --check
+```
+
+Returns exit code `0` if valid, `1` if invalid. Validates:
+
+- `.config/typescript` package exists
+- Linter config exists (`.config/oxlint`, `eslint.config.js`, or `biome.json`)
+- Formatter config exists (`.config/oxfmt`, `.prettierrc.json`, or `biome.json`)
+
+Useful in scripts:
+
+```bash
+if pnpm create krispya --check; then
+  pnpm create krispya  # add package
+fi
+```
 
 ## Tooling Options
 
@@ -93,10 +117,9 @@ Sub-packages automatically:
 ```
 create-krispya [name] [options]
 
-Options:
+Project Options:
   --type <type>               app | library (default: app)
   --template <type>           vanilla | react | r3f (+ -js variants)
-  --monorepo                  Create a pnpm monorepo workspace
   --linter <type>             eslint | oxlint | biome
   --formatter <type>          prettier | oxfmt | biome
   --bundler <bundler>         unbuild | tsdown (libraries only)
@@ -104,6 +127,11 @@ Options:
   --node-version <version>    Node.js version (default: latest)
   --pnpm-manage-versions      Enable pnpm version management (default: true)
   -y, --yes                   Skip prompts, use defaults
+
+Utility Options:
+  --check                     Validate current monorepo workspace (exit 0/1)
+  --clear-config              Clear saved preferences (editor, window reuse)
+  --config-path               Print path to config file
 ```
 
 ### R3F Integrations
@@ -134,8 +162,8 @@ pnpm create krispya
 # React app with defaults
 pnpm create krispya my-app --template react -y
 
-# Monorepo workspace
-pnpm create krispya my-workspace --monorepo
+# Monorepo workspace (select "Monorepo" in prompts)
+pnpm create krispya my-workspace
 
 # R3F with integrations
 pnpm create krispya my-3d-app --template r3f --drei --rapier --leva
@@ -145,6 +173,31 @@ pnpm create krispya my-lib --type library --template react --bundler tsdown
 
 # Custom tooling
 pnpm create krispya my-app --linter eslint --formatter prettier
+
+# Validate monorepo workspace
+pnpm create krispya --check
+
+# Clear saved preferences
+pnpm create krispya --clear-config
+```
+
+## Preferences
+
+The CLI saves preferences for:
+
+- **Editor** — Cursor, VS Code, WebStorm, or skip
+- **Window reuse** — Open in current window or new window
+
+Clear saved preferences:
+
+```bash
+pnpm create krispya --clear-config
+```
+
+View config file location:
+
+```bash
+pnpm create krispya --config-path
 ```
 
 ## Post-Creation
