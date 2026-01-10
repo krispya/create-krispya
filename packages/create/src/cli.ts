@@ -603,9 +603,19 @@ async function main() {
         process.exit(0);
       }
 
-      // Handle flags that may have been parsed as the name argument
-      if (name?.startsWith("-")) {
-        if (name === "--check") {
+      // Flag handlers for flags that may be parsed as the name argument
+      const flagHandlers: Record<string, () => Promise<void> | void> = {
+        "--version": () => {
+          console.log(pkg.version);
+          process.exit(0);
+        },
+        "-V": () => {
+          console.log(pkg.version);
+          process.exit(0);
+        },
+        "--help": () => program.help(),
+        "-h": () => program.help(),
+        "--check": async () => {
           const monorepoRoot = await detectMonorepoRoot();
           if (!monorepoRoot) {
             console.log(color.red("✗") + " Not a monorepo workspace");
@@ -623,30 +633,23 @@ async function main() {
             }
           }
           process.exit(valid ? 0 : 1);
-        }
-        // Unknown flag parsed as name - show help
-        console.error(color.red(`Unknown option: ${name}`));
-        process.exit(1);
-      }
+        },
+      };
 
-      if (options.check) {
-        const monorepoRoot = await detectMonorepoRoot();
-        if (!monorepoRoot) {
-          console.log(color.red("✗") + " Not a monorepo workspace");
+      // Handle flags that may have been parsed as the name argument
+      if (name?.startsWith("-")) {
+        const handler = flagHandlers[name];
+        if (handler) {
+          await handler();
+        } else {
+          console.error(color.red(`Unknown option: ${name}`));
           process.exit(1);
         }
-        const { valid, errors } = await validateWorkspace(monorepoRoot);
-        if (valid) {
-          console.log(color.green("✓") + " Valid monorepo workspace");
-          console.log(color.dim(`  ${monorepoRoot}`));
-        } else {
-          console.log(color.red("✗") + " Invalid monorepo workspace");
-          console.log(color.dim(`  ${monorepoRoot}`));
-          for (const error of errors) {
-            console.log(color.red(`  • ${error}`));
-          }
-        }
-        process.exit(valid ? 0 : 1);
+      }
+
+      // Handle flags passed correctly via options
+      if (options.check) {
+        await flagHandlers["--check"]!();
       }
 
       console.clear();
