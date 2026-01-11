@@ -28,6 +28,8 @@ yarn create krispya
 | Library     | Publishable npm package with ESM/CJS output              |
 | Monorepo    | pnpm workspace with shared configs and multiple packages |
 
+> **Note:** Monorepos require pnpm. Applications and libraries support pnpm, npm, and yarn.
+
 ## Templates
 
 | Template     | Description                       |
@@ -146,7 +148,7 @@ Project Options:
   --linter <type>             eslint | oxlint | biome
   --formatter <type>          prettier | oxfmt | biome
   --bundler <bundler>         unbuild | tsdown (libraries only)
-  --package-manager <pm>      npm | yarn | pnpm
+  --package-manager <pm>      npm | yarn | pnpm (monorepos: pnpm only)
   --node-version <version>    Node.js version (default: latest)
   --pnpm-manage-versions      Enable pnpm version management (default: true)
 

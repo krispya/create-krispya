@@ -360,32 +360,14 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
     process.exit(0);
   }
 
-  const packageManager = await p.select({
-    message: "Package manager",
-    options: [
-      { value: "pnpm", label: "pnpm" },
-      { value: "npm", label: "npm" },
-      { value: "yarn", label: "yarn" },
-    ],
-    initialValue: "pnpm",
+  // Monorepos are pnpm-only
+  const managePnpm = await p.confirm({
+    message: "Enable manage-package-manager-versions?",
+    initialValue: true,
   });
-
-  if (p.isCancel(packageManager)) {
+  if (p.isCancel(managePnpm)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
-  }
-
-  let pnpmManageVersions = true;
-  if (packageManager === "pnpm") {
-    const managePnpm = await p.confirm({
-      message: "Enable manage-package-manager-versions?",
-      initialValue: true,
-    });
-    if (p.isCancel(managePnpm)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-    pnpmManageVersions = managePnpm;
   }
 
   const linter = await p.select({
@@ -422,8 +404,8 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
     name,
     projectType: "monorepo",
     nodeVersion,
-    packageManager: packageManager as string,
-    pnpmManageVersions,
+    packageManager: "pnpm",
+    pnpmManageVersions: managePnpm,
     linter: linter as "eslint" | "oxlint" | "biome",
     formatter: formatter as "prettier" | "oxfmt" | "biome",
   };
