@@ -159,6 +159,7 @@ Workspace Options:
 Utility Options:
   --check                     Validate current monorepo workspace (exit 0/1)
   --fix                       Fix monorepo by generating missing config packages
+                              (use with --linter and --formatter for non-interactive)
   --clear-config              Clear saved preferences (editor, window reuse)
   --config-path               Print path to config file
 ```
@@ -209,6 +210,12 @@ pnpm create krispya my-app --linter eslint --formatter prettier
 
 # Validate monorepo workspace
 pnpm create krispya --check
+
+# Fix monorepo (interactive)
+pnpm create krispya --fix
+
+# Fix monorepo (non-interactive)
+pnpm create krispya --fix --linter oxlint --formatter oxfmt
 
 # Clear saved preferences
 pnpm create krispya --clear-config

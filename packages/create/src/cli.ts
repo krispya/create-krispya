@@ -126,7 +126,9 @@ import {
   generateEslintConfigPackage,
   generateOxfmtConfigPackage,
   generatePrettierConfigPackage,
+  generateVscodeFiles,
 } from "./generators/monorepo.js";
+import { generateAiFiles } from "./generators/ai-files.js";
 
 type WorkspaceTooling = {
   linter?: "oxlint" | "eslint" | "biome";
@@ -937,194 +939,21 @@ async function main() {
           }
           process.exit(valid ? 0 : 1);
         },
-        "--fix": async () => {
-          const monorepoRoot = await detectMonorepoRoot();
-          if (!monorepoRoot) {
-            console.log(color.red("✗") + " Not a monorepo workspace");
-            console.log(color.dim("  Run this command from within a monorepo"));
-            process.exit(1);
-          }
-
-          // Check current validation status
-          const { valid, errors } = await validateWorkspace(monorepoRoot);
-          if (valid) {
-            console.log(color.green("✓") + " Workspace is already valid");
-            console.log(color.dim(`  ${monorepoRoot}`));
-            process.exit(0);
-          }
-
-          console.log(color.yellow("!") + " Invalid monorepo workspace");
-          for (const error of errors) {
-            console.log(color.dim(`  • ${error}`));
-          }
-          console.log();
-
-          // Detect installed tooling and existing configs
-          const tooling = await detectWorkspaceTooling(monorepoRoot);
-          const existingConfigs = await detectExistingConfigs(monorepoRoot);
-
-          // Determine default selections based on detection
-          const detectedLinter = tooling.linter ?? existingConfigs.linter ?? "oxlint";
-          const detectedFormatter = tooling.formatter ?? existingConfigs.formatter ?? "oxfmt";
-
-          // Prompt for linter
-          const linterChoice = await p.select({
-            message: "Linter",
-            options: [
-              {
-                value: "oxlint",
-                label: "oxlint" + (tooling.linter === "oxlint" ? color.dim(" (installed)") : ""),
-              },
-              {
-                value: "eslint",
-                label: "eslint" + (tooling.linter === "eslint" || existingConfigs.linter === "eslint" ? color.dim(" (installed)") : ""),
-              },
-              {
-                value: "biome",
-                label: "biome" + (tooling.linter === "biome" ? color.dim(" (installed)") : ""),
-              },
-            ],
-            initialValue: detectedLinter,
-          });
-
-          if (p.isCancel(linterChoice)) {
-            p.cancel("Operation cancelled.");
-            process.exit(0);
-          }
-
-          // Prompt for formatter
-          const formatterChoice = await p.select({
-            message: "Formatter",
-            options: [
-              {
-                value: "oxfmt",
-                label: "oxfmt" + (tooling.formatter === "oxfmt" ? color.dim(" (installed)") : ""),
-              },
-              {
-                value: "prettier",
-                label: "prettier" + (tooling.formatter === "prettier" || existingConfigs.formatter === "prettier" ? color.dim(" (installed)") : ""),
-              },
-              {
-                value: "biome",
-                label: "biome" + (tooling.formatter === "biome" ? color.dim(" (installed)") : ""),
-              },
-            ],
-            initialValue: detectedFormatter,
-          });
-
-          if (p.isCancel(formatterChoice)) {
-            p.cancel("Operation cancelled.");
-            process.exit(0);
-          }
-
-          const linter = linterChoice as "oxlint" | "eslint" | "biome";
-          const formatter = formatterChoice as "oxfmt" | "prettier" | "biome";
-
-          console.log();
-          const s = p.spinner();
-          s.start("Fixing workspace...");
-
-          try {
-            const files: Record<string, { type: "text"; content: string }> = {};
-
-            // Generate .config/typescript if missing
-            const tsConfigExists = await fileExists(join(monorepoRoot, ".config/typescript/package.json"));
-            if (!tsConfigExists) {
-              generateTypescriptConfigPackage(files);
-            }
-
-            // Handle linter config
-            if (linter === "oxlint") {
-              const oxlintExists = await fileExists(join(monorepoRoot, ".config/oxlint/package.json"));
-              if (!oxlintExists) {
-                generateOxlintConfigPackage(files);
-              }
-            } else if (linter === "eslint") {
-              const eslintPkgExists = await fileExists(join(monorepoRoot, ".config/eslint/package.json"));
-              if (!eslintPkgExists) {
-                // Check for existing root config to migrate
-                const rootEslintPath = join(monorepoRoot, "eslint.config.js");
-                if (existingConfigs.eslintConfigPath) {
-                  // Migrate existing config
-                  await migrateEslintConfig(monorepoRoot, files);
-                } else {
-                  generateEslintConfigPackage(files);
-                }
-              }
-            }
-            // biome stays at root, no .config package needed
-
-            // Handle formatter config
-            if (formatter === "oxfmt") {
-              const oxfmtExists = await fileExists(join(monorepoRoot, ".config/oxfmt/package.json"));
-              if (!oxfmtExists) {
-                generateOxfmtConfigPackage(files);
-              }
-            } else if (formatter === "prettier") {
-              const prettierPkgExists = await fileExists(join(monorepoRoot, ".config/prettier/package.json"));
-              if (!prettierPkgExists) {
-                // Check for existing root config to migrate
-                if (existingConfigs.prettierConfigPath) {
-                  await migratePrettierConfig(monorepoRoot, files);
-                } else {
-                  generatePrettierConfigPackage(files);
-                }
-              }
-            }
-            // biome stays at root, no .config package needed
-
-            // Write all generated files
-            for (const [filePath, file] of Object.entries(files)) {
-              const fullPath = join(monorepoRoot, filePath);
-              await mkdir(dirname(fullPath), { recursive: true });
-              await writeFile(fullPath, file.content);
-            }
-
-            // Update pnpm-workspace.yaml if needed
-            await ensureConfigInWorkspace(monorepoRoot);
-
-            // Delete migrated root configs
-            if (existingConfigs.eslintConfigPath && linter === "eslint") {
-              try {
-                await unlink(existingConfigs.eslintConfigPath);
-              } catch {
-                // Ignore if already deleted
-              }
-            }
-            if (existingConfigs.prettierConfigPath && formatter === "prettier") {
-              try {
-                await unlink(existingConfigs.prettierConfigPath);
-              } catch {
-                // Ignore if already deleted
-              }
-            }
-
-            s.stop(color.green("✓") + " Workspace fixed!");
-
-            // Show what was done
-            const generated = Object.keys(files).filter((f) => f.endsWith("package.json"));
-            for (const pkg of generated) {
-              const pkgName = pkg.replace("/package.json", "").replace(".config/", ".config/");
-              console.log(color.dim(`  Generated ${pkgName}`));
-            }
-
-            process.exit(0);
-          } catch (error) {
-            s.stop(color.red("✗") + " Failed to fix workspace");
-            console.error(error);
-            process.exit(1);
-          }
-        },
       };
 
       // Handle flags that may have been parsed as the name argument
       if (name?.startsWith("-")) {
-        const handler = flagHandlers[name];
-        if (handler) {
-          await handler();
+        // --fix is handled separately with options support
+        if (name === "--fix") {
+          options.fix = true;
         } else {
-          console.error(color.red(`Unknown option: ${name}`));
-          process.exit(1);
+          const handler = flagHandlers[name];
+          if (handler) {
+            await handler();
+          } else {
+            console.error(color.red(`Unknown option: ${name}`));
+            process.exit(1);
+          }
         }
       }
 
@@ -1134,7 +963,234 @@ async function main() {
       }
 
       if (options.fix) {
-        await flagHandlers["--fix"]!();
+        // Handle --fix with optional non-interactive flags
+        const monorepoRoot = await detectMonorepoRoot();
+        if (!monorepoRoot) {
+          console.log(color.red("✗") + " Not a monorepo workspace");
+          console.log(color.dim("  Run this command from within a monorepo"));
+          process.exit(1);
+        }
+
+        const { valid, errors } = await validateWorkspace(monorepoRoot);
+        if (valid) {
+          console.log(color.green("✓") + " Workspace is already valid");
+          console.log(color.dim(`  ${monorepoRoot}`));
+          process.exit(0);
+        }
+
+        console.log(color.yellow("!") + " Invalid monorepo workspace");
+        for (const error of errors) {
+          console.log(color.dim(`  • ${error}`));
+        }
+        console.log();
+
+        const tooling = await detectWorkspaceTooling(monorepoRoot);
+        const existingConfigs = await detectExistingConfigs(monorepoRoot);
+        const detectedLinter = tooling.linter ?? existingConfigs.linter ?? "oxlint";
+        const detectedFormatter = tooling.formatter ?? existingConfigs.formatter ?? "oxfmt";
+
+        // Non-interactive if --linter and --formatter are provided
+        const isNonInteractive = options.linter && options.formatter;
+
+        let linter: "oxlint" | "eslint" | "biome";
+        let formatter: "oxfmt" | "prettier" | "biome";
+
+        if (isNonInteractive) {
+          linter = options.linter as "oxlint" | "eslint" | "biome";
+          formatter = options.formatter as "oxfmt" | "prettier" | "biome";
+        } else {
+          const linterChoice = await p.select({
+            message: "Linter",
+            options: [
+              { value: "oxlint", label: "oxlint" + (tooling.linter === "oxlint" ? color.dim(" (installed)") : "") },
+              { value: "eslint", label: "eslint" + (tooling.linter === "eslint" || existingConfigs.linter === "eslint" ? color.dim(" (installed)") : "") },
+              { value: "biome", label: "biome" + (tooling.linter === "biome" ? color.dim(" (installed)") : "") },
+            ],
+            initialValue: detectedLinter,
+          });
+
+          if (p.isCancel(linterChoice)) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+
+          const formatterChoice = await p.select({
+            message: "Formatter",
+            options: [
+              { value: "oxfmt", label: "oxfmt" + (tooling.formatter === "oxfmt" ? color.dim(" (installed)") : "") },
+              { value: "prettier", label: "prettier" + (tooling.formatter === "prettier" || existingConfigs.formatter === "prettier" ? color.dim(" (installed)") : "") },
+              { value: "biome", label: "biome" + (tooling.formatter === "biome" ? color.dim(" (installed)") : "") },
+            ],
+            initialValue: detectedFormatter,
+          });
+
+          if (p.isCancel(formatterChoice)) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+
+          linter = linterChoice as "oxlint" | "eslint" | "biome";
+          formatter = formatterChoice as "oxfmt" | "prettier" | "biome";
+        }
+
+        console.log();
+        const s = p.spinner();
+        s.start("Fixing workspace...");
+
+        try {
+          const files: Record<string, { type: "text"; content: string }> = {};
+
+          const tsConfigExists = await fileExists(join(monorepoRoot, ".config/typescript/package.json"));
+          if (!tsConfigExists) {
+            generateTypescriptConfigPackage(files);
+          }
+
+          if (linter === "oxlint") {
+            const oxlintExists = await fileExists(join(monorepoRoot, ".config/oxlint/package.json"));
+            if (!oxlintExists) generateOxlintConfigPackage(files);
+          } else if (linter === "eslint") {
+            const eslintPkgExists = await fileExists(join(monorepoRoot, ".config/eslint/package.json"));
+            if (!eslintPkgExists) {
+              if (existingConfigs.eslintConfigPath) {
+                await migrateEslintConfig(monorepoRoot, files);
+              } else {
+                generateEslintConfigPackage(files);
+              }
+            }
+          }
+
+          if (formatter === "oxfmt") {
+            const oxfmtExists = await fileExists(join(monorepoRoot, ".config/oxfmt/package.json"));
+            if (!oxfmtExists) generateOxfmtConfigPackage(files);
+          } else if (formatter === "prettier") {
+            const prettierPkgExists = await fileExists(join(monorepoRoot, ".config/prettier/package.json"));
+            if (!prettierPkgExists) {
+              if (existingConfigs.prettierConfigPath) {
+                await migratePrettierConfig(monorepoRoot, files);
+              } else {
+                generatePrettierConfigPackage(files);
+              }
+            }
+          }
+
+          for (const [filePath, file] of Object.entries(files)) {
+            const fullPath = join(monorepoRoot, filePath);
+            await mkdir(dirname(fullPath), { recursive: true });
+            await writeFile(fullPath, file.content);
+          }
+
+          await ensureConfigInWorkspace(monorepoRoot);
+
+          if (existingConfigs.eslintConfigPath && linter === "eslint") {
+            try { await unlink(existingConfigs.eslintConfigPath); } catch {}
+          }
+          if (existingConfigs.prettierConfigPath && formatter === "prettier") {
+            try { await unlink(existingConfigs.prettierConfigPath); } catch {}
+          }
+
+          s.stop(color.green("✓") + " Workspace fixed!");
+
+          const generated = Object.keys(files).filter((f) => f.endsWith("package.json"));
+          for (const pkg of generated) {
+            const pkgName = pkg.replace("/package.json", "");
+            console.log(color.dim(`  Generated ${pkgName}`));
+          }
+
+          // VS Code and AI files - skip prompts in non-interactive mode unless explicitly requested
+          const vscodeExists = await fileExists(join(monorepoRoot, ".vscode/settings.json"));
+
+          if (!vscodeExists) {
+            let addVscode = false;
+            if (isNonInteractive) {
+              // In non-interactive mode, generate VS Code files by default
+              addVscode = true;
+            } else {
+              const vscodeChoice = await p.confirm({
+                message: "Generate VS Code settings?",
+                initialValue: true,
+              });
+              addVscode = !p.isCancel(vscodeChoice) && vscodeChoice;
+            }
+
+            if (addVscode) {
+              const vscodeFiles: Record<string, { type: "text"; content: string }> = {};
+              generateVscodeFiles(vscodeFiles, linter, formatter);
+              for (const [filePath, file] of Object.entries(vscodeFiles)) {
+                const fullPath = join(monorepoRoot, filePath);
+                await mkdir(dirname(fullPath), { recursive: true });
+                await writeFile(fullPath, file.content);
+              }
+              console.log(color.dim("  Generated .vscode/settings.json"));
+              console.log(color.dim("  Generated .vscode/extensions.json"));
+            }
+          }
+
+          // AI files
+          let selectedAiFiles: AiFileChoice[] = [];
+          const savedAiFiles = getAiFiles();
+
+          if (isNonInteractive) {
+            // In non-interactive mode, use saved preference or default to cursor-rules
+            selectedAiFiles = savedAiFiles ?? ["cursor-rules"];
+          } else if (savedAiFiles && savedAiFiles.length > 0) {
+            const aiFileLabels: Record<AiFileChoice, string> = {
+              "cursor-rules": ".cursor/rules",
+              "agents-md": "AGENTS.md",
+              "claude-md": "CLAUDE.md",
+              "copilot-md": ".github/copilot-instructions.md",
+            };
+            const savedLabels = savedAiFiles.map((f) => aiFileLabels[f]).join(", ");
+            const useDefault = await p.confirm({
+              message: `Generate AI instruction files? ${color.dim(`(${savedLabels})`)}`,
+              initialValue: true,
+            });
+            if (!p.isCancel(useDefault) && useDefault) {
+              selectedAiFiles = savedAiFiles;
+            }
+          } else {
+            const aiFilesChoice = await p.multiselect({
+              message: "Generate AI instruction files?",
+              options: [
+                { value: "cursor-rules", label: ".cursor/rules", hint: "Cursor AI" },
+                { value: "agents-md", label: "AGENTS.md", hint: "GitHub Copilot, general" },
+                { value: "claude-md", label: "CLAUDE.md", hint: "Claude" },
+                { value: "copilot-md", label: ".github/copilot-instructions.md", hint: "GitHub Copilot" },
+              ],
+              required: false,
+            });
+            if (!p.isCancel(aiFilesChoice) && aiFilesChoice.length > 0) {
+              selectedAiFiles = aiFilesChoice as AiFileChoice[];
+              const saveChoice = await p.confirm({ message: "Save as default for future?", initialValue: true });
+              if (!p.isCancel(saveChoice) && saveChoice) {
+                setAiFiles(selectedAiFiles);
+              }
+            }
+          }
+
+          if (selectedAiFiles.length > 0) {
+            const scope = await getMonorepoScope(monorepoRoot);
+            const aiFilesOutput: Record<string, { type: "text"; content: string }> = {};
+            generateAiFiles(aiFilesOutput, {
+              name: scope,
+              packageManager: "pnpm",
+              linter,
+              formatter,
+              aiFiles: selectedAiFiles,
+            });
+            for (const [filePath, file] of Object.entries(aiFilesOutput)) {
+              const fullPath = join(monorepoRoot, filePath);
+              await mkdir(dirname(fullPath), { recursive: true });
+              await writeFile(fullPath, file.content);
+              console.log(color.dim(`  Generated ${filePath}`));
+            }
+          }
+
+          process.exit(0);
+        } catch (error) {
+          s.stop(color.red("✗") + " Failed to fix workspace");
+          console.error(error);
+          process.exit(1);
+        }
       }
 
       // Validate --dir requires --workspace

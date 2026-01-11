@@ -73,12 +73,14 @@ ${packageManager} create krispya <name> --workspace [options]
 - The package directory will be \`apps/<name>\` (apps) or \`packages/<name>\` (libraries), unless \`--dir\` is provided.
 - The package name will be auto-scoped to \`@${name}/<name>\` unless you pass a scoped name explicitly.
 
-### Useful workspace safety checks
+### Workspace maintenance (non-interactive)
 
 \`\`\`bash
-${packageManager} create krispya --check   # validate workspace from current directory
-${packageManager} create krispya --fix     # generate missing .config packages if workspace is invalid
+${packageManager} create krispya --check                                # validate workspace
+${packageManager} create krispya --fix --linter ${linter} --formatter ${formatter}  # fix missing .config packages
 \`\`\`
+
+For non-interactive \`--fix\`, you MUST provide both \`--linter\` and \`--formatter\` flags.
 
 ## Package creation options (CLI truth)
 

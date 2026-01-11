@@ -238,7 +238,7 @@ To add a new package to this workspace, run create-krispya from this directory a
 /**
  * Generates VS Code configuration files for the monorepo root.
  */
-function generateVscodeFiles(
+export function generateVscodeFiles(
   files: Record<string, File>,
   linter: Linter,
   formatter: Formatter
