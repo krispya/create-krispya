@@ -63,7 +63,7 @@ my-workspace/
 
 ### Adding Packages
 
-Run the CLI from within a monorepo to add new packages:
+**Interactive:**
 
 ```bash
 cd my-workspace
@@ -71,7 +71,17 @@ pnpm create krispya
 # Select "Add new package to this workspace"
 ```
 
-The CLI automatically detects workspace directories from `pnpm-workspace.yaml`. If you have custom directories beyond `apps/` and `packages/` (e.g., `examples/`, `modules/`), you'll be prompted to select where to place the new package.
+**Non-interactive (for scripts/AI):**
+
+```bash
+# Add a library to packages/
+pnpm create krispya my-lib --workspace --type library --template react
+
+# Add an app to apps/
+pnpm create krispya my-app --workspace --template r3f --drei --leva
+```
+
+The CLI automatically detects workspace directories from `pnpm-workspace.yaml`. If you have custom directories beyond `apps/` and `packages/` (e.g., `examples/`, `modules/`), you'll be prompted to select where to place the new package (interactive mode only).
 
 Sub-packages automatically:
 
@@ -101,6 +111,19 @@ if pnpm create krispya --check; then
 fi
 ```
 
+### AI Instruction Files
+
+When creating a monorepo, you can generate AI instruction files to help AI assistants understand the workspace:
+
+| File                              | Tool                    |
+| --------------------------------- | ----------------------- |
+| `.cursor/rules`                   | Cursor                  |
+| `AGENTS.md`                       | GitHub Copilot, general |
+| `CLAUDE.md`                       | Claude                  |
+| `.github/copilot-instructions.md` | GitHub Copilot          |
+
+Select which files to generate during monorepo creation. Your selection can be saved as a default.
+
 ## Tooling Options
 
 | Category  | Options                      | Default   |
@@ -126,10 +149,14 @@ Project Options:
   --package-manager <pm>      npm | yarn | pnpm
   --node-version <version>    Node.js version (default: latest)
   --pnpm-manage-versions      Enable pnpm version management (default: true)
-  -y, --yes                   Skip prompts, use defaults
+
+Workspace Options:
+  --workspace                 Add package to current monorepo (non-interactive)
+  --dir <directory>           Target directory (default: apps/ or packages/)
 
 Utility Options:
   --check                     Validate current monorepo workspace (exit 0/1)
+  --fix                       Fix monorepo by generating missing config packages
   --clear-config              Clear saved preferences (editor, window reuse)
   --config-path               Print path to config file
 ```
@@ -160,10 +187,14 @@ For `r3f`/`r3f-js` templates:
 pnpm create krispya
 
 # React app with defaults
-pnpm create krispya my-app --template react -y
+pnpm create krispya my-app --template react
 
 # Monorepo workspace (select "Monorepo" in prompts)
 pnpm create krispya my-workspace
+
+# Add package to monorepo (non-interactive)
+pnpm create krispya my-lib --workspace --type library --template react
+pnpm create krispya my-example --workspace --dir examples --template r3f
 
 # R3F with integrations
 pnpm create krispya my-3d-app --template r3f --drei --rapier --leva
@@ -187,6 +218,7 @@ The CLI saves preferences for:
 
 - **Editor** — Cursor, VS Code, WebStorm, or skip
 - **Window reuse** — Open in current window or new window
+- **AI files** — Which AI instruction files to generate for monorepos
 
 Clear saved preferences:
 

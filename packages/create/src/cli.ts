@@ -25,6 +25,9 @@ import {
   getReuseWindow,
   setPreferredEditor,
   setReuseWindow,
+  getAiFiles,
+  setAiFiles,
+  type AiFileChoice,
 } from "./config.js";
 import {
   generate,
@@ -65,11 +68,12 @@ interface CliOptions {
   viverse?: boolean;
   packageManager?: string;
   nodeVersion?: string;
-  yes?: boolean;
   clearConfig?: boolean;
+  dir?: string;
   configPath?: boolean;
   check?: boolean;
   fix?: boolean;
+  workspace?: boolean;
 }
 
 /**
@@ -859,7 +863,14 @@ async function main() {
       "--node-version <version>",
       'set Node.js version for engines.node field (default: "latest")'
     )
-    .option("-y, --yes", "Skip prompts and use default values")
+    .option(
+      "--workspace",
+      "Add package to current monorepo workspace (non-interactive)"
+    )
+    .option(
+      "--dir <directory>",
+      "Target directory for --workspace (default: apps/ or packages/)"
+    )
     .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
     .option("--config-path", "Print the path to the config file")
     .option(
@@ -892,6 +903,15 @@ async function main() {
         },
         "--help": () => program.help(),
         "-h": () => program.help(),
+        "--clear-config": () => {
+          clearConfig();
+          console.log("Configuration cleared.");
+          process.exit(0);
+        },
+        "--config-path": () => {
+          console.log(getConfigPath());
+          process.exit(0);
+        },
         "--check": async () => {
           const monorepoRoot = await detectMonorepoRoot();
           if (!monorepoRoot) {
@@ -1111,6 +1131,143 @@ async function main() {
         await flagHandlers["--fix"]!();
       }
 
+      // Validate --dir requires --workspace
+      if (options.dir && !options.workspace) {
+        console.error(
+          color.red("Error:") + " --dir requires --workspace flag"
+        );
+        console.log(
+          color.dim(
+            "  Example: pnpm create krispya my-lib --workspace --dir examples"
+          )
+        );
+        process.exit(1);
+      }
+
+      // Handle --workspace flag for non-interactive package creation in monorepo
+      if (options.workspace) {
+        const monorepoRoot = await detectMonorepoRoot();
+        if (!monorepoRoot) {
+          console.error(
+            color.red("Error:") +
+              " --workspace flag requires being inside a monorepo"
+          );
+          process.exit(1);
+        }
+
+        if (!name) {
+          console.error(
+            color.red("Error:") +
+              " Package name is required with --workspace flag"
+          );
+          console.log(
+            color.dim(
+              "  Example: pnpm create krispya my-lib --workspace --type library"
+            )
+          );
+          process.exit(1);
+        }
+
+        const scope = await getMonorepoScope(monorepoRoot);
+        const inheritedTooling = await detectWorkspaceTooling(monorepoRoot);
+        const projectType: ProjectType = options.type ?? "app";
+        const defaultDir = projectType === "library" ? "packages" : "apps";
+        const targetDir = options.dir ?? defaultDir;
+        const template: Template = options.template ?? "vanilla";
+        const baseTemplate = getBaseTemplate(template);
+
+        // Build scoped package name
+        const scopedName = name.startsWith("@") ? name : `@${scope}/${name}`;
+
+        // Check if directory already exists
+        const packagePath = join(monorepoRoot, targetDir, name);
+        try {
+          await access(packagePath, constants.F_OK);
+          console.error(
+            color.red("Error:") + ` Directory ${targetDir}/${name} already exists`
+          );
+          process.exit(1);
+        } catch {
+          // Directory doesn't exist, which is what we want
+        }
+
+        // Fetch versions
+        const versions: PackageVersions = {};
+        const versionPromises: Promise<void>[] = [];
+
+        const isLibrary = projectType === "library";
+        if (!isLibrary) {
+          versionPromises.push(
+            getLatestNpmVersion("vite", "6.3.4").then((v) => {
+              versions.vite = v;
+            })
+          );
+        }
+
+        const linter = inheritedTooling.linter ?? options.linter ?? "oxlint";
+        const formatter =
+          inheritedTooling.formatter ?? options.formatter ?? "oxfmt";
+
+        await Promise.all(versionPromises);
+
+        const generateOptions: GenerateOptions = {
+          name: scopedName,
+          projectType,
+          libraryBundler: isLibrary ? options.bundler ?? "unbuild" : undefined,
+          template,
+          linter,
+          formatter,
+          workspaceRoot: "../..",
+          versions,
+          ...(baseTemplate === "r3f" && {
+            drei: options.drei ? {} : undefined,
+            handle: options.handle ? {} : undefined,
+            leva: options.leva ? {} : undefined,
+            postprocessing: options.postprocessing ? {} : undefined,
+            rapier: options.rapier ? {} : undefined,
+            xr: options.xr ? {} : undefined,
+            uikit: options.uikit ? {} : undefined,
+            offscreen: options.offscreen ? {} : undefined,
+            zustand: options.zustand ? {} : undefined,
+            koota: options.koota ? {} : undefined,
+            viverse: options.viverse ? {} : undefined,
+            triplex: options.triplex ? {} : undefined,
+          }),
+        };
+
+        console.log(
+          color.cyan("Creating") +
+            ` ${scopedName} in ${targetDir}/${name}...`
+        );
+
+        try {
+          const files = generate(generateOptions);
+          const filePaths = Object.keys(files).sort();
+
+          for (const filePath of filePaths) {
+            const fullFilePath = join(packagePath, filePath);
+            await mkdir(dirname(fullFilePath), { recursive: true });
+            const file = files[filePath]!;
+
+            if (file.type === "text") {
+              await writeFile(fullFilePath, file.content);
+            } else {
+              const response = await fetch(file.url);
+              await writeFile(fullFilePath, response.body!);
+            }
+          }
+
+          console.log(
+            color.green("✓") + ` Created ${scopedName} at ${targetDir}/${name}`
+          );
+          process.exit(0);
+        } catch (error) {
+          console.error(color.red("Error:") + " Failed to create package");
+          console.error(String(error));
+          process.exit(1);
+        }
+      }
+
       console.clear();
       p.intro(color.bgCyan(color.black(` create-krispya v${pkg.version} `)));
 
@@ -1232,6 +1389,56 @@ async function main() {
           generateOptions.nodeVersion = await getLatestNodeVersion();
         }
 
+        // Prompt for AI instruction files
+        const savedAiFiles = getAiFiles();
+        let selectedAiFiles: AiFileChoice[] = [];
+
+        if (savedAiFiles && savedAiFiles.length > 0) {
+          // User has saved preference - show confirm prompt
+          const aiFileLabels: Record<AiFileChoice, string> = {
+            "cursor-rules": ".cursor/rules",
+            "agents-md": "AGENTS.md",
+            "claude-md": "CLAUDE.md",
+            "copilot-md": ".github/copilot-instructions.md",
+          };
+          const savedLabels = savedAiFiles.map((f) => aiFileLabels[f]).join(", ");
+
+          const useDefault = await p.confirm({
+            message: `Generate AI instruction files? ${color.dim(`(${savedLabels})`)}`,
+            initialValue: true,
+          });
+
+          if (!p.isCancel(useDefault) && useDefault) {
+            selectedAiFiles = savedAiFiles;
+          }
+        } else {
+          // No saved preference - show multiselect
+          const aiFilesChoice = await p.multiselect({
+            message: "Generate AI instruction files?",
+            options: [
+              { value: "cursor-rules", label: ".cursor/rules", hint: "Cursor AI" },
+              { value: "agents-md", label: "AGENTS.md", hint: "GitHub Copilot, general" },
+              { value: "claude-md", label: "CLAUDE.md", hint: "Claude" },
+              { value: "copilot-md", label: ".github/copilot-instructions.md", hint: "GitHub Copilot" },
+            ],
+            required: false,
+          });
+
+          if (!p.isCancel(aiFilesChoice) && aiFilesChoice.length > 0) {
+            selectedAiFiles = aiFilesChoice as AiFileChoice[];
+
+            // Offer to save preference
+            const saveChoice = await p.confirm({
+              message: "Save as default for future monorepos?",
+              initialValue: true,
+            });
+
+            if (!p.isCancel(saveChoice) && saveChoice) {
+              setAiFiles(selectedAiFiles);
+            }
+          }
+        }
+
         const basePath = join(cwd(), generateOptions.name);
         const s = p.spinner();
         s.start("Creating monorepo workspace...");
@@ -1245,6 +1452,7 @@ async function main() {
             pnpmVersion: generateOptions.pnpmVersion,
             pnpmManageVersions: generateOptions.pnpmManageVersions,
             nodeVersion: generateOptions.nodeVersion,
+            aiFiles: selectedAiFiles.length > 0 ? selectedAiFiles : undefined,
           });
 
           // Write all files

@@ -3,6 +3,12 @@ import type { BaseTemplate, Formatter, Linter, Testing } from "./types.js";
 
 export type EditorChoice = "cursor" | "code" | "webstorm" | "skip";
 
+export type AiFileChoice =
+  | "cursor-rules"
+  | "agents-md"
+  | "claude-md"
+  | "copilot-md";
+
 export interface CustomTemplate {
   baseTemplate: BaseTemplate;
   linter: Linter;
@@ -15,6 +21,7 @@ interface Schema {
   preferredEditor?: EditorChoice;
   reuseWindow?: boolean;
   customTemplates?: Record<string, CustomTemplate>;
+  aiFiles?: AiFileChoice[];
 }
 
 const config = new Conf<Schema>({
@@ -35,6 +42,14 @@ export function getReuseWindow(): boolean {
 
 export function setReuseWindow(reuse: boolean): void {
   config.set("reuseWindow", reuse);
+}
+
+export function getAiFiles(): AiFileChoice[] | undefined {
+  return config.get("aiFiles");
+}
+
+export function setAiFiles(files: AiFileChoice[]): void {
+  config.set("aiFiles", files);
 }
 
 export function clearConfig(): void {
