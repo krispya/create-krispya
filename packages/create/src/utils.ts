@@ -4,9 +4,14 @@
  * @param fallback Fallback version if fetch fails
  * @returns The latest version string (e.g., "1.0.0")
  */
-export async function getLatestNpmVersion(packageName: string, fallback: string): Promise<string> {
+export async function getLatestNpmVersion(
+  packageName: string,
+  fallback: string
+): Promise<string> {
   try {
-    const response = await fetch(`https://registry.npmjs.org/${packageName}/latest`);
+    const response = await fetch(
+      `https://registry.npmjs.org/${packageName}/latest`
+    );
     const data = (await response.json()) as { version: string };
     return data.version;
   } catch {
@@ -45,7 +50,10 @@ export async function getLatestNpmCliVersion(): Promise<string> {
 export async function getLatestNodeVersion(): Promise<string> {
   try {
     const response = await fetch("https://nodejs.org/dist/index.json");
-    const data = (await response.json()) as Array<{ version: string; lts: boolean | string }>;
+    const data = (await response.json()) as Array<{
+      version: string;
+      lts: boolean | string;
+    }>;
     // Find the first LTS version
     const ltsVersion = data.find((v) => v.lts);
     if (ltsVersion) {
@@ -115,7 +123,13 @@ export function parseWorkspaceYamlContent(content: string): string[] {
     }
 
     // Stop at next top-level key
-    if (inPackagesSection && trimmed && !line.startsWith(" ") && !line.startsWith("\t") && !trimmed.startsWith("-")) {
+    if (
+      inPackagesSection &&
+      trimmed &&
+      !line.startsWith(" ") &&
+      !line.startsWith("\t") &&
+      !trimmed.startsWith("-")
+    ) {
       break;
     }
 
@@ -215,7 +229,8 @@ export function generateRandomName(): string {
     "universe",
   ];
 
-  const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const randomAdjective =
+    adjectives[Math.floor(Math.random() * adjectives.length)];
   const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
 
   return `${randomAdjective}-${randomNoun}`;
