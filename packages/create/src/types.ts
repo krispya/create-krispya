@@ -127,6 +127,8 @@ export type GenerateOptions = {
   packageManager?: string;
   pnpmVersion?: string;
   pnpmManageVersions?: boolean;
+  yarnVersion?: string;
+  npmVersion?: string;
   nodeVersion?: string;
   workspaceRoot?: string; // relative path to workspace root (e.g., "../..")
   workspaceDependencies?: string[]; // workspace package names to add as dependencies

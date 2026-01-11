@@ -33,8 +33,10 @@ import {
   generate,
   getBaseTemplate,
   getLatestNodeVersion,
+  getLatestNpmCliVersion,
   getLatestNpmVersion,
   getLatestPnpmVersion,
+  getLatestYarnVersion,
   parseWorkspaceYamlContent,
   validatePackageName,
   type GenerateOptions,
@@ -598,9 +600,13 @@ async function createPackageInWorkspace(
   packageOptions.workspaceRoot = workspaceRoot;
   packageOptions.name = scopedName;
 
-  // Fetch versions
+  // Fetch package manager versions
   if (packageManager === "pnpm") {
     packageOptions.pnpmVersion = await getLatestPnpmVersion();
+  } else if (packageManager === "yarn") {
+    packageOptions.yarnVersion = await getLatestYarnVersion();
+  } else if (packageManager === "npm") {
+    packageOptions.npmVersion = await getLatestNpmCliVersion();
   }
 
   const nodeVersion = packageOptions.nodeVersion ?? "latest";
@@ -1377,10 +1383,14 @@ async function main() {
         // Import generateMonorepo dynamically
         const { generateMonorepo } = await import("./generators/monorepo.js");
 
-        // Fetch pnpm version if needed
+        // Fetch package manager version
         const packageManager = generateOptions.packageManager || "pnpm";
         if (packageManager === "pnpm") {
           generateOptions.pnpmVersion = await getLatestPnpmVersion();
+        } else if (packageManager === "yarn") {
+          generateOptions.yarnVersion = await getLatestYarnVersion();
+        } else if (packageManager === "npm") {
+          generateOptions.npmVersion = await getLatestNpmCliVersion();
         }
 
         // Fetch Node version
@@ -1520,10 +1530,14 @@ async function main() {
           : "react-three-app";
       generateOptions.name ??= defaultFallbackName;
 
-      // Fetch latest pnpm version if pnpm is selected
+      // Fetch latest package manager version
       const packageManager = generateOptions.packageManager || "pnpm";
       if (packageManager === "pnpm") {
         generateOptions.pnpmVersion = await getLatestPnpmVersion();
+      } else if (packageManager === "yarn") {
+        generateOptions.yarnVersion = await getLatestYarnVersion();
+      } else if (packageManager === "npm") {
+        generateOptions.npmVersion = await getLatestNpmCliVersion();
       }
 
       // Fetch latest Node version if "latest" is specified or default

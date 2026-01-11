@@ -100,6 +100,16 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
       const majorVersion = pnpmVersion.split(".")[0];
       engines.pnpm = `>=${majorVersion}.0.0`;
       packageJson.packageManager = `pnpm@${pnpmVersion}`;
+    } else if (packageManager === "yarn") {
+      const yarnVersion = options.yarnVersion ?? "4.6.0";
+      const majorVersion = yarnVersion.split(".")[0];
+      engines.yarn = `>=${majorVersion}.0.0`;
+      packageJson.packageManager = `yarn@${yarnVersion}`;
+    } else if (packageManager === "npm") {
+      const npmVersion = options.npmVersion ?? "11.0.0";
+      const majorVersion = npmVersion.split(".")[0];
+      engines.npm = `>=${majorVersion}.0.0`;
+      packageJson.packageManager = `npm@${npmVersion}`;
     }
 
     if (options.nodeVersion) {

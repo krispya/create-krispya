@@ -23,6 +23,22 @@ export async function getLatestPnpmVersion(): Promise<string> {
 }
 
 /**
+ * Fetches the latest version of yarn from the npm registry
+ * @returns The latest yarn version string (e.g., "4.6.0")
+ */
+export async function getLatestYarnVersion(): Promise<string> {
+  return getLatestNpmVersion("yarn", "4.6.0");
+}
+
+/**
+ * Fetches the latest version of npm from the npm registry
+ * @returns The latest npm version string (e.g., "11.0.0")
+ */
+export async function getLatestNpmCliVersion(): Promise<string> {
+  return getLatestNpmVersion("npm", "11.0.0");
+}
+
+/**
  * Fetches the latest LTS version of Node.js
  * @returns The latest Node.js LTS version string (e.g., "22.13.0")
  */
