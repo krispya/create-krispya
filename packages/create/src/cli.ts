@@ -198,7 +198,7 @@ function calculateWorkspaceRoot(packagePath: string): string {
 }
 
 interface ExistingConfigs {
-  linter?: "eslint" | "biome";
+  linter?: "oxlint" | "eslint" | "biome";
   formatter?: "prettier" | "biome";
   eslintConfigPath?: string;
   prettierConfigPath?: string;
@@ -1087,6 +1087,31 @@ async function main() {
             }
           }
 
+          // Biome uses root biome.json (not a .config package)
+          if ((linter === "biome" || formatter === "biome") && !existingConfigs.biomeConfigPath) {
+            const biomeConfig = {
+              $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
+              vcs: {
+                enabled: true,
+                clientKind: "git",
+                useIgnoreFile: true,
+              },
+              linter: {
+                enabled: linter === "biome",
+                rules: {
+                  recommended: true,
+                },
+              },
+              formatter: {
+                enabled: formatter === "biome",
+              },
+            };
+            files["biome.json"] = {
+              type: "text",
+              content: JSON.stringify(biomeConfig, null, 2),
+            };
+          }
+
           for (const [filePath, file] of Object.entries(files)) {
             const fullPath = join(monorepoRoot, filePath);
             await mkdir(dirname(fullPath), { recursive: true });
@@ -1111,7 +1136,9 @@ async function main() {
           }
 
           // VS Code and AI files - skip prompts in non-interactive mode unless explicitly requested
-          const vscodeExists = await fileExists(join(monorepoRoot, ".vscode/settings.json"));
+          const vscodeSettingsExists = await fileExists(join(monorepoRoot, ".vscode/settings.json"));
+          const vscodeExtensionsExists = await fileExists(join(monorepoRoot, ".vscode/extensions.json"));
+          const vscodeExists = vscodeSettingsExists && vscodeExtensionsExists;
 
           if (!vscodeExists) {
             let addVscode = false;
@@ -1139,37 +1166,55 @@ async function main() {
             }
           }
 
-          // AI files
+          // AI files - check which ones already exist
+          const aiFilePaths: Record<AiFileChoice, string> = {
+            "cursor-rules": ".cursor/rules",
+            "agents-md": "AGENTS.md",
+            "claude-md": "CLAUDE.md",
+            "copilot-md": ".github/copilot-instructions.md",
+          };
+
+          // Filter out AI files that already exist
+          const existingAiFiles: AiFileChoice[] = [];
+          for (const [choice, path] of Object.entries(aiFilePaths)) {
+            if (await fileExists(join(monorepoRoot, path))) {
+              existingAiFiles.push(choice as AiFileChoice);
+            }
+          }
+
           let selectedAiFiles: AiFileChoice[] = [];
           const savedAiFiles = getAiFiles();
 
-          if (isNonInteractive) {
-            // In non-interactive mode, use saved preference or default to cursor-rules
-            selectedAiFiles = savedAiFiles ?? ["cursor-rules"];
+          // Only prompt for AI files that don't already exist
+          const availableChoices: AiFileChoice[] = (["cursor-rules", "agents-md", "claude-md", "copilot-md"] as AiFileChoice[])
+            .filter((c) => !existingAiFiles.includes(c));
+
+          if (availableChoices.length === 0) {
+            // All AI files already exist, skip
+          } else if (isNonInteractive) {
+            // In non-interactive mode, use saved preference or default to cursor-rules (filtered by available)
+            const preferred = savedAiFiles ?? ["cursor-rules"];
+            selectedAiFiles = preferred.filter((f) => availableChoices.includes(f));
           } else if (savedAiFiles && savedAiFiles.length > 0) {
-            const aiFileLabels: Record<AiFileChoice, string> = {
-              "cursor-rules": ".cursor/rules",
-              "agents-md": "AGENTS.md",
-              "claude-md": "CLAUDE.md",
-              "copilot-md": ".github/copilot-instructions.md",
-            };
-            const savedLabels = savedAiFiles.map((f) => aiFileLabels[f]).join(", ");
-            const useDefault = await p.confirm({
-              message: `Generate AI instruction files? ${color.dim(`(${savedLabels})`)}`,
-              initialValue: true,
-            });
-            if (!p.isCancel(useDefault) && useDefault) {
-              selectedAiFiles = savedAiFiles;
+            const availableSaved = savedAiFiles.filter((f) => availableChoices.includes(f));
+            if (availableSaved.length > 0) {
+              const savedLabels = availableSaved.map((f) => aiFilePaths[f]).join(", ");
+              const useDefault = await p.confirm({
+                message: `Generate AI instruction files? ${color.dim(`(${savedLabels})`)}`,
+                initialValue: true,
+              });
+              if (!p.isCancel(useDefault) && useDefault) {
+                selectedAiFiles = availableSaved;
+              }
             }
           } else {
             const aiFilesChoice = await p.multiselect({
               message: "Generate AI instruction files?",
-              options: [
-                { value: "cursor-rules", label: ".cursor/rules", hint: "Cursor AI" },
-                { value: "agents-md", label: "AGENTS.md", hint: "GitHub Copilot, general" },
-                { value: "claude-md", label: "CLAUDE.md", hint: "Claude" },
-                { value: "copilot-md", label: ".github/copilot-instructions.md", hint: "GitHub Copilot" },
-              ],
+              options: availableChoices.map((c) => ({
+                value: c,
+                label: aiFilePaths[c],
+                hint: c === "cursor-rules" ? "Cursor AI" : c === "agents-md" ? "GitHub Copilot, general" : c === "claude-md" ? "Claude" : "GitHub Copilot",
+              })),
               required: false,
             });
             if (!p.isCancel(aiFilesChoice) && aiFilesChoice.length > 0) {
