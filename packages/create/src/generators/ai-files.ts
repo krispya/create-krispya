@@ -97,7 +97,7 @@ ${packageManager} create krispya <name> --workspace [options]
 \`\`\`
 
 - The package directory will be \`apps/<name>\` (apps) or \`packages/<name>\` (libraries), unless \`--dir\` is provided.
-- The package name will be auto-scoped to \`@${name}/<name>\` unless you pass a scoped name explicitly.
+- Package names default to \`@${name}/<name>\` but you can pass any name (scoped or unscoped).
 
 ### Workspace maintenance (non-interactive)
 
@@ -130,7 +130,7 @@ ${packageManager} create krispya ui --workspace --type library --template react
 # R3F app with physics + controls (@${name}/game) in apps/game
 ${packageManager} create krispya game --workspace --type app --template r3f --drei --rapier --leva
 
-# App in a custom directory (still auto-scoped)
+# App in a custom directory
 ${packageManager} create krispya demo --workspace --type app --template react --dir examples
 \`\`\`
 
