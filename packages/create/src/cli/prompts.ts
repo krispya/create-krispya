@@ -8,7 +8,7 @@ import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
 /**
  * Gets default options for a given template and project type.
  * For R3F templates, pass integrations array to specify which integrations to include.
- * When inheritedTooling is provided, uses those values instead of defaults.
+ * When inheritedSettings is provided, uses those values instead of defaults.
  */
 export function getDefaultOptions(
   template: Template,
@@ -16,7 +16,7 @@ export function getDefaultOptions(
   projectType: ProjectType = "app",
   libraryBundler?: LibraryBundler,
   integrations?: string[],
-  inheritedTooling?: InheritedTooling,
+  inheritedSettings?: InheritedWorkspaceSettings,
 ): GenerateOptions {
   const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
@@ -24,11 +24,11 @@ export function getDefaultOptions(
     template,
     projectType,
     libraryBundler: projectType === "library" ? (libraryBundler ?? "unbuild") : undefined,
-    packageManager: "pnpm",
-    pnpmManageVersions: true,
-    nodeVersion: "latest",
-    linter: inheritedTooling?.linter ?? "oxlint",
-    formatter: inheritedTooling?.formatter ?? "oxfmt",
+    packageManager: inheritedSettings?.packageManager ?? "pnpm",
+    pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
+    nodeVersion: inheritedSettings?.nodeVersion ?? "latest",
+    linter: inheritedSettings?.linter ?? "oxlint",
+    formatter: inheritedSettings?.formatter ?? "oxfmt",
     // Libraries get vitest by default, apps don't
     testing: projectType === "library" ? "vitest" : "none",
   };
@@ -104,14 +104,14 @@ async function promptForR3fIntegrations(): Promise<string[]> {
 /**
  * Prompts user for customization options.
  * For R3F templates, integrations should be passed in (already selected upfront).
- * When inheritedTooling is provided, linter/formatter prompts are skipped.
+ * When inheritedSettings is provided, workspace-level settings are skipped.
  */
 export async function promptForCustomization(
   template: Template,
   name: string,
   projectType: ProjectType,
   integrations?: string[],
-  inheritedTooling?: InheritedTooling,
+  inheritedSettings?: InheritedWorkspaceSettings,
 ): Promise<GenerateOptions> {
   // Library bundler selection (only for libraries)
   let libraryBundler: LibraryBundler | undefined;
@@ -132,72 +132,81 @@ export async function promptForCustomization(
     libraryBundler = bundler as LibraryBundler;
   }
 
-  const nodeVersion = await p.text({
-    message: "Node.js version",
-    placeholder: "latest",
-    defaultValue: "latest",
-    validate: (value) => {
-      if (!value.length) return "Required";
-      if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
-        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
-      }
-    },
-  });
+  // Skip workspace-level settings if inherited from workspace
+  let nodeVersion: string = inheritedSettings?.nodeVersion ?? "latest";
+  let finalPackageManager: string = inheritedSettings?.packageManager ?? "pnpm";
+  let pnpmManageVersions: boolean = inheritedSettings?.pnpmManageVersions ?? true;
 
-  if (p.isCancel(nodeVersion)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  const packageManager = await p.select({
-    message: "Package manager",
-    options: [
-      { value: "pnpm", label: "pnpm" },
-      { value: "npm", label: "npm" },
-      { value: "yarn", label: "yarn" },
-      { value: "custom", label: "Other (custom)" },
-    ],
-    initialValue: "pnpm",
-  });
-
-  if (p.isCancel(packageManager)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
-  }
-
-  let finalPackageManager = packageManager as string;
-  if (packageManager === "custom") {
-    const customPm = await p.text({
-      message: "Enter package manager command",
+  if (!inheritedSettings?.nodeVersion) {
+    const nodeVersionInput = await p.text({
+      message: "Node.js version",
+      placeholder: "latest",
+      defaultValue: "latest",
       validate: (value) => {
         if (!value.length) return "Required";
+        if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+          return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
+        }
       },
     });
-    if (p.isCancel(customPm)) {
+
+    if (p.isCancel(nodeVersionInput)) {
       p.cancel("Operation cancelled.");
       process.exit(0);
     }
-    finalPackageManager = customPm;
+    nodeVersion = nodeVersionInput;
   }
 
-  let pnpmManageVersions = true;
-  if (packageManager === "pnpm") {
-    const managePnpm = await p.confirm({
-      message: "Enable manage-package-manager-versions?",
-      initialValue: true,
+  if (!inheritedSettings?.packageManager) {
+    const packageManager = await p.select({
+      message: "Package manager",
+      options: [
+        { value: "pnpm", label: "pnpm" },
+        { value: "npm", label: "npm" },
+        { value: "yarn", label: "yarn" },
+        { value: "custom", label: "Other (custom)" },
+      ],
+      initialValue: "pnpm",
     });
-    if (p.isCancel(managePnpm)) {
+
+    if (p.isCancel(packageManager)) {
       p.cancel("Operation cancelled.");
       process.exit(0);
     }
-    pnpmManageVersions = managePnpm;
+
+    finalPackageManager = packageManager as string;
+    if (packageManager === "custom") {
+      const customPm = await p.text({
+        message: "Enter package manager command",
+        validate: (value) => {
+          if (!value.length) return "Required";
+        },
+      });
+      if (p.isCancel(customPm)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+      finalPackageManager = customPm;
+    }
+
+    if (packageManager === "pnpm") {
+      const managePnpm = await p.confirm({
+        message: "Enable manage-package-manager-versions?",
+        initialValue: true,
+      });
+      if (p.isCancel(managePnpm)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+      pnpmManageVersions = managePnpm;
+    }
   }
 
   // Skip linter/formatter prompts if inherited from workspace
-  let linter: "oxlint" | "eslint" | "biome" = inheritedTooling?.linter ?? "oxlint";
-  let formatter: "oxfmt" | "prettier" | "biome" = inheritedTooling?.formatter ?? "oxfmt";
+  let linter: "oxlint" | "eslint" | "biome" = inheritedSettings?.linter ?? "oxlint";
+  let formatter: "oxfmt" | "prettier" | "biome" = inheritedSettings?.formatter ?? "oxfmt";
 
-  if (!inheritedTooling?.linter) {
+  if (!inheritedSettings?.linter) {
     const linterChoice = await p.select({
       message: "Linter",
       options: [
@@ -215,7 +224,7 @@ export async function promptForCustomization(
     linter = linterChoice as "oxlint" | "eslint" | "biome";
   }
 
-  if (!inheritedTooling?.formatter) {
+  if (!inheritedSettings?.formatter) {
     const formatterChoice = await p.select({
       message: "Formatter",
       options: [
@@ -501,6 +510,7 @@ function customTemplateToOptions(
   customTemplate: CustomTemplate,
   name: string,
   projectType: "app" | "library",
+  inheritedSettings?: InheritedWorkspaceSettings,
 ): GenerateOptions {
   const baseTemplate = customTemplate.baseTemplate;
   const template: Template = baseTemplate; // TypeScript by default for custom templates
@@ -509,11 +519,11 @@ function customTemplateToOptions(
     name,
     template,
     projectType,
-    packageManager: "pnpm",
-    pnpmManageVersions: true,
-    nodeVersion: "latest",
-    linter: customTemplate.linter,
-    formatter: customTemplate.formatter,
+    packageManager: inheritedSettings?.packageManager ?? "pnpm",
+    pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
+    nodeVersion: inheritedSettings?.nodeVersion ?? "latest",
+    linter: inheritedSettings?.linter ?? customTemplate.linter,
+    formatter: inheritedSettings?.formatter ?? customTemplate.formatter,
     testing: customTemplate.testing,
   };
 
@@ -539,20 +549,23 @@ function customTemplateToOptions(
   return base;
 }
 
-export type InheritedTooling = {
+export type InheritedWorkspaceSettings = {
   linter?: "oxlint" | "eslint" | "biome";
   formatter?: "oxfmt" | "prettier" | "biome";
+  packageManager?: string;
+  nodeVersion?: string;
+  pnpmManageVersions?: boolean;
 };
 
 /**
  * Prompt flow for package options when project type is already known.
  * Used when adding packages to a monorepo.
- * When inheritedTooling is provided, linter/formatter prompts are skipped.
+ * When inheritedSettings is provided, workspace-level setting prompts are skipped.
  */
 export async function promptForPackageOptions(
   projectName: string,
   projectType: "app" | "library",
-  inheritedTooling?: InheritedTooling,
+  inheritedSettings?: InheritedWorkspaceSettings,
 ): Promise<GenerateOptions> {
   // Build template options including custom templates
   const builtInOptions = [
@@ -588,21 +601,18 @@ export async function promptForPackageOptions(
   if (selection.startsWith("custom:")) {
     const customName = selection.slice(7); // Remove "custom:" prefix
     const customTemplate = customTemplates[customName]!;
-    const defaultOptions = customTemplateToOptions(customTemplate, projectName, projectType);
-
-    // Override with inherited tooling if provided
-    if (inheritedTooling?.linter) {
-      defaultOptions.linter = inheritedTooling.linter;
-    }
-    if (inheritedTooling?.formatter) {
-      defaultOptions.formatter = inheritedTooling.formatter;
-    }
+    const defaultOptions = customTemplateToOptions(
+      customTemplate,
+      projectName,
+      projectType,
+      inheritedSettings,
+    );
 
     // Show summary and ask confirm/customize
-    const configTitle = inheritedTooling
-      ? `Template: ${customName} (using workspace tooling)`
+    const configTitle = inheritedSettings
+      ? `Template: ${customName} (using workspace settings)`
       : `Template: ${customName}`;
-    p.note(formatConfigSummary(defaultOptions), configTitle);
+    p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
 
     const proceed = await p.confirm({
       message: "Proceed with these settings?",
@@ -624,7 +634,7 @@ export async function promptForPackageOptions(
       projectName,
       projectType,
       customTemplate.integrations,
-      inheritedTooling,
+      inheritedSettings,
     );
   }
 
@@ -644,14 +654,14 @@ export async function promptForPackageOptions(
     projectType,
     undefined,
     integrations,
-    inheritedTooling,
+    inheritedSettings,
   );
 
   // Show summary and ask confirm/customize
-  const configTitle = inheritedTooling
-    ? "Template Configuration (using workspace tooling)"
+  const configTitle = inheritedSettings
+    ? "Template Configuration (using workspace settings)"
     : "Template Configuration";
-  p.note(formatConfigSummary(defaultOptions), configTitle);
+  p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
 
   const proceed = await p.confirm({
     message: "Proceed with these settings?",
@@ -668,5 +678,5 @@ export async function promptForPackageOptions(
   }
 
   // Customize (pass integrations for R3F so they're preserved)
-  return promptForCustomization(template, projectName, projectType, integrations, inheritedTooling);
+  return promptForCustomization(template, projectName, projectType, integrations, inheritedSettings);
 }

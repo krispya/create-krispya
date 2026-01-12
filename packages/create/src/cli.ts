@@ -94,9 +94,12 @@ interface CliOptions {
   path?: string;
 }
 
-type WorkspaceTooling = {
+type InheritedWorkspaceSettings = {
   linter?: "oxlint" | "eslint" | "biome";
   formatter?: "oxfmt" | "prettier" | "biome";
+  packageManager?: string;
+  nodeVersion?: string;
+  pnpmManageVersions?: boolean;
 };
 
 interface ExistingConfigs {
@@ -198,16 +201,18 @@ async function parseWorkspaceDirectories(
 }
 
 /**
- * Detects linter and formatter from the monorepo root package.json.
+ * Detects workspace-level settings from the monorepo root.
  */
-async function detectWorkspaceTooling(
+async function detectWorkspaceSettings(
   monorepoRoot: string
-): Promise<WorkspaceTooling> {
+): Promise<InheritedWorkspaceSettings> {
   try {
     const pkgPath = join(monorepoRoot, "package.json");
     const content = await readFile(pkgPath, "utf-8");
     const pkgJson = JSON.parse(content) as {
       devDependencies?: Record<string, string>;
+      packageManager?: string;
+      engines?: { node?: string };
     };
     const devDeps = pkgJson.devDependencies ?? {};
 
@@ -227,7 +232,40 @@ async function detectWorkspaceTooling(
       ? "biome"
       : undefined;
 
-    return { linter, formatter };
+    // Extract package manager from packageManager field (e.g., "pnpm@9.15.4")
+    let packageManager: string | undefined;
+    if (pkgJson.packageManager) {
+      packageManager = pkgJson.packageManager.split("@")[0];
+    }
+
+    // Extract node version from engines.node (e.g., ">=22.0.0" -> "22")
+    let nodeVersion: string | undefined;
+    if (pkgJson.engines?.node) {
+      const match = pkgJson.engines.node.match(/(\d+)/);
+      if (match) {
+        nodeVersion = match[1];
+      }
+    }
+
+    // Check pnpm-workspace.yaml for manage-package-manager-versions
+    let pnpmManageVersions: boolean | undefined;
+    try {
+      const workspaceFile = join(monorepoRoot, "pnpm-workspace.yaml");
+      const workspaceContent = await readFile(workspaceFile, "utf-8");
+      pnpmManageVersions = workspaceContent.includes(
+        "manage-package-manager-versions: true"
+      );
+    } catch {
+      // pnpm-workspace.yaml doesn't exist or can't be read
+    }
+
+    return {
+      linter,
+      formatter,
+      packageManager,
+      nodeVersion,
+      pnpmManageVersions,
+    };
   } catch {
     return {};
   }
@@ -524,7 +562,7 @@ Or in \`package.json\`:
 async function createPackageInWorkspace(
   monorepoRoot: string,
   packageManager: string,
-  inheritedTooling: WorkspaceTooling,
+  inheritedSettings: InheritedWorkspaceSettings,
   scope: string
 ): Promise<boolean> {
   const workspaceDirectories = await parseWorkspaceDirectories(monorepoRoot);
@@ -578,7 +616,7 @@ async function createPackageInWorkspace(
   const packageOptions = await promptForPackageOptions(
     scopedName,
     packageType,
-    inheritedTooling
+    inheritedSettings
   );
 
   let targetDir = defaultDir;
@@ -868,7 +906,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
   }
   console.log();
 
-  const tooling = await detectWorkspaceTooling(monorepoRoot);
+  const tooling = await detectWorkspaceSettings(monorepoRoot);
   const existingConfigs = await detectExistingConfigs(monorepoRoot);
   const detectedLinter = tooling.linter ?? existingConfigs.linter ?? "oxlint";
   const detectedFormatter =
@@ -1223,7 +1261,7 @@ async function handleWorkspaceCommand(
   }
 
   const scope = await getMonorepoScope(monorepoRoot);
-  const inheritedTooling = await detectWorkspaceTooling(monorepoRoot);
+  const inheritedSettings = await detectWorkspaceSettings(monorepoRoot);
   const projectType: ProjectType = options.type ?? "app";
   const defaultDir = projectType === "library" ? "packages" : "apps";
   const targetDir = options.dir ?? defaultDir;
@@ -1257,8 +1295,11 @@ async function handleWorkspaceCommand(
     );
   }
 
-  const linter = inheritedTooling.linter ?? options.linter ?? "oxlint";
-  const formatter = inheritedTooling.formatter ?? options.formatter ?? "oxfmt";
+  const linter = inheritedSettings.linter ?? options.linter ?? "oxlint";
+  const formatter = inheritedSettings.formatter ?? options.formatter ?? "oxfmt";
+  const packageManager = inheritedSettings.packageManager ?? "pnpm";
+  const nodeVersion = inheritedSettings.nodeVersion ?? "latest";
+  const pnpmManageVersions = inheritedSettings.pnpmManageVersions ?? true;
 
   await Promise.all(versionPromises);
 
@@ -1272,6 +1313,9 @@ async function handleWorkspaceCommand(
     template,
     linter,
     formatter,
+    packageManager,
+    nodeVersion,
+    pnpmManageVersions,
     workspaceRoot,
     versions,
     ...(baseTemplate === "r3f" && {
@@ -1417,9 +1461,12 @@ async function handleMonorepoCreation(
 
     spinner.stop(color.green.inverse(" ✓ Monorepo workspace created! "));
 
-    const newMonorepoTooling: WorkspaceTooling = {
+    const newWorkspaceSettings: InheritedWorkspaceSettings = {
       linter: generateOptions.linter,
       formatter: generateOptions.formatter,
+      packageManager,
+      nodeVersion: generateOptions.nodeVersion,
+      pnpmManageVersions: generateOptions.pnpmManageVersions,
     };
 
     const scope = generateOptions.name;
@@ -1429,7 +1476,7 @@ async function handleMonorepoCreation(
       addMore = await createPackageInWorkspace(
         projectPath,
         packageManager,
-        newMonorepoTooling,
+        newWorkspaceSettings,
         scope
       );
     }
@@ -1606,16 +1653,19 @@ async function handleInteractiveMonorepoMode(
   }
 
   if (choice === "add") {
-    const inheritedTooling = await detectWorkspaceTooling(monorepoRoot);
-    if (inheritedTooling.linter || inheritedTooling.formatter) {
-      const toolingInfo = [
-        inheritedTooling.linter && `linter: ${inheritedTooling.linter}`,
-        inheritedTooling.formatter &&
-          `formatter: ${inheritedTooling.formatter}`,
+    const inheritedSettings = await detectWorkspaceSettings(monorepoRoot);
+    const hasSettings = Object.values(inheritedSettings).some(Boolean);
+    if (hasSettings) {
+      const settingsInfo = [
+        inheritedSettings.linter && `linter: ${inheritedSettings.linter}`,
+        inheritedSettings.formatter &&
+          `formatter: ${inheritedSettings.formatter}`,
+        inheritedSettings.packageManager &&
+          `pm: ${inheritedSettings.packageManager}`,
       ]
         .filter(Boolean)
         .join(", ");
-      p.log.info(`Using workspace tooling (${toolingInfo})`);
+      p.log.info(`Using workspace settings (${settingsInfo})`);
     }
 
     const scope = await getMonorepoScope(monorepoRoot);
@@ -1624,8 +1674,8 @@ async function handleInteractiveMonorepoMode(
     while (addMore) {
       addMore = await createPackageInWorkspace(
         monorepoRoot,
-        "pnpm",
-        inheritedTooling,
+        inheritedSettings.packageManager ?? "pnpm",
+        inheritedSettings,
         scope
       );
     }

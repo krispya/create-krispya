@@ -12,17 +12,33 @@ export type MonorepoConfigOptions = {
 };
 
 /**
- * Formats the configuration summary for display in the CLI.
+ * Inherited workspace settings that cannot be customized per-package.
  */
-export function formatConfigSummary(options: GenerateOptions): string {
+export type InheritedFields = {
+  linter?: string;
+  formatter?: string;
+  packageManager?: string;
+  nodeVersion?: string;
+  pnpmManageVersions?: boolean;
+};
+
+/**
+ * Formats the configuration summary for display in the CLI.
+ * When inherited is provided, those fields are displayed with dim styling.
+ */
+export function formatConfigSummary(
+  options: GenerateOptions,
+  inherited?: InheritedFields,
+): string {
   const lines: string[] = [];
   const VALUE_COL = 27; // Start position for values
 
-  const formatRow = (label: string, value: string, indent = "") => {
+  const formatRow = (label: string, value: string, isInherited = false, indent = "") => {
     const fullLabel = indent + label;
     const dotCount = Math.max(1, VALUE_COL - fullLabel.length - 1);
     const dots = color.gray(".".repeat(dotCount));
-    return `${indent}${label} ${dots} ${value}`;
+    const displayValue = isInherited ? `${value} 🔒` : value;
+    return `${indent}${label} ${dots} ${displayValue}`;
   };
 
   const formatLanguage = (lang: string) => {
@@ -49,26 +65,31 @@ export function formatConfigSummary(options: GenerateOptions): string {
     lines.push(formatRow("Bundler", "vite"));
   }
 
-  // Node version
-  lines.push(formatRow("Node version", options.nodeVersion || "latest"));
+  // Node version (inherited from workspace)
+  const nodeVersionInherited = inherited?.nodeVersion !== undefined;
+  lines.push(formatRow("Node version", options.nodeVersion || "latest", nodeVersionInherited));
 
-  // Package manager
-  lines.push(formatRow("Package manager", options.packageManager || "pnpm"));
+  // Package manager (inherited from workspace)
+  const pmInherited = inherited?.packageManager !== undefined;
+  lines.push(formatRow("Package manager", options.packageManager || "pnpm", pmInherited));
 
-  // pnpm-specific options
+  // pnpm-specific options (inherited from workspace)
   if (options.packageManager === "pnpm") {
     const versionManaged = options.pnpmManageVersions ? "yes" : "no";
-    lines.push(formatRow("↳ Version managed", versionManaged, ""));
+    const pnpmVersionInherited = inherited?.pnpmManageVersions !== undefined;
+    lines.push(formatRow("↳ Version managed", versionManaged, pnpmVersionInherited, ""));
   }
 
-  // Linter
+  // Linter (inherited from workspace)
   if (options.linter) {
-    lines.push(formatRow("Linter", options.linter));
+    const linterInherited = inherited?.linter !== undefined;
+    lines.push(formatRow("Linter", options.linter, linterInherited));
   }
 
-  // Formatter
+  // Formatter (inherited from workspace)
   if (options.formatter) {
-    lines.push(formatRow("Formatter", options.formatter));
+    const formatterInherited = inherited?.formatter !== undefined;
+    lines.push(formatRow("Formatter", options.formatter, formatterInherited));
   }
 
   // Testing
