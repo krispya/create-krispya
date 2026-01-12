@@ -99,11 +99,6 @@ type WorkspaceTooling = {
   formatter?: "oxfmt" | "prettier" | "biome";
 };
 
-type WorkspacePackage = {
-  name: string;
-  path: string;
-};
-
 interface ExistingConfigs {
   linter?: "oxlint" | "eslint" | "biome";
   formatter?: "prettier" | "biome";
@@ -286,40 +281,34 @@ async function getMonorepoScope(monorepoRoot: string): Promise<string> {
 }
 
 /**
- * Scans the packages/ directory for existing workspace packages.
+ * Scans the packages/ directory for existing workspace package names.
  */
-async function getWorkspacePackages(
-  monorepoRoot: string
-): Promise<WorkspacePackage[]> {
+async function getWorkspacePackages(monorepoRoot: string): Promise<string[]> {
   const packagesDir = join(monorepoRoot, "packages");
-  const packages: WorkspacePackage[] = [];
 
   try {
     const { readdir } = await import("fs/promises");
     const entries = await readdir(packagesDir, { withFileTypes: true });
+    const names: string[] = [];
 
     for (const entry of entries) {
-      if (entry.isDirectory()) {
-        try {
-          const pkgJsonPath = join(packagesDir, entry.name, "package.json");
-          const content = await readFile(pkgJsonPath, "utf-8");
-          const pkgJson = JSON.parse(content) as { name?: string };
-          if (pkgJson.name) {
-            packages.push({
-              name: pkgJson.name,
-              path: `packages/${entry.name}`,
-            });
-          }
-        } catch {
-          // No package.json or invalid, skip
-        }
+      if (!entry.isDirectory()) continue;
+      try {
+        const content = await readFile(
+          join(packagesDir, entry.name, "package.json"),
+          "utf-8"
+        );
+        const pkg = JSON.parse(content) as { name?: string };
+        if (pkg.name) names.push(pkg.name);
+      } catch {
+        // No package.json or invalid, skip
       }
     }
-  } catch {
-    // packages/ doesn't exist yet
-  }
 
-  return packages;
+    return names;
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -710,21 +699,17 @@ async function createPackageInWorkspace(
   packageOptions.versions = versions;
 
   // For apps, prompt for workspace dependencies
-  if (packageType === "app") {
-    const workspacePackages = await getWorkspacePackages(monorepoRoot);
-    if (workspacePackages.length > 0) {
-      const selectedDeps = await p.multiselect({
-        message: "Add workspace dependencies?",
-        options: workspacePackages.map((pkgInfo) => ({
-          value: pkgInfo.name,
-          label: pkgInfo.name.replace(/^@[^/]+\//, ""),
-        })),
-        required: false,
-      });
+  const workspacePackages =
+    packageType === "app" ? await getWorkspacePackages(monorepoRoot) : [];
+  if (workspacePackages.length > 0) {
+    const selectedDeps = await p.multiselect({
+      message: "Add workspace dependencies?",
+      options: workspacePackages.map((name) => ({ value: name, label: name })),
+      required: false,
+    });
 
-      if (!p.isCancel(selectedDeps) && selectedDeps.length > 0) {
-        packageOptions.workspaceDependencies = selectedDeps as string[];
-      }
+    if (!p.isCancel(selectedDeps) && selectedDeps.length > 0) {
+      packageOptions.workspaceDependencies = selectedDeps as string[];
     }
   }
 
