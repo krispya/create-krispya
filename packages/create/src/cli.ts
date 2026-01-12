@@ -554,17 +554,21 @@ async function createPackageInWorkspace(
 
   const packageNameInput = await p.text({
     message: "Package name?",
-    placeholder: `Scoped to @${scope}/`,
+    initialValue: `@${scope}/`,
     validate: (value) => {
       const validationError = validatePackageName(value);
       if (validationError) return validationError;
 
+      // Extract directory name from package name (last part after @scope/ or full name)
+      const dirName = value.includes("/") ? value.split("/").pop()! : value;
+      if (!dirName) return "Package name is required";
+
       if (!hasCustomDirectories) {
-        const targetPath = join(monorepoRoot, defaultDir, value);
+        const targetPath = join(monorepoRoot, defaultDir, dirName);
         try {
           const { statSync } = require("fs");
           statSync(targetPath);
-          return `Directory ${defaultDir}/${value} already exists`;
+          return `Directory ${defaultDir}/${dirName} already exists`;
         } catch {
           // Directory doesn't exist, which is what we want
         }
@@ -576,8 +580,11 @@ async function createPackageInWorkspace(
     return false;
   }
 
-  const shortName = packageNameInput as string;
-  const scopedName = `@${scope}/${shortName}`;
+  const scopedName = packageNameInput as string;
+  // Extract directory name from package name (last part after @scope/ or full name)
+  const shortName = scopedName.includes("/")
+    ? scopedName.split("/").pop()!
+    : scopedName;
 
   const packageOptions = await promptForPackageOptions(
     scopedName,

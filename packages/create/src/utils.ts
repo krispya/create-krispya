@@ -68,12 +68,39 @@ export async function getLatestNodeVersion(): Promise<string> {
 }
 
 /**
+ * Validates a single name segment (scope or package name part).
+ */
+function validateNameSegment(segment: string, label: string): string | undefined {
+  if (!segment.length) {
+    return `${label} is required`;
+  }
+
+  // Check for valid characters (lowercase alphanumeric and hyphens)
+  if (!/^[a-z0-9-]+$/.test(segment)) {
+    return `${label} must be lowercase and contain only letters, numbers, and hyphens`;
+  }
+
+  // Cannot start or end with hyphen
+  if (segment.startsWith("-") || segment.endsWith("-")) {
+    return `${label} cannot start or end with a hyphen`;
+  }
+
+  // Cannot have consecutive hyphens
+  if (segment.includes("--")) {
+    return `${label} cannot contain consecutive hyphens`;
+  }
+
+  return undefined;
+}
+
+/**
  * Validates a package name for use in a monorepo workspace.
  * Returns an error message if invalid, undefined if valid.
  *
  * Rules:
+ * - Supports scoped names (@scope/name) or unscoped names
  * - Must be lowercase
- * - Only alphanumeric characters and hyphens allowed
+ * - Only alphanumeric characters and hyphens allowed in each segment
  * - Cannot start or end with a hyphen
  * - Cannot contain path traversal sequences
  * - Cannot be empty
@@ -84,26 +111,40 @@ export function validatePackageName(name: string): string | undefined {
   }
 
   // Check for path traversal attempts
-  if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-    return "Package name cannot contain path separators or '..'";
+  if (name.includes("..") || name.includes("\\")) {
+    return "Package name cannot contain path traversal sequences";
   }
 
-  // Check for valid characters (lowercase alphanumeric and hyphens)
-  if (!/^[a-z0-9-]+$/.test(name)) {
-    return "Package name must be lowercase and contain only letters, numbers, and hyphens";
+  // Handle scoped packages (@scope/name)
+  if (name.startsWith("@")) {
+    const slashIndex = name.indexOf("/");
+    if (slashIndex === -1) {
+      return "Scoped package name must include a package name after the scope (e.g., @scope/name)";
+    }
+
+    // Multiple slashes not allowed
+    if (name.indexOf("/", slashIndex + 1) !== -1) {
+      return "Package name can only have one slash for scoped packages";
+    }
+
+    const scope = name.slice(1, slashIndex); // Remove @ prefix
+    const packageName = name.slice(slashIndex + 1);
+
+    const scopeError = validateNameSegment(scope, "Scope");
+    if (scopeError) return scopeError;
+
+    const nameError = validateNameSegment(packageName, "Package name");
+    if (nameError) return nameError;
+
+    return undefined;
   }
 
-  // Cannot start or end with hyphen
-  if (name.startsWith("-") || name.endsWith("-")) {
-    return "Package name cannot start or end with a hyphen";
+  // Unscoped package - no slashes allowed
+  if (name.includes("/")) {
+    return "Unscoped package name cannot contain slashes. Use @scope/name format for scoped packages";
   }
 
-  // Cannot have consecutive hyphens
-  if (name.includes("--")) {
-    return "Package name cannot contain consecutive hyphens";
-  }
-
-  return undefined;
+  return validateNameSegment(name, "Package name");
 }
 
 /**
