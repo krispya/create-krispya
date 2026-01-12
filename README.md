@@ -157,6 +157,7 @@ Workspace Options:
   --dir <directory>           Target directory (default: apps/ or packages/)
 
 Utility Options:
+  --path <directory>          Run in specified directory instead of cwd
   --check                     Validate current monorepo workspace (exit 0/1)
   --fix                       Fix monorepo by generating missing config packages
                               (use with --linter and --formatter for non-interactive)
@@ -210,6 +211,9 @@ pnpm create krispya my-app --linter eslint --formatter prettier
 
 # Validate monorepo workspace
 pnpm create krispya --check
+
+# Validate a different directory
+pnpm create krispya --check --path ~/Dev/my-monorepo
 
 # Fix monorepo (interactive)
 pnpm create krispya --fix
