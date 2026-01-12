@@ -360,7 +360,8 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
     process.exit(0);
   }
 
-  // Monorepos are pnpm-only
+  // Monorepos are currently pnpm-only
+  // TODO: Support yarn and npm workspaces in the future
   const managePnpm = await p.confirm({
     message: "Enable manage-package-manager-versions?",
     initialValue: true,

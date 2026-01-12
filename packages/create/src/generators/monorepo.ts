@@ -9,10 +9,19 @@ import {
   generateOxfmtConfigPackage,
 } from "./config-packages.js";
 
+/**
+ * Parameters for generating a monorepo workspace.
+ *
+ * Note: Monorepos are currently pnpm-only. We use pnpm workspaces for
+ * dependency management and the .config/* pattern for shared configs.
+ *
+ * TODO: Support yarn and npm workspaces in the future.
+ */
 export type MonorepoParams = {
   name: string;
   linter: Linter;
   formatter: Formatter;
+  /** Currently always "pnpm" - monorepos are pnpm-only */
   packageManager: string;
   pnpmVersion?: string;
   pnpmManageVersions?: boolean;
@@ -26,6 +35,9 @@ export type MonorepoResult = {
 
 /**
  * Generates a monorepo workspace root structure with shared config packages.
+ *
+ * Note: Monorepos are currently pnpm-only. Detection relies on pnpm-workspace.yaml.
+ * TODO: Support yarn and npm workspaces in the future.
  */
 export function generateMonorepo(params: MonorepoParams): MonorepoResult {
   const {

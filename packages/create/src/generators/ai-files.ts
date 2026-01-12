@@ -51,10 +51,36 @@ type AiContentParams = {
 };
 
 /**
+ * Builds the .config/ description based on linter/formatter choices.
+ * Biome uses root biome.json instead of a .config package.
+ */
+function getConfigPackagesDescription(linter: string, formatter: string): string {
+  const packages = ["`@config/typescript`"];
+
+  // Biome uses root biome.json, not a .config package
+  if (linter !== "biome") {
+    packages.push(`\`@config/${linter}\``);
+  }
+  if (formatter !== "biome" && formatter !== linter) {
+    packages.push(`\`@config/${formatter}\``);
+  }
+
+  let description = `- \`.config/\`: shared config packages (${packages.join(", ")})`;
+
+  // Add note about biome.json if biome is used
+  if (linter === "biome" || formatter === "biome") {
+    description += "\n- `biome.json`: Biome configuration (root level)";
+  }
+
+  return description;
+}
+
+/**
  * Returns the AI instructions content for the monorepo.
  */
 function getAiInstructionsContent(params: AiContentParams): string {
   const { name, packageManager, linter, formatter } = params;
+  const configDescription = getConfigPackagesDescription(linter, formatter);
 
   return `# ${name}
 
@@ -131,7 +157,7 @@ ${packageManager} run format       # Format with ${formatter}
 
 - \`apps/\`: applications (\`--type app\`)
 - \`packages/\`: libraries (\`--type library\`)
-- \`.config/\`: shared config packages (\`@config/typescript\`, \`@config/${linter}\`, \`@config/${formatter}\`)
+${configDescription}
 - TS configs extend \`@config/typescript/*\` (base/app/node/react)
 `;
 }

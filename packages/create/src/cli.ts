@@ -81,6 +81,9 @@ interface CliOptions {
 /**
  * Detects if the current directory is inside a monorepo workspace.
  * Looks for pnpm-workspace.yaml with packages array in current or parent directories.
+ *
+ * Note: Monorepos are currently pnpm-only - we only detect pnpm workspaces.
+ * TODO: Support yarn and npm workspaces in the future.
  */
 async function detectMonorepoRoot(): Promise<string | null> {
   let currentDir = cwd();
@@ -181,6 +184,17 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Calculates the relative path from a package directory back to the monorepo root.
+ * @param packagePath - The path from monorepo root to the package (e.g., "apps/my-app" or "examples/nested/demo")
+ * @returns The relative path back to root (e.g., "../.." or "../../..")
+ */
+function calculateWorkspaceRoot(packagePath: string): string {
+  // Count the number of path segments
+  const segments = packagePath.split(/[/\\]/).filter(Boolean);
+  return segments.map(() => "..").join("/");
 }
 
 interface ExistingConfigs {
@@ -597,7 +611,7 @@ async function createPackageInWorkspace(
   }
 
   const packagePath = join(targetDir, shortName);
-  const workspaceRoot = "../..";
+  const workspaceRoot = calculateWorkspaceRoot(packagePath);
 
   packageOptions.workspaceRoot = workspaceRoot;
   packageOptions.name = scopedName;
@@ -1272,6 +1286,10 @@ async function main() {
 
         await Promise.all(versionPromises);
 
+        // Calculate workspace root based on target directory depth
+        const packagePath = join(targetDir, name);
+        const workspaceRoot = calculateWorkspaceRoot(packagePath);
+
         const generateOptions: GenerateOptions = {
           name: scopedName,
           projectType,
@@ -1279,7 +1297,7 @@ async function main() {
           template,
           linter,
           formatter,
-          workspaceRoot: "../..",
+          workspaceRoot,
           versions,
           ...(baseTemplate === "r3f" && {
             drei: options.drei ? {} : undefined,
