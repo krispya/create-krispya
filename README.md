@@ -134,6 +134,31 @@ Files are grouped by category. For each category with changes:
 
 Use `--yes` for non-interactive mode (adds new files only, skips modified).
 
+### Migrating Linter/Formatter
+
+Switch between linters or formatters:
+
+```bash
+# Migrate linter
+pnpm create krispya --update --linter eslint
+
+# Migrate formatter
+pnpm create krispya --update --formatter prettier
+
+# Migrate both
+pnpm create krispya --update --linter biome --formatter biome
+```
+
+Migration automatically:
+
+- Removes old config packages (e.g., `.config/oxlint/`)
+- Generates new config packages (e.g., `.config/eslint/`)
+- Updates root `package.json` (devDependencies, scripts)
+- Updates all sub-package devDependencies
+- Regenerates VS Code settings and AI files
+
+Run `pnpm install` after migration to update dependencies.
+
 ### AI Instruction Files
 
 When creating a monorepo, you can generate AI instruction files to help AI assistants understand the workspace:

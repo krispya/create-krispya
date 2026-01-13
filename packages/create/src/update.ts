@@ -1,4 +1,4 @@
-import { readFile, access, writeFile, mkdir } from "fs/promises";
+import { readFile, access, writeFile, mkdir, rm, readdir } from "fs/promises";
 import { constants } from "fs";
 import { join, dirname } from "path";
 
@@ -12,6 +12,7 @@ import {
   generateVscodeFiles,
 } from "./generators/monorepo.js";
 import { generateAiFiles, type AiFilesParams } from "./generators/ai-files.js";
+import { parseWorkspaceYamlContent, detectTooling } from "./utils.js";
 
 // =============================================================================
 // Types
@@ -47,12 +48,34 @@ export type WorkspaceConfig = {
   packageManager: "pnpm";
 };
 
+export type MigrationTarget = {
+  linter?: Linter;
+  formatter?: Formatter;
+};
+
+export type MigrationChange = {
+  type: "remove-dir" | "add-file" | "remove-file" | "update-package-json";
+  path: string;
+  description: string;
+  content?: string;
+};
+
+export type MigrationPlan = {
+  fromLinter: Linter;
+  toLinter: Linter;
+  fromFormatter: Formatter;
+  toFormatter: Formatter;
+  changes: MigrationChange[];
+  subPackageUpdates: { path: string; remove: string[]; add: string[] }[];
+};
+
 // =============================================================================
 // Config Detection
 // =============================================================================
 
 /**
  * Detects the current workspace configuration from existing files.
+ * Uses scripts → .config/ directories → devDependencies priority.
  */
 export async function detectCurrentConfig(
   root: string
@@ -70,50 +93,13 @@ export async function detectCurrentConfig(
     // Use directory name
   }
 
-  // Detect linter from devDependencies
-  let linter: Linter = "oxlint";
-  try {
-    const pkgPath = join(root, "package.json");
-    const content = await readFile(pkgPath, "utf-8");
-    const pkgJson = JSON.parse(content) as {
-      devDependencies?: Record<string, string>;
-    };
-    const devDeps = pkgJson.devDependencies ?? {};
-    if (devDeps["@biomejs/biome"]) {
-      linter = "biome";
-    } else if (devDeps.eslint) {
-      linter = "eslint";
-    } else if (devDeps.oxlint) {
-      linter = "oxlint";
-    }
-  } catch {
-    // Default to oxlint
-  }
-
-  // Detect formatter from devDependencies
-  let formatter: Formatter = "oxfmt";
-  try {
-    const pkgPath = join(root, "package.json");
-    const content = await readFile(pkgPath, "utf-8");
-    const pkgJson = JSON.parse(content) as {
-      devDependencies?: Record<string, string>;
-    };
-    const devDeps = pkgJson.devDependencies ?? {};
-    if (devDeps["@biomejs/biome"]) {
-      formatter = "biome";
-    } else if (devDeps.prettier) {
-      formatter = "prettier";
-    } else if (devDeps.oxfmt) {
-      formatter = "oxfmt";
-    }
-  } catch {
-    // Default to oxfmt
-  }
+  // Detect linter and formatter using standardized detection
+  const tooling = await detectTooling(root);
 
   return {
     name,
-    linter,
-    formatter,
+    linter: tooling.linter ?? "oxlint",
+    formatter: tooling.formatter ?? "oxfmt",
     packageManager: "pnpm",
   };
 }
@@ -426,4 +412,514 @@ export function formatFileChange(change: FileChange): string {
   const icon =
     change.status === "added" ? "+" : change.status === "modified" ? "~" : "=";
   return `  ${icon} ${change.path}`;
+}
+
+// =============================================================================
+// Migration
+// =============================================================================
+
+const LINTER_DEPS: Record<Linter, string> = {
+  oxlint: "oxlint",
+  eslint: "eslint",
+  biome: "@biomejs/biome",
+};
+
+const FORMATTER_DEPS: Record<Formatter, string> = {
+  oxfmt: "oxfmt",
+  prettier: "prettier",
+  biome: "@biomejs/biome",
+};
+
+const LINTER_CONFIG_PACKAGES: Record<Linter, string | null> = {
+  oxlint: "@config/oxlint",
+  eslint: "@config/eslint",
+  biome: null, // biome uses root biome.json
+};
+
+const FORMATTER_CONFIG_PACKAGES: Record<Formatter, string | null> = {
+  oxfmt: "@config/oxfmt",
+  prettier: "@config/prettier",
+  biome: null, // biome uses root biome.json
+};
+
+/**
+ * Checks if a migration is needed based on current config and target.
+ */
+export function needsMigration(
+  current: WorkspaceConfig,
+  target: MigrationTarget
+): boolean {
+  const linterChange = target.linter && target.linter !== current.linter;
+  const formatterChange =
+    target.formatter && target.formatter !== current.formatter;
+  return linterChange || formatterChange || false;
+}
+
+/**
+ * Generates a migration plan from current config to target.
+ */
+export async function getMigrationPlan(
+  current: WorkspaceConfig,
+  target: MigrationTarget,
+  root: string
+): Promise<MigrationPlan> {
+  const toLinter = target.linter ?? current.linter;
+  const toFormatter = target.formatter ?? current.formatter;
+
+  const changes: MigrationChange[] = [];
+
+  // Linter changes
+  if (toLinter !== current.linter) {
+    // Remove old linter config package (if not biome)
+    if (current.linter !== "biome") {
+      changes.push({
+        type: "remove-dir",
+        path: `.config/${current.linter}`,
+        description: `Remove @config/${current.linter} package`,
+      });
+    }
+
+    // Add new linter config package (if not biome)
+    if (toLinter !== "biome") {
+      const files: Record<string, File> = {};
+      if (toLinter === "oxlint") {
+        generateOxlintConfigPackage(files);
+      } else if (toLinter === "eslint") {
+        generateEslintConfigPackage(files);
+      }
+      for (const [path, file] of Object.entries(files)) {
+        if (file.type === "text") {
+          changes.push({
+            type: "add-file",
+            path,
+            description: `Add ${path}`,
+            content: file.content,
+          });
+        }
+      }
+    }
+
+    // Handle biome.json
+    if (toLinter === "biome" && toFormatter === "biome") {
+      // Both switching to biome - add biome.json
+      changes.push({
+        type: "add-file",
+        path: "biome.json",
+        description: "Add biome.json config",
+        content: JSON.stringify(
+          {
+            $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
+            vcs: { enabled: true, clientKind: "git", useIgnoreFile: true },
+            linter: { enabled: true, rules: { recommended: true } },
+            formatter: { enabled: true },
+          },
+          null,
+          2
+        ),
+      });
+    } else if (toLinter === "biome" && toFormatter !== "biome") {
+      // Only linter is biome
+      changes.push({
+        type: "add-file",
+        path: "biome.json",
+        description: "Add biome.json config (linter only)",
+        content: JSON.stringify(
+          {
+            $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
+            vcs: { enabled: true, clientKind: "git", useIgnoreFile: true },
+            linter: { enabled: true, rules: { recommended: true } },
+            formatter: { enabled: false },
+          },
+          null,
+          2
+        ),
+      });
+    }
+
+    // Remove biome.json if migrating away from biome (and formatter isn't biome)
+    if (
+      current.linter === "biome" &&
+      toLinter !== "biome" &&
+      current.formatter !== "biome" &&
+      toFormatter !== "biome"
+    ) {
+      changes.push({
+        type: "remove-file",
+        path: "biome.json",
+        description: "Remove biome.json",
+      });
+    }
+  }
+
+  // Formatter changes
+  if (toFormatter !== current.formatter) {
+    // Remove old formatter config package (if not biome and not same as linter)
+    const formatterSameAsLinter =
+      (current.formatter as string) === (current.linter as string);
+    if (current.formatter !== "biome" && !formatterSameAsLinter) {
+      changes.push({
+        type: "remove-dir",
+        path: `.config/${current.formatter}`,
+        description: `Remove @config/${current.formatter} package`,
+      });
+    }
+
+    // Add new formatter config package (if not biome and not same as new linter)
+    const newFormatterSameAsLinter =
+      (toFormatter as string) === (toLinter as string);
+    if (toFormatter !== "biome" && !newFormatterSameAsLinter) {
+      const files: Record<string, File> = {};
+      if (toFormatter === "oxfmt") {
+        generateOxfmtConfigPackage(files);
+      } else if (toFormatter === "prettier") {
+        generatePrettierConfigPackage(files);
+      }
+      for (const [path, file] of Object.entries(files)) {
+        if (file.type === "text") {
+          changes.push({
+            type: "add-file",
+            path,
+            description: `Add ${path}`,
+            content: file.content,
+          });
+        }
+      }
+    }
+
+    // Handle biome.json for formatter-only switch
+    if (toFormatter === "biome" && toLinter !== "biome") {
+      changes.push({
+        type: "add-file",
+        path: "biome.json",
+        description: "Add biome.json config (formatter only)",
+        content: JSON.stringify(
+          {
+            $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
+            vcs: { enabled: true, clientKind: "git", useIgnoreFile: true },
+            linter: { enabled: false },
+            formatter: { enabled: true },
+          },
+          null,
+          2
+        ),
+      });
+    }
+
+    // Remove biome.json if migrating away from biome formatter (and linter isn't biome)
+    if (
+      current.formatter === "biome" &&
+      toFormatter !== "biome" &&
+      current.linter !== "biome" &&
+      toLinter !== "biome"
+    ) {
+      changes.push({
+        type: "remove-file",
+        path: "biome.json",
+        description: "Remove biome.json",
+      });
+    }
+  }
+
+  // Root package.json update
+  changes.push({
+    type: "update-package-json",
+    path: "package.json",
+    description: "Update root package.json (devDependencies, scripts)",
+  });
+
+  // Note: VS Code settings and AI files are NOT included in migration.
+  // User should run `--update` separately to update those interactively.
+
+  // Find sub-packages that need updates
+  const subPackageUpdates = await getSubPackageUpdates(
+    root,
+    current,
+    toLinter,
+    toFormatter
+  );
+
+  return {
+    fromLinter: current.linter,
+    toLinter,
+    fromFormatter: current.formatter,
+    toFormatter,
+    changes,
+    subPackageUpdates,
+  };
+}
+
+/**
+ * Finds all sub-packages and determines what devDependency updates are needed.
+ */
+async function getSubPackageUpdates(
+  root: string,
+  current: WorkspaceConfig,
+  toLinter: Linter,
+  toFormatter: Formatter
+): Promise<MigrationPlan["subPackageUpdates"]> {
+  const updates: MigrationPlan["subPackageUpdates"] = [];
+
+  // Parse pnpm-workspace.yaml to find package directories
+  const workspacePath = join(root, "pnpm-workspace.yaml");
+  let workspaceContent: string;
+  try {
+    workspaceContent = await readFile(workspacePath, "utf-8");
+  } catch {
+    return updates;
+  }
+
+  const packageGlobs = parseWorkspaceYamlContent(workspaceContent);
+
+  // Find actual package directories
+  for (const glob of packageGlobs) {
+    // Skip .config - we handle those separately
+    if (glob.includes(".config")) continue;
+
+    // Handle simple globs like "apps/*" or "packages/*"
+    const baseDir = glob.replace(/\/\*$/, "").replace(/^["']|["']$/g, "");
+    const basePath = join(root, baseDir);
+
+    try {
+      const entries = await readdir(basePath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+
+        const pkgJsonPath = join(basePath, entry.name, "package.json");
+        try {
+          const content = await readFile(pkgJsonPath, "utf-8");
+          const pkg = JSON.parse(content) as {
+            devDependencies?: Record<string, string>;
+          };
+          const devDeps = pkg.devDependencies ?? {};
+
+          const remove: string[] = [];
+          const add: string[] = [];
+
+          // Check linter config package
+          const oldLinterPkg = LINTER_CONFIG_PACKAGES[current.linter];
+          const newLinterPkg = LINTER_CONFIG_PACKAGES[toLinter];
+          if (
+            oldLinterPkg &&
+            oldLinterPkg !== newLinterPkg &&
+            devDeps[oldLinterPkg]
+          ) {
+            remove.push(oldLinterPkg);
+          }
+          if (
+            newLinterPkg &&
+            newLinterPkg !== oldLinterPkg &&
+            oldLinterPkg &&
+            devDeps[oldLinterPkg]
+          ) {
+            add.push(newLinterPkg);
+          }
+
+          // Check formatter config package (skip if same as linter - e.g. both biome)
+          if (current.formatter !== current.linter) {
+            const oldFormatterPkg =
+              FORMATTER_CONFIG_PACKAGES[current.formatter];
+            const newFormatterPkg = FORMATTER_CONFIG_PACKAGES[toFormatter];
+            if (
+              oldFormatterPkg &&
+              oldFormatterPkg !== newFormatterPkg &&
+              devDeps[oldFormatterPkg]
+            ) {
+              remove.push(oldFormatterPkg);
+            }
+            if (
+              newFormatterPkg &&
+              newFormatterPkg !== oldFormatterPkg &&
+              oldFormatterPkg &&
+              devDeps[oldFormatterPkg]
+            ) {
+              add.push(newFormatterPkg);
+            }
+          }
+
+          if (remove.length > 0 || add.length > 0) {
+            updates.push({
+              path: join(baseDir, entry.name, "package.json"),
+              remove,
+              add,
+            });
+          }
+        } catch {
+          // Not a package or can't read
+        }
+      }
+    } catch {
+      // Directory doesn't exist
+    }
+  }
+
+  return updates;
+}
+
+/**
+ * Applies a migration plan.
+ */
+export async function applyMigration(
+  plan: MigrationPlan,
+  root: string
+): Promise<void> {
+  // 1. Remove directories first
+  for (const change of plan.changes) {
+    if (change.type === "remove-dir") {
+      const fullPath = join(root, change.path);
+      try {
+        await rm(fullPath, { recursive: true });
+      } catch {
+        // Already removed or doesn't exist
+      }
+    }
+  }
+
+  // 2. Remove files
+  for (const change of plan.changes) {
+    if (change.type === "remove-file") {
+      const fullPath = join(root, change.path);
+      try {
+        await rm(fullPath);
+      } catch {
+        // Already removed or doesn't exist
+      }
+    }
+  }
+
+  // 3. Add/update files
+  for (const change of plan.changes) {
+    if (change.type === "add-file" && change.content) {
+      const fullPath = join(root, change.path);
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, change.content);
+    }
+  }
+
+  // 4. Update root package.json
+  await updateRootPackageJson(root, plan);
+
+  // 5. Update sub-packages
+  for (const update of plan.subPackageUpdates) {
+    await updateSubPackageJson(root, update);
+  }
+}
+
+/**
+ * Updates the root package.json with new devDependencies and scripts.
+ */
+async function updateRootPackageJson(
+  root: string,
+  plan: MigrationPlan
+): Promise<void> {
+  const pkgPath = join(root, "package.json");
+  const content = await readFile(pkgPath, "utf-8");
+  const pkg = JSON.parse(content) as {
+    scripts?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+
+  const devDeps = pkg.devDependencies ?? {};
+
+  // Remove old linter dep
+  const oldLinterDep = LINTER_DEPS[plan.fromLinter];
+  delete devDeps[oldLinterDep];
+
+  // Remove old formatter dep (if different from linter)
+  if (plan.fromFormatter !== plan.fromLinter) {
+    const oldFormatterDep = FORMATTER_DEPS[plan.fromFormatter];
+    delete devDeps[oldFormatterDep];
+  }
+
+  // Add new linter dep
+  const newLinterDep = LINTER_DEPS[plan.toLinter];
+  if (plan.toLinter === "oxlint") {
+    devDeps[newLinterDep] = "^1.36.0";
+  } else if (plan.toLinter === "eslint") {
+    devDeps[newLinterDep] = "^9.17.0";
+  } else if (plan.toLinter === "biome") {
+    devDeps[newLinterDep] = "^1.9.4";
+  }
+
+  // Add new formatter dep (if different from linter)
+  if (plan.toFormatter !== plan.toLinter) {
+    const newFormatterDep = FORMATTER_DEPS[plan.toFormatter];
+    if (plan.toFormatter === "oxfmt") {
+      devDeps[newFormatterDep] = "^0.21.0";
+    } else if (plan.toFormatter === "prettier") {
+      devDeps[newFormatterDep] = "^3.4.2";
+    } else if (plan.toFormatter === "biome") {
+      devDeps[newFormatterDep] = "^1.9.4";
+    }
+  }
+
+  pkg.devDependencies = Object.fromEntries(
+    Object.entries(devDeps).sort(([a], [b]) => a.localeCompare(b))
+  );
+
+  // Update scripts
+  const scripts = pkg.scripts ?? {};
+  if (plan.toLinter === "oxlint") {
+    scripts.lint = "oxlint .";
+  } else if (plan.toLinter === "eslint") {
+    scripts.lint = "eslint .";
+  } else if (plan.toLinter === "biome") {
+    scripts.lint = "biome check .";
+  }
+
+  if (plan.toFormatter === "oxfmt") {
+    scripts.format = "oxfmt .";
+  } else if (plan.toFormatter === "prettier") {
+    scripts.format = "prettier --write .";
+  } else if (plan.toFormatter === "biome") {
+    scripts.format = "biome format . --write";
+  }
+
+  pkg.scripts = scripts;
+
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+
+/**
+ * Updates a sub-package's package.json devDependencies.
+ */
+async function updateSubPackageJson(
+  root: string,
+  update: MigrationPlan["subPackageUpdates"][0]
+): Promise<void> {
+  const pkgPath = join(root, update.path);
+  const content = await readFile(pkgPath, "utf-8");
+  const pkg = JSON.parse(content) as {
+    devDependencies?: Record<string, string>;
+  };
+
+  const devDeps = pkg.devDependencies ?? {};
+
+  // Remove old deps
+  for (const dep of update.remove) {
+    delete devDeps[dep];
+  }
+
+  // Add new deps
+  for (const dep of update.add) {
+    devDeps[dep] = "workspace:*";
+  }
+
+  pkg.devDependencies = Object.fromEntries(
+    Object.entries(devDeps).sort(([a], [b]) => a.localeCompare(b))
+  );
+
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+
+/**
+ * Formats a migration change for display.
+ */
+export function formatMigrationChange(change: MigrationChange): string {
+  const icon =
+    change.type === "remove-dir" || change.type === "remove-file"
+      ? "-"
+      : change.type === "add-file"
+      ? "+"
+      : "~";
+  return `  ${icon} ${change.description}`;
 }

@@ -9,6 +9,8 @@ import * as p from "@clack/prompts";
 import color from "chalk";
 import { fetch } from "undici";
 
+import type { Linter, Formatter } from "./types.js";
+
 import {
   editorNames,
   getDefaultProjectName,
@@ -38,6 +40,7 @@ import {
   getLatestPnpmVersion,
   getLatestYarnVersion,
   parseWorkspaceYamlContent,
+  detectTooling,
   validatePackageName,
   type File,
   type GenerateOptions,
@@ -63,7 +66,12 @@ import {
   getWorkspaceConfigUpdates,
   applyUpdates,
   formatFileChange,
+  needsMigration,
+  getMigrationPlan,
+  applyMigration,
+  formatMigrationChange,
   type CategoryUpdate,
+  type MigrationTarget,
 } from "./update.js";
 
 const require = createRequire(import.meta.url);
@@ -306,35 +314,21 @@ async function parseWorkspaceDirectories(
 
 /**
  * Detects workspace-level settings from the monorepo root.
+ * Uses standardized detection: scripts → .config/ directories → devDependencies
  */
 async function detectWorkspaceSettings(
   monorepoRoot: string
 ): Promise<InheritedWorkspaceSettings> {
   try {
+    // Use standardized tooling detection
+    const tooling = await detectTooling(monorepoRoot);
+
     const pkgPath = join(monorepoRoot, "package.json");
     const content = await readFile(pkgPath, "utf-8");
     const pkgJson = JSON.parse(content) as {
-      devDependencies?: Record<string, string>;
       packageManager?: string;
       engines?: { node?: string };
     };
-    const devDeps = pkgJson.devDependencies ?? {};
-
-    const linter = devDeps.oxlint
-      ? "oxlint"
-      : devDeps.eslint
-      ? "eslint"
-      : devDeps["@biomejs/biome"]
-      ? "biome"
-      : undefined;
-
-    const formatter = devDeps.oxfmt
-      ? "oxfmt"
-      : devDeps.prettier
-      ? "prettier"
-      : devDeps["@biomejs/biome"]
-      ? "biome"
-      : undefined;
 
     // Extract package manager from packageManager field (e.g., "pnpm@9.15.4")
     let packageManager: string | undefined;
@@ -364,8 +358,8 @@ async function detectWorkspaceSettings(
     }
 
     return {
-      linter,
-      formatter,
+      linter: tooling.linter,
+      formatter: tooling.formatter,
       packageManager,
       nodeVersion,
       pnpmManageVersions,
@@ -1281,6 +1275,84 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 }
 
 /**
+ * Handles migration from one linter/formatter to another.
+ */
+async function handleMigration(
+  config: {
+    name: string;
+    linter: Linter;
+    formatter: Formatter;
+    packageManager: "pnpm";
+  },
+  target: MigrationTarget,
+  root: string,
+  options: CliOptions
+): Promise<void> {
+  const plan = await getMigrationPlan(config, target, root);
+
+  // Display migration summary
+  console.log(color.cyan("Migration:"));
+  if (plan.fromLinter !== plan.toLinter) {
+    console.log(
+      `  Linter: ${color.dim(plan.fromLinter)} → ${color.green(plan.toLinter)}`
+    );
+  }
+  if (plan.fromFormatter !== plan.toFormatter) {
+    console.log(
+      `  Formatter: ${color.dim(plan.fromFormatter)} → ${color.green(
+        plan.toFormatter
+      )}`
+    );
+  }
+  console.log();
+
+  // Display changes
+  console.log(color.cyan("Changes:"));
+  for (const change of plan.changes) {
+    console.log(formatMigrationChange(change));
+  }
+
+  if (plan.subPackageUpdates.length > 0) {
+    console.log();
+    console.log(color.cyan(`Sub-packages (${plan.subPackageUpdates.length}):`));
+    for (const update of plan.subPackageUpdates) {
+      const changes = [
+        ...update.remove.map((d) => `-${d}`),
+        ...update.add.map((d) => `+${d}`),
+      ].join(", ");
+      console.log(`  ~ ${update.path} (${changes})`);
+    }
+  }
+  console.log();
+
+  // Confirm
+  if (!options.yes) {
+    const confirm = await p.confirm({
+      message: "Apply migration?",
+      initialValue: true,
+    });
+
+    if (p.isCancel(confirm) || !confirm) {
+      console.log(color.dim("  Migration cancelled"));
+      process.exit(0);
+    }
+  }
+
+  // Apply migration
+  await applyMigration(plan, root);
+
+  console.log();
+  console.log(
+    color.green("✓") + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`
+  );
+  console.log(color.dim("  Run `pnpm install` to update dependencies"));
+  console.log(
+    color.dim("  Run `--update` again to update VS Code settings and AI files")
+  );
+  process.exit(0);
+}
+
+/**
  * Handles the --update command to update a monorepo workspace to latest configuration.
  */
 async function handleUpdateCommand(options: CliOptions): Promise<void> {
@@ -1328,13 +1400,24 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
 
   // Step 2: Detect current configuration
   const config = await detectCurrentConfig(monorepoRoot);
+
+  // Step 3: Check for migration (if --linter or --formatter flags provided)
+  const targetLinter = options.linter as Linter | undefined;
+  const targetFormatter = options.formatter as Formatter | undefined;
+  const migrationTarget = { linter: targetLinter, formatter: targetFormatter };
+
+  if (needsMigration(config, migrationTarget)) {
+    await handleMigration(config, migrationTarget, monorepoRoot, options);
+    return;
+  }
+
   console.log(
     color.cyan("Checking for updates...") +
       color.dim(` (${config.linter}/${config.formatter})`)
   );
   console.log();
 
-  // Step 3: Generate expected files and compare
+  // Step 4: Generate expected files and compare
   const expected = generateExpectedFiles(config);
   const categories = await compareWithDisk(expected, monorepoRoot);
 

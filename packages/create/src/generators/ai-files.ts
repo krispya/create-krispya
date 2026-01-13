@@ -105,10 +105,13 @@ ${packageManager} create krispya <name> --workspace [options]
 ${packageManager} create krispya --check                                # validate workspace
 ${packageManager} create krispya --fix --linter ${linter} --formatter ${formatter}  # fix missing .config packages
 ${packageManager} create krispya --update --yes                         # update to latest template
+${packageManager} create krispya --update --linter eslint --yes         # migrate to different linter
+${packageManager} create krispya --update --formatter prettier --yes    # migrate to different formatter
 \`\`\`
 
 - \`--fix\` requires \`--linter\` and \`--formatter\` flags for non-interactive mode
 - \`--update --yes\` adds new files only, skips modified files
+- \`--update --linter/--formatter\` migrates tools, updating all configs and sub-packages
 
 ## Package creation options (CLI truth)
 
