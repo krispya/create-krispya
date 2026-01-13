@@ -1,13 +1,10 @@
 import Conf from "conf";
-import type { BaseTemplate, Formatter, Linter, Testing } from "./types.js";
+import type { AiFileChoice, BaseTemplate, Formatter, Linter, Testing } from "./types.js";
 
 export type EditorChoice = "cursor" | "code" | "webstorm" | "skip";
 
-export type AiFileChoice =
-  | "cursor-rules"
-  | "agents-md"
-  | "claude-md"
-  | "copilot-md";
+// Re-export for backwards compatibility
+export type { AiFileChoice } from "./types.js";
 
 export interface CustomTemplate {
   baseTemplate: BaseTemplate;

@@ -1280,6 +1280,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
         linter,
         formatter,
         aiFiles: selectedAiFiles,
+        isMonorepo: true,
       });
       for (const [filePath, file] of Object.entries(aiFilesOutput)) {
         const fullPath = join(monorepoRoot, filePath);
@@ -1923,6 +1924,18 @@ async function handleStandaloneProjectCreation(
       ? "react-app"
       : "react-three-app";
   generateOptions.name ??= defaultFallbackName;
+
+  // Prompt for AI files
+  const allAiChoices: AiFileChoice[] = [
+    "cursor-rules",
+    "agents-md",
+    "claude-md",
+    "copilot-md",
+  ];
+  const selectedAiFiles = await promptForAiFileSelection(allAiChoices, false);
+  if (selectedAiFiles.length > 0) {
+    generateOptions.aiFiles = selectedAiFiles;
+  }
 
   const packageManager = generateOptions.packageManager || "pnpm";
   if (packageManager === "pnpm") {

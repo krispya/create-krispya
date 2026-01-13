@@ -1,5 +1,4 @@
-import type { AiFileChoice } from "../config.js";
-import type { File } from "../types.js";
+import type { AiFileChoice, File } from "../types.js";
 
 export type AiFilesParams = {
   name: string;
@@ -7,22 +6,21 @@ export type AiFilesParams = {
   linter: string;
   formatter: string;
   aiFiles: AiFileChoice[];
+  /** Whether this is a monorepo workspace (affects content) */
+  isMonorepo?: boolean;
 };
 
 /**
- * Generates AI instruction files for the monorepo.
+ * Generates AI instruction files for the project.
  */
 export function generateAiFiles(
   files: Record<string, File>,
   params: AiFilesParams
 ): void {
-  const { name, packageManager, linter, formatter, aiFiles } = params;
-
-  const content = getAiInstructionsContent({
-    name,
-    packageManager,
-    linter,
-    formatter,
+  const { aiFiles, isMonorepo, ...contentParams } = params;
+  const content = buildAiInstructions({
+    ...contentParams,
+    isMonorepo: !!isMonorepo,
   });
 
   for (const fileChoice of aiFiles) {
@@ -43,50 +41,116 @@ export function generateAiFiles(
   }
 }
 
+// =============================================================================
+// Content Building
+// =============================================================================
+
 type AiContentParams = {
   name: string;
   packageManager: string;
   linter: string;
   formatter: string;
+  isMonorepo: boolean;
 };
 
+type Section = (params: AiContentParams) => string | null;
+
 /**
- * Builds the .config/ description based on linter/formatter choices.
- * Biome uses root biome.json instead of a .config package.
+ * Builds the AI instructions by composing sections.
+ * Sections return null to be excluded.
  */
-function getConfigPackagesDescription(linter: string, formatter: string): string {
-  const packages = ["`@config/typescript`"];
+function buildAiInstructions(params: AiContentParams): string {
+  const sections: Section[] = [
+    // Header (shared, but with different description)
+    sectionHeader,
+    // Monorepo-specific: package creation rules
+    sectionMonorepoPackageCreation,
+    // Commands (shared structure, different content)
+    sectionCommands,
+    // Structure (different for each)
+    params.isMonorepo ? sectionMonorepoStructure : sectionStandaloneStructure,
+    // Shared: linting & formatting info
+    sectionLintingInfo,
+  ];
 
-  // Biome uses root biome.json, not a .config package
-  if (linter !== "biome") {
-    packages.push(`\`@config/${linter}\``);
-  }
-  if (formatter !== "biome" && formatter !== linter) {
-    packages.push(`\`@config/${formatter}\``);
-  }
-
-  let description = `- \`.config/\`: shared config packages (${packages.join(", ")})`;
-
-  // Add note about biome.json if biome is used
-  if (linter === "biome" || formatter === "biome") {
-    description += "\n- `biome.json`: Biome configuration (root level)";
-  }
-
-  return description;
+  return sections
+    .map((section) => section(params))
+    .filter((content): content is string => content !== null)
+    .join("\n\n");
 }
 
-/**
- * Returns the AI instructions content for the monorepo.
- */
-function getAiInstructionsContent(params: AiContentParams): string {
+// =============================================================================
+// Shared Sections
+// =============================================================================
+
+function sectionHeader(params: AiContentParams): string {
+  const { name, isMonorepo } = params;
+  const description = isMonorepo
+    ? "This is a pnpm monorepo workspace generated with `create-krispya`."
+    : "This project was generated with `create-krispya`.";
+
+  return `# ${name}\n\n${description}`;
+}
+
+function sectionCommands(params: AiContentParams): string {
+  const { packageManager, linter, formatter, isMonorepo } = params;
+
+  if (isMonorepo) {
+    return `## Workspace commands
+
+\`\`\`bash
+${packageManager} install          # Install all dependencies
+${packageManager} run dev          # Run all apps in dev mode
+${packageManager} run build        # Build packages then apps
+${packageManager} run test         # Run all tests
+${packageManager} run lint         # Lint with ${linter}
+${packageManager} run format       # Format with ${formatter}
+\`\`\``;
+  }
+
+  return `## Commands
+
+\`\`\`bash
+${packageManager} install          # Install dependencies
+${packageManager} run dev          # Start development server
+${packageManager} run build        # Build for production
+${packageManager} run lint         # Lint with ${linter}
+${packageManager} run format       # Format with ${formatter}
+\`\`\``;
+}
+
+function sectionLintingInfo(params: AiContentParams): string {
+  const { linter, formatter } = params;
+  return `## Linting & formatting
+
+- Linter: ${linter}
+- Formatter: ${formatter}`;
+}
+
+// =============================================================================
+// Standalone-Only Sections
+// =============================================================================
+
+function sectionStandaloneStructure(_params: AiContentParams): string {
+  return `## Project structure
+
+- \`src/\`: Source code
+- \`public/\`: Static assets (copied to dist)
+- \`dist/\`: Build output (gitignored)`;
+}
+
+// =============================================================================
+// Monorepo-Only Sections
+// =============================================================================
+
+function sectionMonorepoPackageCreation(
+  params: AiContentParams
+): string | null {
+  if (!params.isMonorepo) return null;
+
   const { name, packageManager, linter, formatter } = params;
-  const configDescription = getConfigPackagesDescription(linter, formatter);
 
-  return `# ${name}
-
-This is a pnpm monorepo workspace generated with \`create-krispya\`.
-
-## Most important rule (package creation)
+  return `## Most important rule (package creation)
 
 If you need a new app/package for any reason, **ALWAYS** create it with \`create-krispya\` (do not hand-create folders/package.json).
 
@@ -145,24 +209,45 @@ ${packageManager} create krispya demo --workspace --type app --template react --
 ${packageManager} install
 \`\`\`
 
-- Use \`"workspace:*"\` for internal deps (e.g. \`"@${name}/ui": "workspace:*"\`).
+- Use \`"workspace:*"\` for internal deps (e.g. \`"@${name}/ui": "workspace:*"\`).`;
+}
 
-## Workspace commands
+function sectionMonorepoStructure(params: AiContentParams): string {
+  const { linter, formatter } = params;
+  const configDescription = getConfigPackagesDescription(linter, formatter);
 
-\`\`\`bash
-${packageManager} install          # Install all dependencies
-${packageManager} run dev          # Run all apps in dev mode
-${packageManager} run build        # Build packages then apps
-${packageManager} run test         # Run all tests
-${packageManager} run lint         # Lint with ${linter}
-${packageManager} run format       # Format with ${formatter}
-\`\`\`
-
-## Structure + conventions
+  return `## Structure + conventions
 
 - \`apps/\`: applications (\`--type app\`)
 - \`packages/\`: libraries (\`--type library\`)
 ${configDescription}
-- TS configs extend \`@config/typescript/*\` (base/app/node/react)
-`;
+- TS configs extend \`@config/typescript/*\` (base/app/node/react)`;
+}
+
+/**
+ * Builds the .config/ description based on linter/formatter choices.
+ * Biome uses root biome.json instead of a .config package.
+ */
+function getConfigPackagesDescription(
+  linter: string,
+  formatter: string
+): string {
+  const packages = ["`@config/typescript`"];
+
+  if (linter !== "biome") {
+    packages.push(`\`@config/${linter}\``);
+  }
+  if (formatter !== "biome" && formatter !== linter) {
+    packages.push(`\`@config/${formatter}\``);
+  }
+
+  let description = `- \`.config/\`: shared config packages (${packages.join(
+    ", "
+  )})`;
+
+  if (linter === "biome" || formatter === "biome") {
+    description += "\n- `biome.json`: Biome configuration (root level)";
+  }
+
+  return description;
 }

@@ -241,6 +241,7 @@ To add a new package to this workspace, run create-krispya from this directory a
       linter,
       formatter,
       aiFiles,
+      isMonorepo: true,
     });
   }
 

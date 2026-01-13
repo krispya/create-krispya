@@ -101,6 +101,12 @@ export type GenerateZustandOptions =
 export type GenerateGithubPagesOptions = {} | boolean;
 
 // Main generation options
+export type AiFileChoice =
+  | "cursor-rules"
+  | "agents-md"
+  | "claude-md"
+  | "copilot-md";
+
 export type GenerateOptions = {
   githubUserName?: string;
   githubRepoName?: string;
@@ -111,6 +117,7 @@ export type GenerateOptions = {
   linter?: Linter;
   formatter?: Formatter;
   testing?: Testing;
+  aiFiles?: AiFileChoice[];
   versions?: PackageVersions;
   fiber?: GenerateFiberOptions;
   handle?: GenerateHandleOptions;

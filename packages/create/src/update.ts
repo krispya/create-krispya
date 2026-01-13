@@ -124,7 +124,8 @@ export function generateExpectedFiles(
     linter,
     formatter,
     aiFiles: ["cursor-rules", "agents-md", "claude-md", "copilot-md"],
-  } as AiFilesParams);
+    isMonorepo: true,
+  });
 
   // VS Code
   const vscodeFiles: Record<string, File> = {};

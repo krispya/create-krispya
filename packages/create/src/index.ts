@@ -1,4 +1,5 @@
 import { GitAttributes } from "./constants.js";
+import { generateAiFiles } from "./generators/ai-files.js";
 import {
   generatePackageJson,
   generateReadme,
@@ -357,6 +358,18 @@ export function generate(options: GenerateOptions) {
       content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
     };
     files[".gitattributes"] = { type: "text", content: GitAttributes };
+  }
+
+  // AI files (skip for monorepo sub-packages - use workspace root config)
+  if (!isMonorepoPackage && clonedOptions.aiFiles && clonedOptions.aiFiles.length > 0) {
+    generateAiFiles(files, {
+      name,
+      packageManager: clonedOptions.packageManager ?? "pnpm",
+      linter: clonedOptions.linter ?? "oxlint",
+      formatter: clonedOptions.formatter ?? "prettier",
+      aiFiles: clonedOptions.aiFiles,
+      isMonorepo: false,
+    });
   }
 
   if (language === "javascript") {
