@@ -56,6 +56,15 @@ import {
   generateVscodeFiles,
 } from "./generators/monorepo.js";
 import { generateAiFiles } from "./generators/ai-files.js";
+import {
+  detectCurrentConfig,
+  generateExpectedFiles,
+  compareWithDisk,
+  getWorkspaceConfigUpdates,
+  applyUpdates,
+  formatFileChange,
+  type CategoryUpdate,
+} from "./update.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -90,6 +99,8 @@ interface CliOptions {
   configPath?: boolean;
   check?: boolean;
   fix?: boolean;
+  update?: boolean;
+  yes?: boolean;
   workspace?: boolean;
   path?: string;
 }
@@ -111,6 +122,24 @@ interface ExistingConfigs {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const AI_FILE_PATHS: Record<AiFileChoice, string> = {
+  "cursor-rules": ".cursor/rules",
+  "agents-md": "AGENTS.md",
+  "claude-md": "CLAUDE.md",
+  "copilot-md": ".github/copilot-instructions.md",
+};
+
+const AI_FILE_HINTS: Record<AiFileChoice, string> = {
+  "cursor-rules": "Cursor AI",
+  "agents-md": "GitHub Copilot, general",
+  "claude-md": "Claude",
+  "copilot-md": "GitHub Copilot",
+};
+
+// =============================================================================
 // Utility Functions
 // =============================================================================
 
@@ -124,6 +153,81 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Prompts user to select AI instruction files.
+ * Handles saved preferences, non-interactive mode, and fresh selection.
+ *
+ * @param availableChoices - AI file choices that don't already exist
+ * @param isNonInteractive - Skip prompts and use saved/default
+ * @returns Selected AI file choices
+ */
+async function promptForAiFileSelection(
+  availableChoices: AiFileChoice[],
+  isNonInteractive: boolean
+): Promise<AiFileChoice[]> {
+  if (availableChoices.length === 0) {
+    return [];
+  }
+
+  const savedAiFiles = getAiFiles();
+
+  // Non-interactive: use saved preference or default to cursor-rules
+  if (isNonInteractive) {
+    const preferred = savedAiFiles ?? ["cursor-rules"];
+    return preferred.filter((f) => availableChoices.includes(f));
+  }
+
+  // Has saved preference: confirm to use it
+  if (savedAiFiles && savedAiFiles.length > 0) {
+    const availableSaved = savedAiFiles.filter((f) =>
+      availableChoices.includes(f)
+    );
+    if (availableSaved.length > 0) {
+      const savedLabels = availableSaved
+        .map((f) => AI_FILE_PATHS[f])
+        .join(", ");
+      const useDefault = await p.confirm({
+        message: `Generate AI instruction files? ${color.dim(
+          `(${savedLabels})`
+        )}`,
+        initialValue: true,
+      });
+      if (!p.isCancel(useDefault) && useDefault) {
+        return availableSaved;
+      }
+      return [];
+    }
+  }
+
+  // No saved preference: multiselect
+  const aiFilesChoice = await p.multiselect({
+    message: "Which AI instruction files?",
+    options: availableChoices.map((c) => ({
+      value: c,
+      label: AI_FILE_PATHS[c],
+      hint: AI_FILE_HINTS[c],
+    })),
+    required: false,
+  });
+
+  if (p.isCancel(aiFilesChoice) || aiFilesChoice.length === 0) {
+    return [];
+  }
+
+  const selected = aiFilesChoice as AiFileChoice[];
+
+  // Offer to save as default
+  const saveChoice = await p.confirm({
+    message: "Save as default for future?",
+    initialValue: true,
+  });
+  if (!p.isCancel(saveChoice) && saveChoice) {
+    setAiFiles(selected);
+  }
+
+  return selected;
 }
 
 /**
@@ -912,7 +1016,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
   const detectedFormatter =
     tooling.formatter ?? existingConfigs.formatter ?? "oxfmt";
 
-  const isNonInteractive = options.linter && options.formatter;
+  const isNonInteractive = Boolean(options.linter && options.formatter);
 
   let linter: "oxlint" | "eslint" | "biome";
   let formatter: "oxfmt" | "prettier" | "biome";
@@ -1133,78 +1237,21 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
     }
 
     // AI files
-    const aiFilePaths: Record<AiFileChoice, string> = {
-      "cursor-rules": ".cursor/rules",
-      "agents-md": "AGENTS.md",
-      "claude-md": "CLAUDE.md",
-      "copilot-md": ".github/copilot-instructions.md",
-    };
-
     const existingAiFiles: AiFileChoice[] = [];
-    for (const [choice, path] of Object.entries(aiFilePaths)) {
+    for (const [choice, path] of Object.entries(AI_FILE_PATHS)) {
       if (await fileExists(join(monorepoRoot, path))) {
         existingAiFiles.push(choice as AiFileChoice);
       }
     }
 
-    let selectedAiFiles: AiFileChoice[] = [];
-    const savedAiFiles = getAiFiles();
-
-    const availableChoices: AiFileChoice[] = (
+    const availableAiChoices: AiFileChoice[] = (
       ["cursor-rules", "agents-md", "claude-md", "copilot-md"] as AiFileChoice[]
     ).filter((c) => !existingAiFiles.includes(c));
 
-    if (availableChoices.length === 0) {
-      // All AI files already exist, skip
-    } else if (isNonInteractive) {
-      const preferred = savedAiFiles ?? ["cursor-rules"];
-      selectedAiFiles = preferred.filter((f) => availableChoices.includes(f));
-    } else if (savedAiFiles && savedAiFiles.length > 0) {
-      const availableSaved = savedAiFiles.filter((f) =>
-        availableChoices.includes(f)
-      );
-      if (availableSaved.length > 0) {
-        const savedLabels = availableSaved
-          .map((f) => aiFilePaths[f])
-          .join(", ");
-        const useDefault = await p.confirm({
-          message: `Generate AI instruction files? ${color.dim(
-            `(${savedLabels})`
-          )}`,
-          initialValue: true,
-        });
-        if (!p.isCancel(useDefault) && useDefault) {
-          selectedAiFiles = availableSaved;
-        }
-      }
-    } else {
-      const aiFilesChoice = await p.multiselect({
-        message: "Generate AI instruction files?",
-        options: availableChoices.map((c) => ({
-          value: c,
-          label: aiFilePaths[c],
-          hint:
-            c === "cursor-rules"
-              ? "Cursor AI"
-              : c === "agents-md"
-              ? "GitHub Copilot, general"
-              : c === "claude-md"
-              ? "Claude"
-              : "GitHub Copilot",
-        })),
-        required: false,
-      });
-      if (!p.isCancel(aiFilesChoice) && aiFilesChoice.length > 0) {
-        selectedAiFiles = aiFilesChoice as AiFileChoice[];
-        const saveChoice = await p.confirm({
-          message: "Save as default for future?",
-          initialValue: true,
-        });
-        if (!p.isCancel(saveChoice) && saveChoice) {
-          setAiFiles(selectedAiFiles);
-        }
-      }
-    }
+    const selectedAiFiles = await promptForAiFileSelection(
+      availableAiChoices,
+      isNonInteractive
+    );
 
     if (selectedAiFiles.length > 0) {
       const scope = await getMonorepoScope(monorepoRoot);
@@ -1231,6 +1278,307 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
     console.error(error);
     process.exit(1);
   }
+}
+
+/**
+ * Handles the --update command to update a monorepo workspace to latest configuration.
+ */
+async function handleUpdateCommand(options: CliOptions): Promise<void> {
+  const monorepoRoot = await detectMonorepoRoot();
+  if (!monorepoRoot) {
+    console.log(color.red("✗") + " Not a monorepo workspace");
+    console.log(color.dim("  --update only supports pnpm monorepos"));
+    process.exit(1);
+  }
+
+  // Step 1: Validate workspace
+  const { valid, errors } = await validateWorkspace(monorepoRoot);
+  if (!valid) {
+    console.log(color.yellow("!") + " Workspace has issues:");
+    for (const error of errors) {
+      console.log(color.dim(`  • ${error}`));
+    }
+    console.log();
+
+    const shouldFix =
+      options.yes ||
+      (await p.confirm({
+        message: "Run fix first to resolve these issues?",
+        initialValue: true,
+      }));
+
+    if (p.isCancel(shouldFix) || !shouldFix) {
+      console.log(
+        color.dim("  Run `pnpm create krispya --fix` to fix manually")
+      );
+      process.exit(1);
+    }
+
+    // Detect config before fix so we can pass linter/formatter for non-interactive mode
+    const preFixConfig = await detectCurrentConfig(monorepoRoot);
+
+    // Run fix command with detected linter/formatter for non-interactive mode
+    const fixOptions: CliOptions = {
+      ...options,
+      linter: options.linter ?? preFixConfig.linter,
+      formatter: options.formatter ?? preFixConfig.formatter,
+    };
+    await handleFixCommand(fixOptions);
+  }
+
+  // Step 2: Detect current configuration
+  const config = await detectCurrentConfig(monorepoRoot);
+  console.log(
+    color.cyan("Checking for updates...") +
+      color.dim(` (${config.linter}/${config.formatter})`)
+  );
+  console.log();
+
+  // Step 3: Generate expected files and compare
+  const expected = generateExpectedFiles(config);
+  const categories = await compareWithDisk(expected, monorepoRoot);
+
+  // Step 4: Add workspace config updates (merge strategy)
+  const workspaceConfigChanges = await getWorkspaceConfigUpdates(monorepoRoot);
+  const workspaceCategory: CategoryUpdate = {
+    category: "workspace-config",
+    label: "Workspace Config",
+    changes: workspaceConfigChanges,
+    hasUserModifications: workspaceConfigChanges.some(
+      (c) => c.status === "modified"
+    ),
+  };
+
+  // Insert workspace config into categories
+  const allCategories = categories.filter(
+    (c) => c.category !== "workspace-config"
+  );
+  if (workspaceConfigChanges.length > 0) {
+    // Insert after config-packages
+    const configPkgIndex = allCategories.findIndex(
+      (c) => c.category === "config-packages"
+    );
+    if (configPkgIndex !== -1) {
+      allCategories.splice(configPkgIndex + 1, 0, workspaceCategory);
+    } else {
+      allCategories.push(workspaceCategory);
+    }
+  }
+
+  // Step 5: Process each category
+  let updatedCount = 0;
+  let skippedCount = 0;
+
+  for (const category of allCategories) {
+    const newChanges = category.changes.filter((c) => c.status === "added");
+    const modifiedChanges = category.changes.filter(
+      (c) => c.status === "modified"
+    );
+    const hasNew = newChanges.length > 0;
+    const hasModified = modifiedChanges.length > 0;
+    const hasChanges = hasNew || hasModified;
+
+    if (!hasChanges) {
+      console.log(color.green("✓") + ` ${category.label}: Up to date`);
+      continue;
+    }
+
+    // Special handling for AI Files: prompt for selection
+    if (category.category === "ai-files") {
+      const missingAiFiles = newChanges
+        .map((c) => {
+          const entry = Object.entries(AI_FILE_PATHS).find(
+            ([, path]) => path === c.path
+          );
+          return entry ? (entry[0] as AiFileChoice) : null;
+        })
+        .filter((c): c is AiFileChoice => c !== null);
+
+      if (missingAiFiles.length > 0) {
+        console.log(color.cyan(category.label + ":"));
+        console.log(
+          color.dim(`  ${missingAiFiles.length} AI file(s) can be added`)
+        );
+        console.log();
+
+        const selectedAiFiles = await promptForAiFileSelection(
+          missingAiFiles,
+          options.yes ?? false
+        );
+
+        if (selectedAiFiles.length > 0) {
+          // Only apply selected AI files
+          const selectedPaths = selectedAiFiles.map((f) => AI_FILE_PATHS[f]);
+          const changesToApply = category.changes.filter((c) =>
+            selectedPaths.includes(c.path)
+          );
+          await applyUpdates(changesToApply, monorepoRoot);
+          console.log(
+            color.green("✓") + ` Added ${selectedAiFiles.length} AI file(s)`
+          );
+          updatedCount++;
+        } else {
+          console.log(color.dim(`  Skipped ${category.label}`));
+          skippedCount++;
+        }
+      }
+
+      // Handle modified AI files separately (if any exist and changed)
+      if (hasModified) {
+        console.log(color.cyan("AI Files (existing):"));
+        for (const change of modifiedChanges) {
+          console.log(formatFileChange(change));
+        }
+        console.log();
+
+        // In --yes mode, skip updating existing AI files (safe default)
+        if (options.yes) {
+          console.log(color.dim("  (--yes mode: keeping existing AI files)"));
+        } else {
+          const updateExisting = await p.confirm({
+            message: "Update existing AI files to latest template?",
+            initialValue: false,
+          });
+
+          if (!p.isCancel(updateExisting) && updateExisting) {
+            await applyUpdates(modifiedChanges, monorepoRoot);
+            console.log(color.green("✓") + " Updated existing AI files");
+          }
+        }
+      }
+      console.log();
+      continue;
+    }
+
+    // Determine action based on what changes exist
+    let changesToApply: typeof category.changes = [];
+
+    if (options.yes) {
+      // Show changes for --yes mode
+      console.log(color.cyan(category.label + ":"));
+      for (const change of [...newChanges, ...modifiedChanges]) {
+        console.log(formatFileChange(change));
+      }
+      console.log();
+
+      // Non-interactive: add new only (safe default)
+      // Exception: workspace-config uses merge strategy, so "modified" is safe
+      if (category.category === "workspace-config") {
+        changesToApply = [...newChanges, ...modifiedChanges];
+        if (changesToApply.length > 0) {
+          console.log(color.dim("  (--yes mode: applying merge updates)"));
+        }
+      } else {
+        changesToApply = newChanges;
+        if (newChanges.length > 0) {
+          console.log(color.dim("  (--yes mode: adding new files only)"));
+        }
+      }
+    } else if (hasNew && hasModified) {
+      // Both new and modified: multiselect with individual files
+      // New files pre-selected, modified files not selected by default
+      const allChanges = [...newChanges, ...modifiedChanges];
+      const selectedFiles = await p.multiselect({
+        message: `${category.label} (+ new, ~ changed)`,
+        options: allChanges.map((change) => ({
+          value: change.path,
+          label:
+            change.status === "added" ? `+ ${change.path}` : `~ ${change.path}`,
+        })),
+        initialValues: newChanges.map((c) => c.path), // Pre-select new files
+        required: false,
+      });
+
+      if (p.isCancel(selectedFiles)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+
+      if (selectedFiles.length > 0) {
+        changesToApply = allChanges.filter((c) =>
+          selectedFiles.includes(c.path)
+        );
+      }
+    } else if (hasNew) {
+      // Only new files: show list then confirm
+      console.log(color.cyan(category.label + ":"));
+      for (const change of newChanges) {
+        console.log(formatFileChange(change));
+      }
+      console.log();
+      // Only new files: simple confirm
+      const shouldAdd = await p.confirm({
+        message: `Add ${newChanges.length} new file(s)?`,
+        initialValue: true,
+      });
+
+      if (p.isCancel(shouldAdd)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+
+      if (shouldAdd) {
+        changesToApply = newChanges;
+      }
+    } else if (hasModified) {
+      // Only modified files: show list then confirm with warning
+      console.log(color.cyan(category.label + ":"));
+      for (const change of modifiedChanges) {
+        console.log(formatFileChange(change));
+      }
+      console.log();
+
+      const shouldUpdate = await p.confirm({
+        message: `Update ${modifiedChanges.length} file(s)? (will overwrite)`,
+        initialValue: false,
+      });
+
+      if (p.isCancel(shouldUpdate)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+
+      if (shouldUpdate) {
+        changesToApply = modifiedChanges;
+      }
+    }
+
+    if (changesToApply.length > 0) {
+      await applyUpdates(changesToApply, monorepoRoot);
+      const addedCount = changesToApply.filter(
+        (c) => c.status === "added"
+      ).length;
+      const updatedFilesCount = changesToApply.filter(
+        (c) => c.status === "modified"
+      ).length;
+      const parts = [];
+      if (addedCount > 0) parts.push(`added ${addedCount}`);
+      if (updatedFilesCount > 0) parts.push(`updated ${updatedFilesCount}`);
+      console.log(color.green("✓") + ` ${category.label}: ${parts.join(", ")}`);
+      updatedCount++;
+    } else {
+      console.log(color.dim(`  Skipped ${category.label}`));
+      skippedCount++;
+    }
+    console.log();
+  }
+
+  // Summary
+  if (updatedCount === 0 && skippedCount === 0) {
+    console.log(color.green("✓") + " Everything is up to date!");
+  } else if (updatedCount > 0) {
+    console.log(
+      color.green("✓") +
+        ` Updated ${updatedCount} ${
+          updatedCount === 1 ? "category" : "categories"
+        }`
+    );
+    if (skippedCount > 0) {
+      console.log(color.dim(`  Skipped ${skippedCount}`));
+    }
+  }
+
+  process.exit(0);
 }
 
 /**
@@ -1375,62 +1723,14 @@ async function handleMonorepoCreation(
     generateOptions.nodeVersion = await getLatestNodeVersion();
   }
 
-  // Prompt for AI instruction files
-  const savedAiFiles = getAiFiles();
-  let selectedAiFiles: AiFileChoice[] = [];
-
-  if (savedAiFiles && savedAiFiles.length > 0) {
-    const aiFileLabels: Record<AiFileChoice, string> = {
-      "cursor-rules": ".cursor/rules",
-      "agents-md": "AGENTS.md",
-      "claude-md": "CLAUDE.md",
-      "copilot-md": ".github/copilot-instructions.md",
-    };
-    const savedLabels = savedAiFiles.map((f) => aiFileLabels[f]).join(", ");
-
-    const useDefault = await p.confirm({
-      message: `Generate AI instruction files? ${color.dim(
-        `(${savedLabels})`
-      )}`,
-      initialValue: true,
-    });
-
-    if (!p.isCancel(useDefault) && useDefault) {
-      selectedAiFiles = savedAiFiles;
-    }
-  } else {
-    const aiFilesChoice = await p.multiselect({
-      message: "Generate AI instruction files?",
-      options: [
-        { value: "cursor-rules", label: ".cursor/rules", hint: "Cursor AI" },
-        {
-          value: "agents-md",
-          label: "AGENTS.md",
-          hint: "GitHub Copilot, general",
-        },
-        { value: "claude-md", label: "CLAUDE.md", hint: "Claude" },
-        {
-          value: "copilot-md",
-          label: ".github/copilot-instructions.md",
-          hint: "GitHub Copilot",
-        },
-      ],
-      required: false,
-    });
-
-    if (!p.isCancel(aiFilesChoice) && aiFilesChoice.length > 0) {
-      selectedAiFiles = aiFilesChoice as AiFileChoice[];
-
-      const saveChoice = await p.confirm({
-        message: "Save as default for future monorepos?",
-        initialValue: true,
-      });
-
-      if (!p.isCancel(saveChoice) && saveChoice) {
-        setAiFiles(selectedAiFiles);
-      }
-    }
-  }
+  // Prompt for AI instruction files (all choices available for new monorepo)
+  const allAiChoices: AiFileChoice[] = [
+    "cursor-rules",
+    "agents-md",
+    "claude-md",
+    "copilot-md",
+  ];
+  const selectedAiFiles = await promptForAiFileSelection(allAiChoices, false);
 
   const projectPath = join(cwd(), generateOptions.name);
   const spinner = p.spinner();
@@ -1764,6 +2064,8 @@ async function main() {
       "Check if current directory is in a valid monorepo workspace"
     )
     .option("--fix", "Fix monorepo by generating missing .config packages")
+    .option("--update", "Update monorepo workspace to latest configuration")
+    .option("-y, --yes", "Non-interactive mode - accept all prompts")
     .option(
       "--path <directory>",
       "Run in specified directory instead of current working directory"
@@ -1810,6 +2112,12 @@ async function main() {
           case "--fix":
             options.fix = true;
             break;
+          case "--update":
+            options.update = true;
+            break;
+          case "--yes":
+            options.yes = true;
+            break;
           default:
             console.error(color.red(`Unknown option: ${name}`));
             process.exit(1);
@@ -1824,6 +2132,11 @@ async function main() {
       // Handle --fix flag
       if (options.fix) {
         await handleFixCommand(options);
+      }
+
+      // Handle --update flag
+      if (options.update) {
+        await handleUpdateCommand(options);
       }
 
       // Validate --dir requires --workspace

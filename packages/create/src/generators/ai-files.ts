@@ -104,9 +104,11 @@ ${packageManager} create krispya <name> --workspace [options]
 \`\`\`bash
 ${packageManager} create krispya --check                                # validate workspace
 ${packageManager} create krispya --fix --linter ${linter} --formatter ${formatter}  # fix missing .config packages
+${packageManager} create krispya --update --yes                         # update to latest template
 \`\`\`
 
-For non-interactive \`--fix\`, you MUST provide both \`--linter\` and \`--formatter\` flags.
+- \`--fix\` requires \`--linter\` and \`--formatter\` flags for non-interactive mode
+- \`--update --yes\` adds new files only, skips modified files
 
 ## Package creation options (CLI truth)
 

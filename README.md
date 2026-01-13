@@ -113,6 +113,27 @@ if pnpm create krispya --check; then
 fi
 ```
 
+### Updating a Workspace
+
+Update an existing monorepo to the latest template:
+
+```bash
+pnpm create krispya --update
+```
+
+This compares your workspace against the latest template and offers to:
+
+- Add new files (AI instructions, VS Code settings, etc.)
+- Update config packages to latest versions
+- Merge workspace config changes
+
+Files are grouped by category. For each category with changes:
+
+- `+` indicates new files (safe to add)
+- `~` indicates changed files (will overwrite your customizations)
+
+Use `--yes` for non-interactive mode (adds new files only, skips modified).
+
 ### AI Instruction Files
 
 When creating a monorepo, you can generate AI instruction files to help AI assistants understand the workspace:
@@ -161,6 +182,8 @@ Utility Options:
   --check                     Validate current monorepo workspace (exit 0/1)
   --fix                       Fix monorepo by generating missing config packages
                               (use with --linter and --formatter for non-interactive)
+  --update                    Update monorepo to latest template (add new files, update configs)
+  --yes                       Accept defaults for prompts (non-interactive mode)
   --clear-config              Clear saved preferences (editor, window reuse)
   --config-path               Print path to config file
 ```
@@ -220,6 +243,12 @@ pnpm create krispya --fix
 
 # Fix monorepo (non-interactive)
 pnpm create krispya --fix --linter oxlint --formatter oxfmt
+
+# Update monorepo to latest template
+pnpm create krispya --update
+
+# Update monorepo (non-interactive - adds new files only)
+pnpm create krispya --update --yes
 
 # Clear saved preferences
 pnpm create krispya --clear-config
