@@ -196,7 +196,6 @@ export async function promptForCustomization(
         { value: "pnpm", label: "pnpm" },
         { value: "npm", label: "npm" },
         { value: "yarn", label: "yarn" },
-        { value: "custom", label: "Other (custom)" },
       ],
       initialValue: presets?.packageManager ?? "pnpm",
     });
@@ -207,19 +206,6 @@ export async function promptForCustomization(
     }
 
     finalPackageManager = packageManager as string;
-    if (packageManager === "custom") {
-      const customPm = await p.text({
-        message: "Enter package manager command",
-        validate: (value) => {
-          if (!value.length) return "Required";
-        },
-      });
-      if (p.isCancel(customPm)) {
-        p.cancel("Operation cancelled.");
-        process.exit(0);
-      }
-      finalPackageManager = customPm;
-    }
 
     if (packageManager === "pnpm") {
       const managePnpm = await p.confirm({
