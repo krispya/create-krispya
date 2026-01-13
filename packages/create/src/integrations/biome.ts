@@ -13,7 +13,10 @@ function toBiomeLevel(level: "off" | "warn" | "error"): string {
   return level;
 }
 
-export function generateBiome(generator: Generator, options: GenerateBiomeOptions | undefined) {
+export function generateBiome(
+  generator: Generator,
+  options: GenerateBiomeOptions | undefined
+) {
   if (options == null || (!options.linter && !options.formatter)) {
     return;
   }
@@ -61,7 +64,16 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
         quoteStyle: defaultFormatterConfig.singleQuote ? "single" : "double",
         trailingCommas: defaultFormatterConfig.trailingComma,
         bracketSpacing: defaultFormatterConfig.bracketSpacing,
-        arrowParentheses: defaultFormatterConfig.arrowParens === "always" ? "always" : "asNeeded",
+        arrowParentheses:
+          defaultFormatterConfig.arrowParens === "always"
+            ? "always"
+            : "asNeeded",
+      },
+    };
+    // JSON uses 2-space indentation
+    biomeConfig.json = {
+      formatter: {
+        indentWidth: 2,
       },
     };
   } else {
@@ -79,7 +91,10 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
     generator.addScript("lint", "biome lint --config-path .config .");
   }
   if (options.formatter) {
-    generator.addScript("format", "biome format --config-path .config --write .");
+    generator.addScript(
+      "format",
+      "biome format --config-path .config --write ."
+    );
   }
 
   const roles: string[] = [];
@@ -88,7 +103,9 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
 
   generator.inject(
     "readme-tools",
-    `[Biome](https://biomejs.dev/) - Fast ${roles.join(" and ")} for JavaScript and TypeScript`,
+    `[Biome](https://biomejs.dev/) - Fast ${roles.join(
+      " and "
+    )} for JavaScript and TypeScript`
   );
   generator.inject("vscode-extension-suggestion", "biomejs.biome");
   generator.addVscodeSetting("biome.enabled", true);

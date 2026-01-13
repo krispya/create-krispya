@@ -99,7 +99,7 @@ export async function detectCurrentConfig(
   return {
     name,
     linter: tooling.linter ?? "oxlint",
-    formatter: tooling.formatter ?? "oxfmt",
+    formatter: tooling.formatter ?? "prettier",
     packageManager: "pnpm",
   };
 }

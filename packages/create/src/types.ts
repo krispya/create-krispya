@@ -1,5 +1,11 @@
 // Template types
-export type Template = "vanilla" | "vanilla-js" | "react" | "react-js" | "r3f" | "r3f-js";
+export type Template =
+  | "vanilla"
+  | "vanilla-js"
+  | "react"
+  | "react-js"
+  | "r3f"
+  | "r3f-js";
 
 export type BaseTemplate = "vanilla" | "react" | "r3f";
 
@@ -149,7 +155,9 @@ export type Generator = {
 };
 
 // Template helper functions
-export function getLanguageFromTemplate(template: Template): "javascript" | "typescript" {
+export function getLanguageFromTemplate(
+  template: Template
+): "javascript" | "typescript" {
   return template.endsWith("-js") ? "javascript" : "typescript";
 }
 

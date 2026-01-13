@@ -1,6 +1,11 @@
 import * as p from "@clack/prompts";
 import { getCustomTemplates, type CustomTemplate } from "../config.js";
-import type { GenerateOptions, LibraryBundler, ProjectType, Template } from "../types.js";
+import type {
+  GenerateOptions,
+  LibraryBundler,
+  ProjectType,
+  Template,
+} from "../types.js";
 import { getBaseTemplate } from "../types.js";
 import { generateRandomName } from "../utils.js";
 import { formatConfigSummary, formatMonorepoConfigSummary } from "./format.js";
@@ -16,19 +21,20 @@ export function getDefaultOptions(
   projectType: ProjectType = "app",
   libraryBundler?: LibraryBundler,
   integrations?: string[],
-  inheritedSettings?: InheritedWorkspaceSettings,
+  inheritedSettings?: InheritedWorkspaceSettings
 ): GenerateOptions {
   const baseTemplate = getBaseTemplate(template);
   const base: GenerateOptions = {
     name,
     template,
     projectType,
-    libraryBundler: projectType === "library" ? (libraryBundler ?? "unbuild") : undefined,
+    libraryBundler:
+      projectType === "library" ? libraryBundler ?? "unbuild" : undefined,
     packageManager: inheritedSettings?.packageManager ?? "pnpm",
     pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
     nodeVersion: inheritedSettings?.nodeVersion ?? "latest",
     linter: inheritedSettings?.linter ?? "oxlint",
-    formatter: inheritedSettings?.formatter ?? "oxfmt",
+    formatter: inheritedSettings?.formatter ?? "prettier",
     // Libraries get vitest by default, apps don't
     testing: projectType === "library" ? "vitest" : "none",
   };
@@ -72,7 +78,9 @@ export function getDefaultProjectName(template: Template): string {
 /**
  * Prompts for R3F integrations selection.
  */
-async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]> {
+async function promptForR3fIntegrations(
+  presets?: CliPresets
+): Promise<string[]> {
   // Build initial values from presets or default to drei
   const initialValues: string[] = [];
   if (presets) {
@@ -130,7 +138,7 @@ export async function promptForCustomization(
   projectType: ProjectType,
   integrations?: string[],
   inheritedSettings?: InheritedWorkspaceSettings,
-  presets?: CliPresets,
+  presets?: CliPresets
 ): Promise<GenerateOptions> {
   // Library bundler selection (only for libraries)
   let libraryBundler: LibraryBundler | undefined;
@@ -157,7 +165,9 @@ export async function promptForCustomization(
   let finalPackageManager: string =
     inheritedSettings?.packageManager ?? presets?.packageManager ?? "pnpm";
   let pnpmManageVersions: boolean =
-    inheritedSettings?.pnpmManageVersions ?? presets?.pnpmManageVersions ?? true;
+    inheritedSettings?.pnpmManageVersions ??
+    presets?.pnpmManageVersions ??
+    true;
 
   if (!inheritedSettings?.nodeVersion) {
     const nodeVersionInput = await p.text({
@@ -228,7 +238,7 @@ export async function promptForCustomization(
   let linter: "oxlint" | "eslint" | "biome" =
     inheritedSettings?.linter ?? presets?.linter ?? "oxlint";
   let formatter: "oxfmt" | "prettier" | "biome" =
-    inheritedSettings?.formatter ?? presets?.formatter ?? "oxfmt";
+    inheritedSettings?.formatter ?? presets?.formatter ?? "prettier";
 
   if (!inheritedSettings?.linter) {
     const linterChoice = await p.select({
@@ -252,11 +262,11 @@ export async function promptForCustomization(
     const formatterChoice = await p.select({
       message: "Formatter",
       options: [
+        { value: "prettier", label: "Prettier", hint: "widely adopted" },
         { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
-        { value: "prettier", label: "Prettier", hint: "classic" },
         { value: "biome", label: "Biome", hint: "all-in-one" },
       ],
-      initialValue: presets?.formatter ?? "oxfmt",
+      initialValue: presets?.formatter ?? "prettier",
     });
 
     if (p.isCancel(formatterChoice)) {
@@ -298,7 +308,9 @@ export async function promptForCustomization(
   // Derive final template based on language selection
   const baseTemplate = getBaseTemplate(template);
   const finalTemplate: Template =
-    language === "javascript" ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
+    language === "javascript"
+      ? (`${baseTemplate}-js` as Template)
+      : (baseTemplate as Template);
 
   const base: GenerateOptions = {
     name,
@@ -338,7 +350,9 @@ export async function promptForCustomization(
 /**
  * Prompts for initial package in a monorepo.
  */
-export async function promptForInitialPackage(): Promise<"app" | "library" | "skip"> {
+export async function promptForInitialPackage(): Promise<
+  "app" | "library" | "skip"
+> {
   const choice = await p.select({
     message: "Add an initial package?",
     options: [
@@ -368,7 +382,7 @@ export function getDefaultMonorepoOptions(name: string): GenerateOptions {
     pnpmManageVersions: true,
     nodeVersion: "latest",
     linter: "oxlint",
-    formatter: "oxfmt",
+    formatter: "prettier",
   };
 }
 
@@ -425,11 +439,11 @@ async function promptForMonorepoCustomization(
   const formatter = await p.select({
     message: "Formatter",
     options: [
+      { value: "prettier", label: "Prettier", hint: "widely adopted" },
       { value: "oxfmt", label: "Oxfmt", hint: "fast, Prettier-compatible" },
-      { value: "prettier", label: "Prettier", hint: "classic" },
       { value: "biome", label: "Biome", hint: "all-in-one" },
     ],
-    initialValue: presets?.formatter ?? "oxfmt",
+    initialValue: presets?.formatter ?? "prettier",
   });
 
   if (p.isCancel(formatter)) {
@@ -474,14 +488,18 @@ async function promptForMonorepo(
       packageManager: defaultOptions.packageManager ?? "pnpm",
       pnpmManageVersions: defaultOptions.pnpmManageVersions,
       linter: defaultOptions.linter ?? "oxlint",
-      formatter: defaultOptions.formatter ?? "oxfmt",
+      formatter: defaultOptions.formatter ?? "prettier",
     }),
-    "Workspace Configuration",
+    "Workspace Configuration"
   );
 
-  const proceed = await p.confirm({
+  const proceed = await p.select({
     message: "Proceed with these settings?",
-    initialValue: true,
+    options: [
+      { value: "continue", label: "Yes, continue" },
+      { value: "customize", label: "No, customize settings" },
+    ],
+    initialValue: "continue",
   });
 
   if (p.isCancel(proceed)) {
@@ -489,7 +507,7 @@ async function promptForMonorepo(
     process.exit(0);
   }
 
-  if (proceed) {
+  if (proceed === "continue") {
     return defaultOptions;
   }
 
@@ -543,7 +561,12 @@ export async function promptForOptions(
     return promptForMonorepo(projectName, presets);
   }
 
-  return promptForPackageOptions(projectName, projectType as "app" | "library", undefined, presets);
+  return promptForPackageOptions(
+    projectName,
+    projectType as "app" | "library",
+    undefined,
+    presets
+  );
 }
 
 /**
@@ -553,7 +576,7 @@ function customTemplateToOptions(
   customTemplate: CustomTemplate,
   name: string,
   projectType: "app" | "library",
-  inheritedSettings?: InheritedWorkspaceSettings,
+  inheritedSettings?: InheritedWorkspaceSettings
 ): GenerateOptions {
   const baseTemplate = customTemplate.baseTemplate;
   const template: Template = baseTemplate; // TypeScript by default for custom templates
@@ -654,7 +677,7 @@ export async function promptForPackageOptions(
   projectName: string,
   projectType: "app" | "library",
   inheritedSettings?: InheritedWorkspaceSettings,
-  presets?: CliPresets,
+  presets?: CliPresets
 ): Promise<GenerateOptions> {
   // Build template options including custom templates
   const builtInOptions = [
@@ -694,7 +717,7 @@ export async function promptForPackageOptions(
       customTemplate,
       projectName,
       projectType,
-      inheritedSettings,
+      inheritedSettings
     );
 
     // Show summary and ask confirm/customize
@@ -703,9 +726,13 @@ export async function promptForPackageOptions(
       : `Template: ${customName}`;
     p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
 
-    const proceed = await p.confirm({
+    const proceed = await p.select({
       message: "Proceed with these settings?",
-      initialValue: true,
+      options: [
+        { value: "continue", label: "Yes, continue" },
+        { value: "customize", label: "No, customize settings" },
+      ],
+      initialValue: "continue",
     });
 
     if (p.isCancel(proceed)) {
@@ -713,7 +740,7 @@ export async function promptForPackageOptions(
       process.exit(0);
     }
 
-    if (proceed) {
+    if (proceed === "continue") {
       return defaultOptions;
     }
 
@@ -723,7 +750,7 @@ export async function promptForPackageOptions(
       projectName,
       projectType,
       customTemplate.integrations,
-      inheritedSettings,
+      inheritedSettings
     );
   }
 
@@ -743,7 +770,7 @@ export async function promptForPackageOptions(
     projectType,
     presets?.bundler,
     integrations,
-    inheritedSettings ?? presetsToInheritedSettings(presets),
+    inheritedSettings ?? presetsToInheritedSettings(presets)
   );
 
   // Show summary and ask confirm/customize
@@ -752,9 +779,13 @@ export async function promptForPackageOptions(
     : "Template Configuration";
   p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
 
-  const proceed = await p.confirm({
+  const proceed = await p.select({
     message: "Proceed with these settings?",
-    initialValue: true,
+    options: [
+      { value: "continue", label: "Yes, continue" },
+      { value: "customize", label: "No, customize settings" },
+    ],
+    initialValue: "continue",
   });
 
   if (p.isCancel(proceed)) {
@@ -762,7 +793,7 @@ export async function promptForPackageOptions(
     process.exit(0);
   }
 
-  if (proceed) {
+  if (proceed === "continue") {
     return defaultOptions;
   }
 

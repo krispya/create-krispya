@@ -67,7 +67,8 @@ export function generate(options: GenerateOptions) {
   const files: Record<string, File> = {
     ...clonedOptions.files,
   };
-  const replacements: Array<{ search: string; replace: string }> = clonedOptions.replacements ?? [];
+  const replacements: Array<{ search: string; replace: string }> =
+    clonedOptions.replacements ?? [];
 
   // Base dependencies
   const versions = clonedOptions.versions ?? {};
@@ -116,7 +117,8 @@ export function generate(options: GenerateOptions) {
     Object.assign(devDependencies, tsResult.devDependencies);
   }
 
-  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
+  const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> =
+    {};
   const vscodeSettings: Record<string, unknown> = {};
   const scripts: Record<string, string> = isLibrary
     ? {} // Library build scripts are added by bundler integrations
@@ -127,7 +129,9 @@ export function generate(options: GenerateOptions) {
 
   // Setup vite config imports based on template (only for apps)
   if (!isLibrary && (isReact || isR3f)) {
-    codeSnippets["vite-config-import"] = ["import react from '@vitejs/plugin-react'"];
+    codeSnippets["vite-config-import"] = [
+      "import react from '@vitejs/plugin-react'",
+    ];
   }
 
   // Setup R3F-specific imports (only for apps)
@@ -135,7 +139,11 @@ export function generate(options: GenerateOptions) {
     codeSnippets["import"] = [`import { Canvas } from "@react-three/fiber"`];
   }
 
-  const defaultName = isVanilla ? "vanilla-app" : isReact ? "react-app" : "react-three-app";
+  const defaultName = isVanilla
+    ? "vanilla-app"
+    : isReact
+    ? "react-app"
+    : "react-three-app";
   const name = clonedOptions.name ?? defaultName;
 
   // Build vite config based on template (only for apps)
@@ -228,7 +236,10 @@ export function generate(options: GenerateOptions) {
     }
     // Add release script for libraries
     const packageManager = clonedOptions.packageManager ?? "pnpm";
-    generator.addScript("release", `${packageManager} run build && ${packageManager} publish`);
+    generator.addScript(
+      "release",
+      `${packageManager} run build && ${packageManager} publish`
+    );
   }
 
   // Testing - only if enabled (libraries default to vitest, apps default to none)
@@ -302,7 +313,7 @@ export function generate(options: GenerateOptions) {
       isLibrary,
       codeSnippets,
       replacements,
-    }),
+    })
   );
 
   // Generate test files (only if testing is enabled)
@@ -313,7 +324,7 @@ export function generate(options: GenerateOptions) {
         baseTemplate,
         language,
         isLibrary,
-      }),
+      })
     );
   }
 
@@ -331,7 +342,7 @@ export function generate(options: GenerateOptions) {
       scripts,
       options: clonedOptions,
       workspaceDependencies: clonedOptions.workspaceDependencies,
-    }).files,
+    }).files
   );
 
   // Generate VS Code files (skip for monorepo sub-packages - use workspace root config)

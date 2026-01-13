@@ -833,7 +833,7 @@ async function createPackageInWorkspace(
     );
   }
 
-  const formatter = packageOptions.formatter ?? "oxfmt";
+  const formatter = packageOptions.formatter ?? "prettier";
   if (formatter === "prettier") {
     versionPromises.push(
       getLatestNpmVersion("prettier", "3.4.2").then((v) => {
@@ -1031,7 +1031,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
   const existingConfigs = await detectExistingConfigs(monorepoRoot);
   const detectedLinter = tooling.linter ?? existingConfigs.linter ?? "oxlint";
   const detectedFormatter =
-    tooling.formatter ?? existingConfigs.formatter ?? "oxfmt";
+    tooling.formatter ?? existingConfigs.formatter ?? "prettier";
 
   const isNonInteractive = Boolean(options.linter && options.formatter);
 
@@ -1750,7 +1750,8 @@ async function handleWorkspaceCommand(
   }
 
   const linter = inheritedSettings.linter ?? options.linter ?? "oxlint";
-  const formatter = inheritedSettings.formatter ?? options.formatter ?? "oxfmt";
+  const formatter =
+    inheritedSettings.formatter ?? options.formatter ?? "prettier";
   const packageManager = inheritedSettings.packageManager ?? "pnpm";
   const nodeVersion = inheritedSettings.nodeVersion ?? "latest";
   const pnpmManageVersions = inheritedSettings.pnpmManageVersions ?? true;
@@ -1846,7 +1847,7 @@ async function handleMonorepoCreation(
     const { files } = generateMonorepo({
       name: generateOptions.name,
       linter: generateOptions.linter ?? "oxlint",
-      formatter: generateOptions.formatter ?? "oxfmt",
+      formatter: generateOptions.formatter ?? "prettier",
       packageManager,
       pnpmVersion: generateOptions.pnpmVersion,
       pnpmManageVersions: generateOptions.pnpmManageVersions,
@@ -1980,7 +1981,7 @@ async function handleStandaloneProjectCreation(
     );
   }
 
-  const formatter = generateOptions.formatter ?? "oxfmt";
+  const formatter = generateOptions.formatter ?? "prettier";
   if (formatter === "prettier") {
     versionPromises.push(
       getLatestNpmVersion("prettier", "3.4.2").then((v) => {
@@ -2125,7 +2126,7 @@ async function main() {
     )
     .option(
       "--formatter <type>",
-      "formatter: prettier, oxfmt, or biome (default: oxfmt)"
+      "formatter: prettier, oxfmt, or biome (default: prettier)"
     )
     .option("--drei", "add @react-three/drei (r3f only)")
     .option("--handle", "add @react-three/handle (r3f only)")
@@ -2290,7 +2291,7 @@ async function main() {
               : undefined,
           template,
           linter: options.linter ?? "oxlint",
-          formatter: options.formatter ?? "oxfmt",
+          formatter: options.formatter ?? "prettier",
           ...(baseTemplate === "r3f" && {
             drei: options.drei ? {} : undefined,
             handle: options.handle ? {} : undefined,

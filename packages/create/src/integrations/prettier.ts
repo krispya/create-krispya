@@ -5,7 +5,7 @@ export type GeneratePrettierOptions = {} | boolean;
 
 export function generatePrettier(
   generator: Generator,
-  options: GeneratePrettierOptions | undefined,
+  options: GeneratePrettierOptions | undefined
 ) {
   if (options == null) {
     return;
@@ -25,6 +25,28 @@ export function generatePrettier(
     trailingComma: defaultFormatterConfig.trailingComma,
     bracketSpacing: defaultFormatterConfig.bracketSpacing,
     arrowParens: defaultFormatterConfig.arrowParens,
+    overrides: [
+      {
+        files: ["*.json", "**/*.json"],
+        options: {
+          tabWidth: 2,
+        },
+      },
+      {
+        files: ["*.md", "**/*.md"],
+        options: {
+          tabWidth: 2,
+          semi: false,
+        },
+      },
+      {
+        files: ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
+        options: {
+          tabWidth: 2,
+          semi: false,
+        },
+      },
+    ],
   };
 
   generator.addFile(".config/prettier.json", {
@@ -32,9 +54,18 @@ export function generatePrettier(
     content: JSON.stringify(prettierConfig, null, 2),
   });
 
-  generator.addScript("format", "prettier --config .config/prettier.json --write .");
-  generator.inject("readme-tools", "[Prettier](https://prettier.io/) - Opinionated code formatter");
+  generator.addScript(
+    "format",
+    "prettier --config .config/prettier.json --write ."
+  );
+  generator.inject(
+    "readme-tools",
+    "[Prettier](https://prettier.io/) - Opinionated code formatter"
+  );
   generator.inject("vscode-extension-suggestion", "esbenp.prettier-vscode");
-  generator.addVscodeSetting("editor.defaultFormatter", "esbenp.prettier-vscode");
+  generator.addVscodeSetting(
+    "editor.defaultFormatter",
+    "esbenp.prettier-vscode"
+  );
   generator.addVscodeSetting("prettier.configPath", ".config/prettier.json");
 }

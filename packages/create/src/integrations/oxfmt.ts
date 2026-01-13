@@ -3,7 +3,10 @@ import type { Generator } from "../types.js";
 
 export type GenerateOxfmtOptions = {} | boolean;
 
-export function generateOxfmt(generator: Generator, options: GenerateOxfmtOptions | undefined) {
+export function generateOxfmt(
+  generator: Generator,
+  options: GenerateOxfmtOptions | undefined
+) {
   if (options == null) {
     return;
   }
@@ -46,7 +49,7 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
 
   generator.inject(
     "readme-tools",
-    "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter",
+    "[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter"
   );
   generator.inject("vscode-extension-suggestion", "oxc.oxc-vscode");
   generator.addVscodeSetting("editor.defaultFormatter", "oxc.oxc-vscode");
@@ -55,5 +58,11 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
   });
   generator.addVscodeSetting("[jsonc]", {
     "editor.defaultFormatter": "vscode.json-language-features",
+  });
+  generator.addVscodeSetting("[markdown]", {
+    "editor.defaultFormatter": "vscode.markdown-language-features",
+  });
+  generator.addVscodeSetting("[yaml]", {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
   });
 }
