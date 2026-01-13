@@ -18,6 +18,7 @@ import {
   promptForOptions,
   promptForPackageOptions,
   promptForInitialPackage,
+  type CliPresets,
 } from "./cli/index.js";
 import {
   clearConfig,
@@ -111,6 +112,28 @@ interface CliOptions {
   yes?: boolean;
   workspace?: boolean;
   path?: string;
+}
+
+// Meta options don't affect project configuration, only CLI behavior
+const META_OPTIONS = [
+  "clearConfig",
+  "configPath",
+  "check",
+  "fix",
+  "update",
+  "yes",
+  "workspace",
+  "path",
+  "dir",
+] as const;
+
+/**
+ * Checks if any project config options were provided via CLI flags.
+ */
+function hasConfigOptions(options: CliOptions): boolean {
+  return Object.keys(options).some(
+    (key) => !META_OPTIONS.includes(key as (typeof META_OPTIONS)[number])
+  );
 }
 
 type InheritedWorkspaceSettings = {
@@ -2242,16 +2265,17 @@ async function main() {
       console.clear();
       p.intro(color.bgCyan(color.black(` create-krispya v${pkg.version} `)));
 
-      // Check if we're inside a monorepo workspace
+      // Check if we're inside a monorepo workspace (only if no config options provided)
       const monorepoRoot = await detectMonorepoRoot();
-      if (monorepoRoot && Object.keys(options).length === 0) {
+      if (monorepoRoot && !hasConfigOptions(options)) {
         await handleInteractiveMonorepoMode(monorepoRoot);
       }
 
-      // Get generate options (from CLI flags or prompts)
+      // Get generate options
       let generateOptions: GenerateOptions;
 
-      if (Object.keys(options).length > 0) {
+      // Non-interactive mode: --yes flag skips all prompts
+      if (options.yes) {
         const template: Template = options.template ?? "vanilla";
         const baseTemplate = getBaseTemplate(template);
         const defaultName = getDefaultProjectName(template);
@@ -2286,7 +2310,33 @@ async function main() {
           nodeVersion: options.nodeVersion ?? "latest",
         };
       } else {
-        generateOptions = await promptForOptions(name);
+        // Interactive mode: build presets from CLI flags to pre-fill prompts
+        const presets: CliPresets | undefined = hasConfigOptions(options)
+          ? {
+              type: options.type,
+              template: options.template,
+              bundler: options.bundler,
+              linter: options.linter,
+              formatter: options.formatter,
+              packageManager: options.packageManager,
+              nodeVersion: options.nodeVersion,
+              pnpmManageVersions: options.pnpmManageVersions,
+              drei: options.drei,
+              handle: options.handle,
+              leva: options.leva,
+              postprocessing: options.postprocessing,
+              rapier: options.rapier,
+              xr: options.xr,
+              uikit: options.uikit,
+              offscreen: options.offscreen,
+              zustand: options.zustand,
+              koota: options.koota,
+              triplex: options.triplex,
+              viverse: options.viverse,
+            }
+          : undefined;
+
+        generateOptions = await promptForOptions(name, presets);
       }
 
       // Route to appropriate handler

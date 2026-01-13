@@ -10,4 +10,5 @@ export {
   promptForInitialPackage,
   getDefaultMonorepoOptions,
   type InheritedWorkspaceSettings,
+  type CliPresets,
 } from "./prompts.js";

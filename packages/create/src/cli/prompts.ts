@@ -72,7 +72,24 @@ export function getDefaultProjectName(template: Template): string {
 /**
  * Prompts for R3F integrations selection.
  */
-async function promptForR3fIntegrations(): Promise<string[]> {
+async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]> {
+  // Build initial values from presets or default to drei
+  const initialValues: string[] = [];
+  if (presets) {
+    if (presets.drei) initialValues.push("drei");
+    if (presets.handle) initialValues.push("handle");
+    if (presets.leva) initialValues.push("leva");
+    if (presets.postprocessing) initialValues.push("postprocessing");
+    if (presets.rapier) initialValues.push("rapier");
+    if (presets.xr) initialValues.push("xr");
+    if (presets.uikit) initialValues.push("uikit");
+    if (presets.offscreen) initialValues.push("offscreen");
+    if (presets.zustand) initialValues.push("zustand");
+    if (presets.koota) initialValues.push("koota");
+    if (presets.triplex) initialValues.push("triplex");
+    if (presets.viverse) initialValues.push("viverse");
+  }
+
   const selected = await p.multiselect({
     message: "R3F integrations",
     options: [
@@ -89,7 +106,7 @@ async function promptForR3fIntegrations(): Promise<string[]> {
       { value: "triplex", label: "Triplex" },
       { value: "viverse", label: "Viverse" },
     ],
-    initialValues: ["drei"],
+    initialValues: initialValues.length > 0 ? initialValues : ["drei"],
     required: false,
   });
 
@@ -105,6 +122,7 @@ async function promptForR3fIntegrations(): Promise<string[]> {
  * Prompts user for customization options.
  * For R3F templates, integrations should be passed in (already selected upfront).
  * When inheritedSettings is provided, workspace-level settings are skipped.
+ * When presets are provided, they pre-fill prompt defaults.
  */
 export async function promptForCustomization(
   template: Template,
@@ -112,6 +130,7 @@ export async function promptForCustomization(
   projectType: ProjectType,
   integrations?: string[],
   inheritedSettings?: InheritedWorkspaceSettings,
+  presets?: CliPresets,
 ): Promise<GenerateOptions> {
   // Library bundler selection (only for libraries)
   let libraryBundler: LibraryBundler | undefined;
@@ -122,7 +141,7 @@ export async function promptForCustomization(
         { value: "unbuild", label: "unbuild", hint: "unjs, simple config" },
         { value: "tsdown", label: "tsdown", hint: "fast, esbuild-based" },
       ],
-      initialValue: "unbuild",
+      initialValue: presets?.bundler ?? "unbuild",
     });
 
     if (p.isCancel(bundler)) {
@@ -133,15 +152,18 @@ export async function promptForCustomization(
   }
 
   // Skip workspace-level settings if inherited from workspace
-  let nodeVersion: string = inheritedSettings?.nodeVersion ?? "latest";
-  let finalPackageManager: string = inheritedSettings?.packageManager ?? "pnpm";
-  let pnpmManageVersions: boolean = inheritedSettings?.pnpmManageVersions ?? true;
+  let nodeVersion: string =
+    inheritedSettings?.nodeVersion ?? presets?.nodeVersion ?? "latest";
+  let finalPackageManager: string =
+    inheritedSettings?.packageManager ?? presets?.packageManager ?? "pnpm";
+  let pnpmManageVersions: boolean =
+    inheritedSettings?.pnpmManageVersions ?? presets?.pnpmManageVersions ?? true;
 
   if (!inheritedSettings?.nodeVersion) {
     const nodeVersionInput = await p.text({
       message: "Node.js version",
-      placeholder: "latest",
-      defaultValue: "latest",
+      placeholder: presets?.nodeVersion ?? "latest",
+      defaultValue: presets?.nodeVersion ?? "latest",
       validate: (value) => {
         if (!value.length) return "Required";
         if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
@@ -166,7 +188,7 @@ export async function promptForCustomization(
         { value: "yarn", label: "yarn" },
         { value: "custom", label: "Other (custom)" },
       ],
-      initialValue: "pnpm",
+      initialValue: presets?.packageManager ?? "pnpm",
     });
 
     if (p.isCancel(packageManager)) {
@@ -192,7 +214,7 @@ export async function promptForCustomization(
     if (packageManager === "pnpm") {
       const managePnpm = await p.confirm({
         message: "Enable manage-package-manager-versions?",
-        initialValue: true,
+        initialValue: presets?.pnpmManageVersions ?? true,
       });
       if (p.isCancel(managePnpm)) {
         p.cancel("Operation cancelled.");
@@ -203,8 +225,10 @@ export async function promptForCustomization(
   }
 
   // Skip linter/formatter prompts if inherited from workspace
-  let linter: "oxlint" | "eslint" | "biome" = inheritedSettings?.linter ?? "oxlint";
-  let formatter: "oxfmt" | "prettier" | "biome" = inheritedSettings?.formatter ?? "oxfmt";
+  let linter: "oxlint" | "eslint" | "biome" =
+    inheritedSettings?.linter ?? presets?.linter ?? "oxlint";
+  let formatter: "oxfmt" | "prettier" | "biome" =
+    inheritedSettings?.formatter ?? presets?.formatter ?? "oxfmt";
 
   if (!inheritedSettings?.linter) {
     const linterChoice = await p.select({
@@ -214,7 +238,7 @@ export async function promptForCustomization(
         { value: "eslint", label: "ESLint", hint: "classic" },
         { value: "biome", label: "Biome", hint: "all-in-one" },
       ],
-      initialValue: "oxlint",
+      initialValue: presets?.linter ?? "oxlint",
     });
 
     if (p.isCancel(linterChoice)) {
@@ -232,7 +256,7 @@ export async function promptForCustomization(
         { value: "prettier", label: "Prettier", hint: "classic" },
         { value: "biome", label: "Biome", hint: "all-in-one" },
       ],
-      initialValue: "oxfmt",
+      initialValue: presets?.formatter ?? "oxfmt",
     });
 
     if (p.isCancel(formatterChoice)) {
@@ -351,11 +375,14 @@ export function getDefaultMonorepoOptions(name: string): GenerateOptions {
 /**
  * Prompts for monorepo customization.
  */
-async function promptForMonorepoCustomization(name: string): Promise<GenerateOptions> {
+async function promptForMonorepoCustomization(
+  name: string,
+  presets?: CliPresets
+): Promise<GenerateOptions> {
   const nodeVersion = await p.text({
     message: "Node.js version",
-    placeholder: "latest",
-    defaultValue: "latest",
+    placeholder: presets?.nodeVersion ?? "latest",
+    defaultValue: presets?.nodeVersion ?? "latest",
     validate: (value) => {
       if (!value.length) return "Required";
       if (value !== "latest" && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
@@ -373,7 +400,7 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
   // TODO: Support yarn and npm workspaces in the future
   const managePnpm = await p.confirm({
     message: "Enable manage-package-manager-versions?",
-    initialValue: true,
+    initialValue: presets?.pnpmManageVersions ?? true,
   });
   if (p.isCancel(managePnpm)) {
     p.cancel("Operation cancelled.");
@@ -387,7 +414,7 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
       { value: "eslint", label: "ESLint", hint: "classic" },
       { value: "biome", label: "Biome", hint: "all-in-one" },
     ],
-    initialValue: "oxlint",
+    initialValue: presets?.linter ?? "oxlint",
   });
 
   if (p.isCancel(linter)) {
@@ -402,7 +429,7 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
       { value: "prettier", label: "Prettier", hint: "classic" },
       { value: "biome", label: "Biome", hint: "all-in-one" },
     ],
-    initialValue: "oxfmt",
+    initialValue: presets?.formatter ?? "oxfmt",
   });
 
   if (p.isCancel(formatter)) {
@@ -424,8 +451,20 @@ async function promptForMonorepoCustomization(name: string): Promise<GenerateOpt
 /**
  * Main prompt flow for creating a monorepo workspace.
  */
-async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions> {
+async function promptForMonorepo(
+  workspaceName: string,
+  presets?: CliPresets
+): Promise<GenerateOptions> {
   const defaultOptions = getDefaultMonorepoOptions(workspaceName);
+
+  // Apply presets to defaults
+  if (presets) {
+    if (presets.linter) defaultOptions.linter = presets.linter;
+    if (presets.formatter) defaultOptions.formatter = presets.formatter;
+    if (presets.nodeVersion) defaultOptions.nodeVersion = presets.nodeVersion;
+    if (presets.pnpmManageVersions !== undefined)
+      defaultOptions.pnpmManageVersions = presets.pnpmManageVersions;
+  }
 
   // Show summary and ask confirm/customize
   p.note(
@@ -454,13 +493,17 @@ async function promptForMonorepo(workspaceName: string): Promise<GenerateOptions
     return defaultOptions;
   }
 
-  return promptForMonorepoCustomization(workspaceName);
+  return promptForMonorepoCustomization(workspaceName, presets);
 }
 
 /**
  * Main prompt flow for gathering project options.
+ * When presets are provided, they pre-fill prompt defaults.
  */
-export async function promptForOptions(name: string | undefined): Promise<GenerateOptions> {
+export async function promptForOptions(
+  name: string | undefined,
+  presets?: CliPresets
+): Promise<GenerateOptions> {
   // Step 1: Project Name (if not provided via argument)
   let projectName = name;
   if (!projectName) {
@@ -487,7 +530,7 @@ export async function promptForOptions(name: string | undefined): Promise<Genera
       { value: "library", label: "Library" },
       { value: "monorepo", label: "Monorepo" },
     ],
-    initialValue: "app",
+    initialValue: presets?.type ?? "app",
   });
 
   if (p.isCancel(projectType)) {
@@ -497,10 +540,10 @@ export async function promptForOptions(name: string | undefined): Promise<Genera
 
   // If monorepo, handle differently
   if (projectType === "monorepo") {
-    return promptForMonorepo(projectName);
+    return promptForMonorepo(projectName, presets);
   }
 
-  return promptForPackageOptions(projectName, projectType as "app" | "library");
+  return promptForPackageOptions(projectName, projectType as "app" | "library", undefined, presets);
 }
 
 /**
@@ -558,14 +601,60 @@ export type InheritedWorkspaceSettings = {
 };
 
 /**
+ * CLI-provided presets that pre-fill prompt defaults.
+ * These are used when flags are passed but --yes is not.
+ */
+export type CliPresets = {
+  type?: "app" | "library" | "monorepo";
+  template?: Template;
+  bundler?: "unbuild" | "tsdown";
+  linter?: "oxlint" | "eslint" | "biome";
+  formatter?: "oxfmt" | "prettier" | "biome";
+  packageManager?: string;
+  nodeVersion?: string;
+  pnpmManageVersions?: boolean;
+  // R3F integrations
+  drei?: boolean;
+  handle?: boolean;
+  leva?: boolean;
+  postprocessing?: boolean;
+  rapier?: boolean;
+  xr?: boolean;
+  uikit?: boolean;
+  offscreen?: boolean;
+  zustand?: boolean;
+  koota?: boolean;
+  triplex?: boolean;
+  viverse?: boolean;
+};
+
+/**
+ * Converts CLI presets to inherited settings format for getDefaultOptions.
+ */
+function presetsToInheritedSettings(
+  presets?: CliPresets
+): InheritedWorkspaceSettings | undefined {
+  if (!presets) return undefined;
+  return {
+    linter: presets.linter,
+    formatter: presets.formatter,
+    packageManager: presets.packageManager,
+    nodeVersion: presets.nodeVersion,
+    pnpmManageVersions: presets.pnpmManageVersions,
+  };
+}
+
+/**
  * Prompt flow for package options when project type is already known.
  * Used when adding packages to a monorepo.
  * When inheritedSettings is provided, workspace-level setting prompts are skipped.
+ * When presets are provided, they pre-fill prompt defaults.
  */
 export async function promptForPackageOptions(
   projectName: string,
   projectType: "app" | "library",
   inheritedSettings?: InheritedWorkspaceSettings,
+  presets?: CliPresets,
 ): Promise<GenerateOptions> {
   // Build template options including custom templates
   const builtInOptions = [
@@ -587,7 +676,7 @@ export async function promptForPackageOptions(
   const templateSelection = await p.select({
     message: "Select a template",
     options: allOptions,
-    initialValue: "vanilla",
+    initialValue: presets?.template ?? "vanilla",
   });
 
   if (p.isCancel(templateSelection)) {
@@ -645,16 +734,16 @@ export async function promptForPackageOptions(
   // For R3F, immediately prompt for integrations
   let integrations: string[] | undefined;
   if (baseTemplate === "r3f") {
-    integrations = await promptForR3fIntegrations();
+    integrations = await promptForR3fIntegrations(presets);
   }
 
   const defaultOptions = getDefaultOptions(
     template,
     projectName,
     projectType,
-    undefined,
+    presets?.bundler,
     integrations,
-    inheritedSettings,
+    inheritedSettings ?? presetsToInheritedSettings(presets),
   );
 
   // Show summary and ask confirm/customize
@@ -678,5 +767,12 @@ export async function promptForPackageOptions(
   }
 
   // Customize (pass integrations for R3F so they're preserved)
-  return promptForCustomization(template, projectName, projectType, integrations, inheritedSettings);
+  return promptForCustomization(
+    template,
+    projectName,
+    projectType,
+    integrations,
+    inheritedSettings,
+    presets
+  );
 }
