@@ -21,17 +21,15 @@ export function generateBiome(
     return;
   }
 
-  const version = generator.versions.biome ?? "1.9.4";
+  const version = generator.versions.biome ?? "2.0.0";
   generator.addDevDependency("@biomejs/biome", `^${version}`);
 
   const { rules } = defaultLinterConfig;
 
   // Build biome config based on roles
+  // Note: Biome v2 ignores dist/node_modules by default, no need to specify
   const biomeConfig: Record<string, unknown> = {
-    $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
-    files: {
-      ignore: defaultLinterConfig.ignorePatterns,
-    },
+    $schema: `https://biomejs.dev/schemas/${version}/schema.json`,
   };
 
   if (options.linter) {
@@ -82,19 +80,16 @@ export function generateBiome(
     };
   }
 
-  generator.addFile(".config/biome.json", {
+  generator.addFile("biome.json", {
     type: "text",
     content: JSON.stringify(biomeConfig, null, 2),
   });
 
   if (options.linter) {
-    generator.addScript("lint", "biome lint --config-path .config .");
+    generator.addScript("lint", "biome lint .");
   }
   if (options.formatter) {
-    generator.addScript(
-      "format",
-      "biome format --config-path .config --write ."
-    );
+    generator.addScript("format", "biome format --write .");
   }
 
   const roles: string[] = [];
@@ -109,7 +104,6 @@ export function generateBiome(
   );
   generator.inject("vscode-extension-suggestion", "biomejs.biome");
   generator.addVscodeSetting("biome.enabled", true);
-  generator.addVscodeSetting("biome.linter.configPath", ".config/biome.json");
 
   if (options.formatter) {
     generator.addVscodeSetting("editor.defaultFormatter", "biomejs.biome");
