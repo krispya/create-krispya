@@ -82,16 +82,19 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
     .filter(Boolean)
     .join("\n");
 
-  generator.addFile("eslint.config.js", {
+  generator.addFile(".config/eslint.config.js", {
     type: "text",
     content: configContent,
   });
 
-  generator.addScript("lint", "eslint .");
+  generator.addScript("lint", "eslint --config .config/eslint.config.js .");
   generator.inject(
     "readme-tools",
     "[ESLint](https://eslint.org/) - Linter for JavaScript and TypeScript",
   );
   generator.inject("vscode-extension-suggestion", "dbaeumer.vscode-eslint");
   generator.addVscodeSetting("eslint.enable", true);
+  generator.addVscodeSetting("eslint.options", {
+    overrideConfigFile: ".config/eslint.config.js",
+  });
 }

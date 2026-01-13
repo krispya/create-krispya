@@ -70,16 +70,16 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
     };
   }
 
-  generator.addFile("biome.json", {
+  generator.addFile(".config/biome.json", {
     type: "text",
     content: JSON.stringify(biomeConfig, null, 2),
   });
 
   if (options.linter) {
-    generator.addScript("lint", "biome lint .");
+    generator.addScript("lint", "biome lint --config-path .config .");
   }
   if (options.formatter) {
-    generator.addScript("format", "biome format --write .");
+    generator.addScript("format", "biome format --config-path .config --write .");
   }
 
   const roles: string[] = [];
@@ -92,6 +92,7 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
   );
   generator.inject("vscode-extension-suggestion", "biomejs.biome");
   generator.addVscodeSetting("biome.enabled", true);
+  generator.addVscodeSetting("biome.linter.configPath", ".config/biome.json");
 
   if (options.formatter) {
     generator.addVscodeSetting("editor.defaultFormatter", "biomejs.biome");
