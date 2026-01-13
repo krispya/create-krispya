@@ -28,9 +28,13 @@ export function generateVscodeFiles(params: VscodeParams): Record<string, File> 
   }
 
   if (Object.keys(vscodeSettings).length > 0) {
+    // Sort keys to group related settings (e.g., all oxc.* together)
+    const sortedSettings = Object.fromEntries(
+      Object.entries(vscodeSettings).sort(([a], [b]) => a.localeCompare(b)),
+    );
     files[".vscode/settings.json"] = {
       type: "text",
-      content: JSON.stringify(vscodeSettings, null, "\t"),
+      content: JSON.stringify(sortedSettings, null, "\t"),
     };
   }
 
