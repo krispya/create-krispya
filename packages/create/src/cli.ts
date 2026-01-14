@@ -1803,10 +1803,11 @@ async function handleWorkspaceCommand(
 }
 
 /**
- * Handles interactive monorepo creation.
+ * Handles monorepo creation.
  */
 async function handleMonorepoCreation(
-  generateOptions: GenerateOptions
+  generateOptions: GenerateOptions,
+  isNonInteractive: boolean
 ): Promise<void> {
   const { generateMonorepo } = await import("./generators/monorepo.js");
 
@@ -1825,7 +1826,7 @@ async function handleMonorepoCreation(
   }
 
   // Prompt for AI platforms
-  const aiPlatforms = await promptForAiPlatforms(false);
+  const aiPlatforms = await promptForAiPlatforms(isNonInteractive);
 
   const projectPath = join(cwd(), generateOptions.name);
   const spinner = p.spinner();
@@ -1855,6 +1856,11 @@ async function handleMonorepoCreation(
     }
 
     spinner.stop(color.green.inverse(" ✓ Monorepo workspace created! "));
+
+    // In non-interactive mode, just create the workspace and exit
+    if (isNonInteractive) {
+      process.exit(0);
+    }
 
     const newWorkspaceSettings: InheritedWorkspaceSettings = {
       linter: generateOptions.linter,
@@ -1899,7 +1905,8 @@ async function handleMonorepoCreation(
  * Handles standalone project creation (app or library).
  */
 async function handleStandaloneProjectCreation(
-  generateOptions: GenerateOptions
+  generateOptions: GenerateOptions,
+  isNonInteractive: boolean
 ): Promise<void> {
   const base = generateOptions.template
     ? getBaseTemplate(generateOptions.template)
@@ -1913,7 +1920,7 @@ async function handleStandaloneProjectCreation(
   generateOptions.name ??= defaultFallbackName;
 
   // Prompt for AI platforms
-  const aiPlatforms = await promptForAiPlatforms(false);
+  const aiPlatforms = await promptForAiPlatforms(isNonInteractive);
   if (aiPlatforms.length > 0) {
     generateOptions.aiPlatforms = aiPlatforms;
   }
@@ -2008,6 +2015,11 @@ async function handleStandaloneProjectCreation(
     await writeGeneratedFiles(projectPath, files);
 
     spinner.stop(color.green.inverse(" ✓ Project created! "));
+
+    // In non-interactive mode, just exit
+    if (isNonInteractive) {
+      process.exit(0);
+    }
 
     const nextSteps = isLibrary
       ? [
@@ -2335,10 +2347,11 @@ async function main() {
       }
 
       // Route to appropriate handler
+      const isNonInteractive = options.yes ?? false;
       if (generateOptions.projectType === "monorepo") {
-        await handleMonorepoCreation(generateOptions);
+        await handleMonorepoCreation(generateOptions, isNonInteractive);
       } else {
-        await handleStandaloneProjectCreation(generateOptions);
+        await handleStandaloneProjectCreation(generateOptions, isNonInteractive);
       }
     });
 
