@@ -1,4 +1,4 @@
-import { defaultFormatterConfig } from "../constants.js";
+import { defaultOxfmtConfig } from "../constants.js";
 import type { Generator } from "../types.js";
 
 export type GenerateOxfmtOptions = {} | boolean;
@@ -29,29 +29,17 @@ export function generateOxfmt(
 
     const isStealth = generator.isStealthConfig();
 
-    // Generate local config for standalone projects
-    const oxfmtConfig = {
-      printWidth: defaultFormatterConfig.printWidth,
-      tabWidth: defaultFormatterConfig.tabWidth,
-      useTabs: defaultFormatterConfig.useTabs,
-      semi: defaultFormatterConfig.semi,
-      singleQuote: defaultFormatterConfig.singleQuote,
-      trailingComma: defaultFormatterConfig.trailingComma,
-      bracketSpacing: defaultFormatterConfig.bracketSpacing,
-      arrowParens: defaultFormatterConfig.arrowParens,
-    };
-
     if (isStealth) {
       generator.addFile(".config/oxfmt.json", {
         type: "text",
-        content: JSON.stringify(oxfmtConfig, null, 2),
+        content: JSON.stringify(defaultOxfmtConfig, null, 2),
       });
       generator.addScript("format", "oxfmt -c .config/oxfmt.json --write .");
       generator.addVscodeSetting("oxc.fmt.configPath", ".config/oxfmt.json");
     } else {
       generator.addFile("oxfmt.json", {
         type: "text",
-        content: JSON.stringify(oxfmtConfig, null, 2),
+        content: JSON.stringify(defaultOxfmtConfig, null, 2),
       });
       generator.addScript("format", "oxfmt -c oxfmt.json --write .");
     }

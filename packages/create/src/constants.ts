@@ -112,6 +112,38 @@ export const defaultFormatterConfig: FormatterConfig = {
   arrowParens: "always",
 };
 
+// Full Prettier config with schema and overrides
+export const defaultPrettierConfig = {
+  $schema: "https://json.schemastore.org/prettierrc",
+  ...defaultFormatterConfig,
+  overrides: [
+    {
+      files: ["*.json", "**/*.json"],
+      options: { tabWidth: 2 },
+    },
+    {
+      files: ["*.md", "**/*.md"],
+      options: { tabWidth: 2, semi: false },
+    },
+    {
+      files: ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
+      options: { tabWidth: 2, semi: false },
+    },
+  ],
+};
+
+// Full oxfmt config (Prettier-compatible subset)
+export const defaultOxfmtConfig = {
+  printWidth: defaultFormatterConfig.printWidth,
+  tabWidth: defaultFormatterConfig.tabWidth,
+  useTabs: defaultFormatterConfig.useTabs,
+  semi: defaultFormatterConfig.semi,
+  singleQuote: defaultFormatterConfig.singleQuote,
+  trailingComma: defaultFormatterConfig.trailingComma,
+  bracketSpacing: defaultFormatterConfig.bracketSpacing,
+  arrowParens: defaultFormatterConfig.arrowParens,
+};
+
 // Common linter configuration
 export type LinterConfig = {
   // Ignore patterns (files/directories to skip)

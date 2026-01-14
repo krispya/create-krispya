@@ -1,4 +1,8 @@
-import { defaultFormatterConfig, defaultLinterConfig } from "../constants.js";
+import {
+  defaultLinterConfig,
+  defaultOxfmtConfig,
+  defaultPrettierConfig,
+} from "../constants.js";
 import type { File } from "../types.js";
 
 /**
@@ -407,20 +411,7 @@ Or in \`.prettierrc.json\`:
   // base.json - Base Prettier config
   files[`${basePath}/base.json`] = {
     type: "text",
-    content: JSON.stringify(
-      {
-        printWidth: defaultFormatterConfig.printWidth,
-        tabWidth: defaultFormatterConfig.tabWidth,
-        useTabs: defaultFormatterConfig.useTabs,
-        semi: defaultFormatterConfig.semi,
-        singleQuote: defaultFormatterConfig.singleQuote,
-        trailingComma: defaultFormatterConfig.trailingComma,
-        bracketSpacing: defaultFormatterConfig.bracketSpacing,
-        arrowParens: defaultFormatterConfig.arrowParens,
-      },
-      null,
-      2
-    ),
+    content: JSON.stringify(defaultPrettierConfig, null, 2),
   };
 }
 
@@ -469,19 +460,6 @@ oxfmt -c node_modules/@config/oxfmt/base.json --write .
   // base.json - Base oxfmt config
   files[`${basePath}/base.json`] = {
     type: "text",
-    content: JSON.stringify(
-      {
-        printWidth: defaultFormatterConfig.printWidth,
-        tabWidth: defaultFormatterConfig.tabWidth,
-        useTabs: defaultFormatterConfig.useTabs,
-        semi: defaultFormatterConfig.semi,
-        singleQuote: defaultFormatterConfig.singleQuote,
-        trailingComma: defaultFormatterConfig.trailingComma,
-        bracketSpacing: defaultFormatterConfig.bracketSpacing,
-        arrowParens: defaultFormatterConfig.arrowParens,
-      },
-      null,
-      2
-    ),
+    content: JSON.stringify(defaultOxfmtConfig, null, 2),
   };
 }

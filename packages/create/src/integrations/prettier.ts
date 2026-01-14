@@ -1,4 +1,4 @@
-import { defaultFormatterConfig } from "../constants.js";
+import { defaultPrettierConfig } from "../constants.js";
 import type { Generator } from "../types.js";
 
 export type GeneratePrettierOptions = {} | boolean;
@@ -14,47 +14,12 @@ export function generatePrettier(
   const version = generator.versions.prettier ?? "3.4.2";
   generator.addDevDependency("prettier", `^${version}`);
 
-  // Add prettier config using common formatter settings
-  const prettierConfig = {
-    $schema: "https://json.schemastore.org/prettierrc",
-    printWidth: defaultFormatterConfig.printWidth,
-    tabWidth: defaultFormatterConfig.tabWidth,
-    useTabs: defaultFormatterConfig.useTabs,
-    semi: defaultFormatterConfig.semi,
-    singleQuote: defaultFormatterConfig.singleQuote,
-    trailingComma: defaultFormatterConfig.trailingComma,
-    bracketSpacing: defaultFormatterConfig.bracketSpacing,
-    arrowParens: defaultFormatterConfig.arrowParens,
-    overrides: [
-      {
-        files: ["*.json", "**/*.json"],
-        options: {
-          tabWidth: 2,
-        },
-      },
-      {
-        files: ["*.md", "**/*.md"],
-        options: {
-          tabWidth: 2,
-          semi: false,
-        },
-      },
-      {
-        files: ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
-        options: {
-          tabWidth: 2,
-          semi: false,
-        },
-      },
-    ],
-  };
-
   const isStealth = generator.isStealthConfig();
 
   if (isStealth) {
     generator.addFile(".config/prettier.json", {
       type: "text",
-      content: JSON.stringify(prettierConfig, null, 2),
+      content: JSON.stringify(defaultPrettierConfig, null, 2),
     });
     generator.addScript(
       "format",
@@ -64,7 +29,7 @@ export function generatePrettier(
   } else {
     generator.addFile(".prettierrc", {
       type: "text",
-      content: JSON.stringify(prettierConfig, null, 2),
+      content: JSON.stringify(defaultPrettierConfig, null, 2),
     });
     generator.addScript("format", "prettier --write .");
   }

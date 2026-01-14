@@ -96,9 +96,11 @@ export function formatConfigSummary(
   const testing = options.testing ?? (projectType === "library" ? "vitest" : "none");
   lines.push(formatRow("Testing", testing));
 
-  // Config strategy
-  const configStrategy = options.configStrategy ?? "stealth";
-  lines.push(formatRow("Config strategy", configStrategy));
+  // Config strategy (only relevant for standalone projects, not monorepo packages)
+  if (!inherited) {
+    const configStrategy = options.configStrategy ?? "stealth";
+    lines.push(formatRow("Config strategy", configStrategy));
+  }
 
   // R3F integrations
   if (options.template && getBaseTemplate(options.template) === "r3f") {

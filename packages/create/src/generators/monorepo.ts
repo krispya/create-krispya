@@ -92,10 +92,10 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
           : "eslint .",
       format:
         formatter === "oxfmt"
-          ? "oxfmt ."
+          ? "oxfmt -c .config/oxfmt/base.json ."
           : formatter === "biome"
           ? "biome format . --write"
-          : "prettier --write .",
+          : "prettier --config .config/prettier/base.json --write .",
     },
     devDependencies,
   };
@@ -146,14 +146,50 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
     };
   }
 
+  // Root tsconfig.json extending @config/typescript
+  files["tsconfig.json"] = {
+    type: "text",
+    content: JSON.stringify(
+      {
+        extends: "@config/typescript/base.json",
+        compilerOptions: {
+          noEmit: true,
+        },
+        references: [],
+      },
+      null,
+      2
+    ),
+  };
+
   // Generate @config/typescript package
   generateTypescriptConfigPackage(files);
 
-  // Generate linter config package
+  // Generate linter config package and root config
   if (linter === "oxlint") {
     generateOxlintConfigPackage(files);
+    // Root oxlint.json extending @config/oxlint
+    files["oxlint.json"] = {
+      type: "text",
+      content: JSON.stringify(
+        {
+          $schema: "./node_modules/oxlint/configuration_schema.json",
+          extends: ["@config/oxlint/base.json"],
+        },
+        null,
+        2
+      ),
+    };
   } else if (linter === "eslint") {
     generateEslintConfigPackage(files);
+    // Root eslint.config.js importing from @config/eslint
+    files["eslint.config.js"] = {
+      type: "text",
+      content: `import base from "@config/eslint/base";
+
+export default [...base];
+`,
+    };
   } else if (linter === "biome") {
     // Biome config at root (handles both linting and formatting when selected)
     const biomeConfig = {
