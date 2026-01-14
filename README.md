@@ -47,7 +47,8 @@ yarn create krispya
 Generate a monorepo with shared configuration packages:
 
 ```bash
-pnpm create krispya my-workspace --monorepo
+pnpm create krispya
+# Select "Monorepo" when prompted for project type
 ```
 
 This creates:
@@ -160,18 +161,22 @@ Migration automatically:
 
 Run `pnpm install` after migration to update dependencies.
 
-### AI Instruction Files
+### AI Rules
 
-When creating a monorepo, you can generate AI instruction files to help AI assistants understand the workspace:
+Optionally generate AI instruction files to help coding assistants understand the project:
 
-| File                              | Tool                    |
-| --------------------------------- | ----------------------- |
-| `.cursor/rules`                   | Cursor                  |
-| `AGENTS.md`                       | GitHub Copilot, general |
-| `CLAUDE.md`                       | Claude                  |
-| `.github/copilot-instructions.md` | GitHub Copilot          |
+| File        | Supported by                      |
+| ----------- | --------------------------------- |
+| `AGENTS.md` | OpenAI, Cursor, Windsurf, Copilot |
+| `CLAUDE.md` | Claude Code                       |
 
-Select which files to generate during monorepo creation. Your selection can be saved as a default.
+These are pointer files that reference `.ai/workspace.md`, which contains:
+
+- Project type and tooling (linter, formatter, package manager)
+- Common commands (`pnpm test`, `pnpm build`, etc.)
+- Project structure documentation
+
+Select which files to generate during project creation. Your selection can be saved as a default.
 
 ## Tooling Options
 
@@ -330,7 +335,7 @@ The CLI saves preferences for:
 
 - **Editor** — Cursor, VS Code, WebStorm, or skip
 - **Window reuse** — Open in current window or new window
-- **AI files** — Which AI instruction files to generate for monorepos
+- **AI platforms** — Which AI rule files to generate (AGENTS.md, CLAUDE.md)
 
 Clear saved preferences:
 

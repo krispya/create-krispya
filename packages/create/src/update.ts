@@ -11,7 +11,7 @@ import {
   generateOxfmtConfigPackage,
   generateVscodeFiles,
 } from "./generators/monorepo.js";
-import { generateAiFiles, type AiFilesParams } from "./generators/ai-files.js";
+import { generateAiFiles, ALL_AI_PLATFORMS } from "./generators/ai-files.js";
 import { parseWorkspaceYamlContent, detectTooling } from "./utils.js";
 
 // =============================================================================
@@ -117,14 +117,14 @@ export function generateExpectedFiles(
   const { name, linter, formatter, packageManager } = config;
 
   // AI Files
-  const aiFiles: Record<string, File> = {};
-  generateAiFiles(aiFiles, {
+  const aiFilesMap: Record<string, File> = {};
+  generateAiFiles(aiFilesMap, {
     name,
     packageManager,
     linter,
     formatter,
-    aiFiles: ["cursor-rules", "agents-md", "claude-md", "copilot-md"],
     isMonorepo: true,
+    platforms: ALL_AI_PLATFORMS,
   });
 
   // VS Code
@@ -189,7 +189,7 @@ export function generateExpectedFiles(
   }
 
   return {
-    "ai-files": aiFiles,
+    "ai-files": aiFilesMap,
     vscode: vscodeFiles,
     "config-packages": configPackages,
     "workspace-config": workspaceConfig,

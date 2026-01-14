@@ -101,12 +101,8 @@ export type GenerateZustandOptions =
 
 export type GenerateGithubPagesOptions = {} | boolean;
 
-// Main generation options
-export type AiFileChoice =
-  | "cursor-rules"
-  | "agents-md"
-  | "claude-md"
-  | "copilot-md";
+// AI rules platform options
+export type AiPlatform = "agents" | "claude";
 
 export type GenerateOptions = {
   githubUserName?: string;
@@ -119,7 +115,8 @@ export type GenerateOptions = {
   formatter?: Formatter;
   testing?: Testing;
   configStrategy?: ConfigStrategy;
-  aiFiles?: AiFileChoice[];
+  /** AI platforms to generate pointer files for */
+  aiPlatforms?: AiPlatform[];
   versions?: PackageVersions;
   fiber?: GenerateFiberOptions;
   handle?: GenerateHandleOptions;

@@ -365,14 +365,15 @@ export function generate(options: GenerateOptions) {
   }
 
   // AI files (skip for monorepo sub-packages - use workspace root config)
-  if (!isMonorepoPackage && clonedOptions.aiFiles && clonedOptions.aiFiles.length > 0) {
+  if (!isMonorepoPackage && clonedOptions.aiPlatforms?.length) {
     generateAiFiles(files, {
       name,
       packageManager: clonedOptions.packageManager ?? "pnpm",
       linter: clonedOptions.linter ?? "oxlint",
       formatter: clonedOptions.formatter ?? "prettier",
-      aiFiles: clonedOptions.aiFiles,
       isMonorepo: false,
+      configStrategy: clonedOptions.configStrategy,
+      platforms: clonedOptions.aiPlatforms,
     });
   }
 

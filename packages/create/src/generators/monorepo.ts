@@ -1,5 +1,4 @@
-import type { AiFileChoice } from "../config.js";
-import type { File, Linter, Formatter } from "../types.js";
+import type { AiPlatform, File, Linter, Formatter } from "../types.js";
 import { generateAiFiles } from "./ai-files.js";
 import {
   generateTypescriptConfigPackage,
@@ -26,7 +25,8 @@ export type MonorepoParams = {
   pnpmVersion?: string;
   pnpmManageVersions?: boolean;
   nodeVersion?: string;
-  aiFiles?: AiFileChoice[];
+  /** AI platforms to generate files for */
+  aiPlatforms?: AiPlatform[];
 };
 
 export type MonorepoResult = {
@@ -48,7 +48,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
     pnpmVersion,
     pnpmManageVersions,
     nodeVersion,
-    aiFiles,
+    aiPlatforms,
   } = params;
 
   const files: Record<string, File> = {};
@@ -233,15 +233,15 @@ To add a new package to this workspace, run create-krispya from this directory a
 `,
   };
 
-  // Generate AI instruction files
-  if (aiFiles && aiFiles.length > 0) {
+  // Generate AI files
+  if (aiPlatforms && aiPlatforms.length > 0) {
     generateAiFiles(files, {
       name,
       packageManager,
       linter,
       formatter,
-      aiFiles,
       isMonorepo: true,
+      platforms: aiPlatforms,
     });
   }
 

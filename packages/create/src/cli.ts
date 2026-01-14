@@ -28,10 +28,10 @@ import {
   getReuseWindow,
   setPreferredEditor,
   setReuseWindow,
-  getAiFiles,
-  setAiFiles,
-  type AiFileChoice,
+  getAiPlatforms,
+  setAiPlatforms,
 } from "./config.js";
+import type { AiPlatform } from "./types.js";
 import {
   generate,
   getBaseTemplate,
@@ -59,7 +59,12 @@ import {
   generatePrettierConfigPackage,
   generateVscodeFiles,
 } from "./generators/monorepo.js";
-import { generateAiFiles } from "./generators/ai-files.js";
+import {
+  generateAiFiles,
+  ALL_AI_PLATFORMS,
+  AI_PLATFORM_LABELS,
+  AI_PLATFORM_HINTS,
+} from "./generators/ai-files.js";
 import {
   detectCurrentConfig,
   generateExpectedFiles,
@@ -153,24 +158,6 @@ interface ExistingConfigs {
 }
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-const AI_FILE_PATHS: Record<AiFileChoice, string> = {
-  "cursor-rules": ".cursor/rules",
-  "agents-md": "AGENTS.md",
-  "claude-md": "CLAUDE.md",
-  "copilot-md": ".github/copilot-instructions.md",
-};
-
-const AI_FILE_HINTS: Record<AiFileChoice, string> = {
-  "cursor-rules": "Cursor AI",
-  "agents-md": "GitHub Copilot, general",
-  "claude-md": "Claude",
-  "copilot-md": "GitHub Copilot",
-};
-
-// =============================================================================
 // Utility Functions
 // =============================================================================
 
@@ -187,78 +174,71 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /**
- * Prompts user to select AI instruction files.
- * Handles saved preferences, non-interactive mode, and fresh selection.
+ * Prompts user to select AI platforms for rule generation.
  *
- * @param availableChoices - AI file choices that don't already exist
  * @param isNonInteractive - Skip prompts and use saved/default
- * @returns Selected AI file choices
+ * @returns Selected platforms, or empty array to skip
  */
-async function promptForAiFileSelection(
-  availableChoices: AiFileChoice[],
+async function promptForAiPlatforms(
   isNonInteractive: boolean
-): Promise<AiFileChoice[]> {
-  if (availableChoices.length === 0) {
-    return [];
-  }
+): Promise<AiPlatform[]> {
+  const savedPlatforms = getAiPlatforms();
 
-  const savedAiFiles = getAiFiles();
-
-  // Non-interactive: use saved preference or default to cursor-rules
+  // Non-interactive: use saved preference or default to all
   if (isNonInteractive) {
-    const preferred = savedAiFiles ?? ["cursor-rules"];
-    return preferred.filter((f) => availableChoices.includes(f));
+    return savedPlatforms ?? ALL_AI_PLATFORMS;
   }
 
   // Has saved preference: confirm to use it
-  if (savedAiFiles && savedAiFiles.length > 0) {
-    const availableSaved = savedAiFiles.filter((f) =>
-      availableChoices.includes(f)
-    );
-    if (availableSaved.length > 0) {
-      const savedLabels = availableSaved
-        .map((f) => AI_FILE_PATHS[f])
-        .join(", ");
-      const useDefault = await p.confirm({
-        message: `Generate AI instruction files? ${color.dim(
-          `(${savedLabels})`
-        )}`,
-        initialValue: true,
-      });
-      if (!p.isCancel(useDefault) && useDefault) {
-        return availableSaved;
-      }
+  if (savedPlatforms && savedPlatforms.length > 0) {
+    const savedLabels = savedPlatforms
+      .map((plat) => AI_PLATFORM_LABELS[plat])
+      .join(", ");
+    const useDefault = await p.confirm({
+      message: `Add AI rules? ${color.dim(`(${savedLabels})`)}`,
+      initialValue: true,
+    });
+    if (p.isCancel(useDefault)) {
       return [];
     }
+    if (useDefault) {
+      return savedPlatforms;
+    }
+    // User said no to saved preference, fall through to selection
   }
 
-  // No saved preference: multiselect
-  const aiFilesChoice = await p.multiselect({
-    message: "Which AI instruction files?",
-    options: availableChoices.map((c) => ({
-      value: c,
-      label: AI_FILE_PATHS[c],
-      hint: AI_FILE_HINTS[c],
+  // Multi-select platforms
+  const selected = await p.multiselect({
+    message: "Add AI rules?",
+    options: ALL_AI_PLATFORMS.map((platform) => ({
+      value: platform,
+      label: AI_PLATFORM_LABELS[platform],
+      hint: AI_PLATFORM_HINTS[platform],
     })),
+    initialValues: [],
     required: false,
   });
 
-  if (p.isCancel(aiFilesChoice) || aiFilesChoice.length === 0) {
+  if (p.isCancel(selected)) {
     return [];
   }
 
-  const selected = aiFilesChoice as AiFileChoice[];
+  const platforms = selected as AiPlatform[];
+
+  if (platforms.length === 0) {
+    return [];
+  }
 
   // Offer to save as default
   const saveChoice = await p.confirm({
-    message: "Save as default for future?",
+    message: "Save selection for future projects?",
     initialValue: true,
   });
   if (!p.isCancel(saveChoice) && saveChoice) {
-    setAiFiles(selected);
+    setAiPlatforms(platforms);
   }
 
-  return selected;
+  return platforms;
 }
 
 /**
@@ -1253,40 +1233,32 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
       }
     }
 
-    // AI files
-    const existingAiFiles: AiFileChoice[] = [];
-    for (const [choice, path] of Object.entries(AI_FILE_PATHS)) {
-      if (await fileExists(join(monorepoRoot, path))) {
-        existingAiFiles.push(choice as AiFileChoice);
-      }
-    }
-
-    const availableAiChoices: AiFileChoice[] = (
-      ["cursor-rules", "agents-md", "claude-md", "copilot-md"] as AiFileChoice[]
-    ).filter((c) => !existingAiFiles.includes(c));
-
-    const selectedAiFiles = await promptForAiFileSelection(
-      availableAiChoices,
-      isNonInteractive
+    // AI rules - check if .ai/ folder exists
+    const aiRulesExist = await fileExists(
+      join(monorepoRoot, ".ai/workspace.md")
     );
 
-    if (selectedAiFiles.length > 0) {
-      const scope = await getMonorepoScope(monorepoRoot);
-      const aiFilesOutput: Record<string, { type: "text"; content: string }> =
-        {};
-      generateAiFiles(aiFilesOutput, {
-        name: scope,
-        packageManager: "pnpm",
-        linter,
-        formatter,
-        aiFiles: selectedAiFiles,
-        isMonorepo: true,
-      });
-      for (const [filePath, file] of Object.entries(aiFilesOutput)) {
-        const fullPath = join(monorepoRoot, filePath);
-        await mkdir(dirname(fullPath), { recursive: true });
-        await writeFile(fullPath, file.content);
-        console.log(color.dim(`  Generated ${filePath}`));
+    if (!aiRulesExist) {
+      const platforms = await promptForAiPlatforms(isNonInteractive);
+
+      if (platforms.length > 0) {
+        const scope = await getMonorepoScope(monorepoRoot);
+        const aiFilesOutput: Record<string, { type: "text"; content: string }> =
+          {};
+        generateAiFiles(aiFilesOutput, {
+          name: scope,
+          packageManager: "pnpm",
+          linter,
+          formatter,
+          isMonorepo: true,
+          platforms,
+        });
+        for (const [filePath, file] of Object.entries(aiFilesOutput)) {
+          const fullPath = join(monorepoRoot, filePath);
+          await mkdir(dirname(fullPath), { recursive: true });
+          await writeFile(fullPath, file.content);
+          console.log(color.dim(`  Generated ${filePath}`));
+        }
       }
     }
 
@@ -1365,14 +1337,46 @@ async function handleMigration(
   // Apply migration
   await applyMigration(plan, root);
 
+  // Update AI rules if they exist (they reference linter/formatter)
+  const aiWorkspacePath = join(root, ".ai/workspace.md");
+  const aiRulesExist = await fileExists(aiWorkspacePath);
+  if (aiRulesExist) {
+    console.log();
+    console.log(color.cyan("Updating AI rules..."));
+
+    const scope = await getMonorepoScope(root);
+    // Detect which platforms already exist
+    const existingPlatforms: AiPlatform[] = [];
+    if (await fileExists(join(root, "AGENTS.md"))) {
+      existingPlatforms.push("agents");
+    }
+    if (await fileExists(join(root, "CLAUDE.md"))) {
+      existingPlatforms.push("claude");
+    }
+
+    const aiFilesOutput: Record<string, { type: "text"; content: string }> = {};
+    generateAiFiles(aiFilesOutput, {
+      name: scope,
+      packageManager: "pnpm",
+      linter: plan.toLinter,
+      formatter: plan.toFormatter,
+      isMonorepo: true,
+      platforms: existingPlatforms.length > 0 ? existingPlatforms : ["agents"],
+    });
+
+    for (const [filePath, file] of Object.entries(aiFilesOutput)) {
+      const fullPath = join(root, filePath);
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, file.content);
+      console.log(color.dim(`  ${filePath}`));
+    }
+  }
+
   console.log();
   console.log(
     color.green("✓") + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`
   );
   console.log(color.dim("  Run `pnpm install` to update dependencies"));
-  console.log(
-    color.dim("  Run `--update` again to update VS Code settings and AI files")
-  );
   process.exit(0);
 }
 
@@ -1490,38 +1494,27 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
       continue;
     }
 
-    // Special handling for AI Files: prompt for selection
+    // Special handling for AI Files: prompt for yes/no
     if (category.category === "ai-files") {
-      const missingAiFiles = newChanges
-        .map((c) => {
-          const entry = Object.entries(AI_FILE_PATHS).find(
-            ([, path]) => path === c.path
-          );
-          return entry ? (entry[0] as AiFileChoice) : null;
-        })
-        .filter((c): c is AiFileChoice => c !== null);
-
-      if (missingAiFiles.length > 0) {
+      if (hasNew) {
         console.log(color.cyan(category.label + ":"));
         console.log(
-          color.dim(`  ${missingAiFiles.length} AI file(s) can be added`)
+          color.dim(`  ${newChanges.length} AI file(s) can be added`)
         );
         console.log();
 
-        const selectedAiFiles = await promptForAiFileSelection(
-          missingAiFiles,
-          options.yes ?? false
-        );
+        // In update mode, just ask yes/no to apply the determined changes
+        const applyAi = options.yes
+          ? true
+          : await p.confirm({
+              message: "Add AI rules?",
+              initialValue: true,
+            });
 
-        if (selectedAiFiles.length > 0) {
-          // Only apply selected AI files
-          const selectedPaths = selectedAiFiles.map((f) => AI_FILE_PATHS[f]);
-          const changesToApply = category.changes.filter((c) =>
-            selectedPaths.includes(c.path)
-          );
-          await applyUpdates(changesToApply, monorepoRoot);
+        if (!p.isCancel(applyAi) && applyAi) {
+          await applyUpdates(newChanges, monorepoRoot);
           console.log(
-            color.green("✓") + ` Added ${selectedAiFiles.length} AI file(s)`
+            color.green("✓") + ` Added ${newChanges.length} AI file(s)`
           );
           updatedCount++;
         } else {
@@ -1831,14 +1824,8 @@ async function handleMonorepoCreation(
     generateOptions.nodeVersion = await getLatestNodeVersion();
   }
 
-  // Prompt for AI instruction files (all choices available for new monorepo)
-  const allAiChoices: AiFileChoice[] = [
-    "cursor-rules",
-    "agents-md",
-    "claude-md",
-    "copilot-md",
-  ];
-  const selectedAiFiles = await promptForAiFileSelection(allAiChoices, false);
+  // Prompt for AI platforms
+  const aiPlatforms = await promptForAiPlatforms(false);
 
   const projectPath = join(cwd(), generateOptions.name);
   const spinner = p.spinner();
@@ -1853,7 +1840,7 @@ async function handleMonorepoCreation(
       pnpmVersion: generateOptions.pnpmVersion,
       pnpmManageVersions: generateOptions.pnpmManageVersions,
       nodeVersion: generateOptions.nodeVersion,
-      aiFiles: selectedAiFiles.length > 0 ? selectedAiFiles : undefined,
+      aiPlatforms: aiPlatforms.length > 0 ? aiPlatforms : undefined,
     });
 
     const filePaths = Object.keys(files).sort();
@@ -1925,16 +1912,10 @@ async function handleStandaloneProjectCreation(
       : "react-three-app";
   generateOptions.name ??= defaultFallbackName;
 
-  // Prompt for AI files
-  const allAiChoices: AiFileChoice[] = [
-    "cursor-rules",
-    "agents-md",
-    "claude-md",
-    "copilot-md",
-  ];
-  const selectedAiFiles = await promptForAiFileSelection(allAiChoices, false);
-  if (selectedAiFiles.length > 0) {
-    generateOptions.aiFiles = selectedAiFiles;
+  // Prompt for AI platforms
+  const aiPlatforms = await promptForAiPlatforms(false);
+  if (aiPlatforms.length > 0) {
+    generateOptions.aiPlatforms = aiPlatforms;
   }
 
   const packageManager = generateOptions.packageManager || "pnpm";

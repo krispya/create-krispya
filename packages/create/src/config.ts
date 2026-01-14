@@ -1,10 +1,16 @@
 import Conf from "conf";
-import type { AiFileChoice, BaseTemplate, ConfigStrategy, Formatter, Linter, Testing } from "./types.js";
+import type {
+  AiPlatform,
+  BaseTemplate,
+  ConfigStrategy,
+  Formatter,
+  Linter,
+  Testing,
+} from "./types.js";
 
 export type EditorChoice = "cursor" | "code" | "webstorm" | "skip";
 
-// Re-export for backwards compatibility
-export type { AiFileChoice } from "./types.js";
+export type { AiPlatform } from "./types.js";
 
 export interface CustomTemplate {
   baseTemplate: BaseTemplate;
@@ -19,7 +25,8 @@ interface Schema {
   preferredEditor?: EditorChoice;
   reuseWindow?: boolean;
   customTemplates?: Record<string, CustomTemplate>;
-  aiFiles?: AiFileChoice[];
+  /** Selected AI platforms to generate files for */
+  aiPlatforms?: AiPlatform[];
   configStrategy?: ConfigStrategy;
 }
 
@@ -43,12 +50,12 @@ export function setReuseWindow(reuse: boolean): void {
   config.set("reuseWindow", reuse);
 }
 
-export function getAiFiles(): AiFileChoice[] | undefined {
-  return config.get("aiFiles");
+export function getAiPlatforms(): AiPlatform[] | undefined {
+  return config.get("aiPlatforms");
 }
 
-export function setAiFiles(files: AiFileChoice[]): void {
-  config.set("aiFiles", files);
+export function setAiPlatforms(platforms: AiPlatform[]): void {
+  config.set("aiPlatforms", platforms);
 }
 
 export function getConfigStrategy(): ConfigStrategy {
@@ -76,7 +83,10 @@ export function getCustomTemplate(name: string): CustomTemplate | undefined {
   return templates[name];
 }
 
-export function saveCustomTemplate(name: string, template: CustomTemplate): void {
+export function saveCustomTemplate(
+  name: string,
+  template: CustomTemplate
+): void {
   const templates = getCustomTemplates();
   templates[name] = template;
   config.set("customTemplates", templates);
