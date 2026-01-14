@@ -49,15 +49,26 @@ export function generatePrettier(
     ],
   };
 
-  generator.addFile(".config/prettier.json", {
-    type: "text",
-    content: JSON.stringify(prettierConfig, null, 2),
-  });
+  const isStealth = generator.isStealthConfig();
 
-  generator.addScript(
-    "format",
-    "prettier --config .config/prettier.json --write ."
-  );
+  if (isStealth) {
+    generator.addFile(".config/prettier.json", {
+      type: "text",
+      content: JSON.stringify(prettierConfig, null, 2),
+    });
+    generator.addScript(
+      "format",
+      "prettier --config .config/prettier.json --write ."
+    );
+    generator.addVscodeSetting("prettier.configPath", ".config/prettier.json");
+  } else {
+    generator.addFile(".prettierrc", {
+      type: "text",
+      content: JSON.stringify(prettierConfig, null, 2),
+    });
+    generator.addScript("format", "prettier --write .");
+  }
+
   generator.inject(
     "readme-tools",
     "[Prettier](https://prettier.io/) - Opinionated code formatter"
@@ -67,5 +78,4 @@ export function generatePrettier(
     "editor.defaultFormatter",
     "esbenp.prettier-vscode"
   );
-  generator.addVscodeSetting("prettier.configPath", ".config/prettier.json");
 }

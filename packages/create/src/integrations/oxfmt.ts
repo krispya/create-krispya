@@ -26,6 +26,9 @@ export function generateOxfmt(
     // Standalone: add oxfmt as devDependency
     const version = generator.versions.oxfmt ?? "0.1.0";
     generator.addDevDependency("oxfmt", `^${version}`);
+
+    const isStealth = generator.isStealthConfig();
+
     // Generate local config for standalone projects
     const oxfmtConfig = {
       printWidth: defaultFormatterConfig.printWidth,
@@ -38,13 +41,20 @@ export function generateOxfmt(
       arrowParens: defaultFormatterConfig.arrowParens,
     };
 
-    generator.addFile(".config/oxfmt.json", {
-      type: "text",
-      content: JSON.stringify(oxfmtConfig, null, 2),
-    });
-
-    generator.addScript("format", "oxfmt -c .config/oxfmt.json --write .");
-    generator.addVscodeSetting("oxc.fmt.configPath", ".config/oxfmt.json");
+    if (isStealth) {
+      generator.addFile(".config/oxfmt.json", {
+        type: "text",
+        content: JSON.stringify(oxfmtConfig, null, 2),
+      });
+      generator.addScript("format", "oxfmt -c .config/oxfmt.json --write .");
+      generator.addVscodeSetting("oxc.fmt.configPath", ".config/oxfmt.json");
+    } else {
+      generator.addFile("oxfmt.json", {
+        type: "text",
+        content: JSON.stringify(oxfmtConfig, null, 2),
+      });
+      generator.addScript("format", "oxfmt -c oxfmt.json --write .");
+    }
   }
 
   generator.inject(

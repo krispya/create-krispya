@@ -113,6 +113,7 @@ export function generate(options: GenerateOptions) {
     const tsResult = generateTypescriptConfig({
       baseTemplate,
       useConfigPackage: clonedOptions.workspaceRoot != null,
+      configStrategy: clonedOptions.configStrategy,
     });
     Object.assign(files, tsResult.files);
     Object.assign(devDependencies, tsResult.devDependencies);
@@ -166,6 +167,9 @@ export function generate(options: GenerateOptions) {
   const generator: Generator = {
     options: clonedOptions,
     versions,
+    isStealthConfig() {
+      return (clonedOptions.configStrategy ?? "stealth") === "stealth";
+    },
     addDependency(name, semver) {
       const existingSemver = dependencies[name];
       if (existingSemver != null) {

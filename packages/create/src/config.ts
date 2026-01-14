@@ -1,5 +1,5 @@
 import Conf from "conf";
-import type { AiFileChoice, BaseTemplate, Formatter, Linter, Testing } from "./types.js";
+import type { AiFileChoice, BaseTemplate, ConfigStrategy, Formatter, Linter, Testing } from "./types.js";
 
 export type EditorChoice = "cursor" | "code" | "webstorm" | "skip";
 
@@ -11,6 +11,7 @@ export interface CustomTemplate {
   linter: Linter;
   formatter: Formatter;
   testing: Testing;
+  configStrategy?: ConfigStrategy;
   integrations?: string[];
 }
 
@@ -19,6 +20,7 @@ interface Schema {
   reuseWindow?: boolean;
   customTemplates?: Record<string, CustomTemplate>;
   aiFiles?: AiFileChoice[];
+  configStrategy?: ConfigStrategy;
 }
 
 const config = new Conf<Schema>({
@@ -47,6 +49,14 @@ export function getAiFiles(): AiFileChoice[] | undefined {
 
 export function setAiFiles(files: AiFileChoice[]): void {
   config.set("aiFiles", files);
+}
+
+export function getConfigStrategy(): ConfigStrategy {
+  return config.get("configStrategy") ?? "stealth";
+}
+
+export function setConfigStrategy(strategy: ConfigStrategy): void {
+  config.set("configStrategy", strategy);
 }
 
 export function clearConfig(): void {

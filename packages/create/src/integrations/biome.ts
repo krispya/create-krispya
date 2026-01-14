@@ -80,16 +80,34 @@ export function generateBiome(
     };
   }
 
-  generator.addFile("biome.json", {
-    type: "text",
-    content: JSON.stringify(biomeConfig, null, 2),
-  });
+  const isStealth = generator.isStealthConfig();
 
-  if (options.linter) {
-    generator.addScript("lint", "biome lint .");
-  }
-  if (options.formatter) {
-    generator.addScript("format", "biome format --write .");
+  if (isStealth) {
+    generator.addFile(".config/biome.json", {
+      type: "text",
+      content: JSON.stringify(biomeConfig, null, 2),
+    });
+    if (options.linter) {
+      generator.addScript("lint", "biome lint --config-path .config .");
+    }
+    if (options.formatter) {
+      generator.addScript(
+        "format",
+        "biome format --config-path .config --write ."
+      );
+    }
+    generator.addVscodeSetting("biome.linter.configPath", ".config/biome.json");
+  } else {
+    generator.addFile("biome.json", {
+      type: "text",
+      content: JSON.stringify(biomeConfig, null, 2),
+    });
+    if (options.linter) {
+      generator.addScript("lint", "biome lint .");
+    }
+    if (options.formatter) {
+      generator.addScript("format", "biome format --write .");
+    }
   }
 
   const roles: string[] = [];

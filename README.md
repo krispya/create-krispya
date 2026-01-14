@@ -19,6 +19,7 @@ yarn create krispya
 - **TypeScript first** — Full type safety with JavaScript fallback
 - **Library ready** — ESM/CJS dual output with proper exports
 - **React & R3F** — First-class support with optional integrations
+- **Config strategy** — Choose between stealth (`.config/`) or root placement
 
 ## Project Types
 
@@ -182,6 +183,50 @@ Select which files to generate during monorepo creation. Your selection can be s
 | Testing   | `vitest`, `none`             | varies\*  |
 
 \*Testing defaults to `vitest` for libraries, `none` for applications (configurable via prompts).
+
+## Config Strategy
+
+Control where configuration files are placed in single-package projects:
+
+| Strategy  | Description                                    |
+| --------- | ---------------------------------------------- |
+| `stealth` | Configs in `.config/` directory (default)      |
+| `root`    | Configs at project root (traditional approach) |
+
+**Stealth mode** keeps your project root clean:
+
+```
+my-project/
+├── .config/
+│   ├── oxlint.json
+│   ├── prettier.json
+│   ├── tsconfig.app.json
+│   └── tsconfig.node.json
+├── src/
+├── package.json
+└── tsconfig.json
+```
+
+**Root mode** uses traditional config placement:
+
+```
+my-project/
+├── src/
+├── oxlint.json
+├── .prettierrc
+├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
+└── package.json
+```
+
+Set your default via the global config file (`~/.config/create-krispya/config.json`):
+
+```json
+{
+  "configStrategy": "root"
+}
+```
 
 ## CLI Options
 

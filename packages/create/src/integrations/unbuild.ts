@@ -34,20 +34,22 @@ export function generateUnbuild(generator: Generator) {
   buildConfigLines.push(`  },`);
   buildConfigLines.push(`})`);
 
-  if (isMonorepo) {
-    // Monorepo: place config at package root
-    generator.addFile(`build.config.${ext}`, {
-      type: "text",
-      content: buildConfigLines.join("\n"),
-    });
-    generator.addScript("build", "unbuild");
-  } else {
-    // Standalone: place config in .config/
+  const isStealth = generator.isStealthConfig() && !isMonorepo;
+
+  if (isStealth) {
+    // Standalone stealth: place config in .config/
     generator.addFile(`.config/build.config.${ext}`, {
       type: "text",
       content: buildConfigLines.join("\n"),
     });
     generator.addScript("build", `unbuild --config .config/build.config.${ext}`);
+  } else {
+    // Monorepo or root strategy: place config at package root
+    generator.addFile(`build.config.${ext}`, {
+      type: "text",
+      content: buildConfigLines.join("\n"),
+    });
+    generator.addScript("build", "unbuild");
   }
 
   generator.inject(

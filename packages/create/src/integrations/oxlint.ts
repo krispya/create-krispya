@@ -35,6 +35,9 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     // Standalone: add oxlint as devDependency
     const version = generator.versions.oxlint ?? "0.16.0";
     generator.addDevDependency("oxlint", `^${version}`);
+
+    const isStealth = generator.isStealthConfig();
+
     // Generate local config for standalone projects
     const { rules } = defaultLinterConfig;
 
@@ -46,7 +49,9 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
 
     // Add oxlint config with plugins and common rules
     const oxlintConfig = {
-      $schema: "../node_modules/oxlint/configuration_schema.json",
+      $schema: isStealth
+        ? "../node_modules/oxlint/configuration_schema.json"
+        : "./node_modules/oxlint/configuration_schema.json",
       plugins,
       rules: {
         "no-unused-vars": [
@@ -66,13 +71,20 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
       ignorePatterns: defaultLinterConfig.ignorePatterns,
     };
 
-    generator.addFile(".config/oxlint.json", {
-      type: "text",
-      content: JSON.stringify(oxlintConfig, null, 2),
-    });
-
-    generator.addScript("lint", "oxlint -c .config/oxlint.json");
-    generator.addVscodeSetting("oxc.configPath", ".config/oxlint.json");
+    if (isStealth) {
+      generator.addFile(".config/oxlint.json", {
+        type: "text",
+        content: JSON.stringify(oxlintConfig, null, 2),
+      });
+      generator.addScript("lint", "oxlint -c .config/oxlint.json");
+      generator.addVscodeSetting("oxc.configPath", ".config/oxlint.json");
+    } else {
+      generator.addFile("oxlint.json", {
+        type: "text",
+        content: JSON.stringify(oxlintConfig, null, 2),
+      });
+      generator.addScript("lint", "oxlint");
+    }
   }
 
   generator.inject(

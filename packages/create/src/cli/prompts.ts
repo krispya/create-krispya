@@ -1,5 +1,9 @@
 import * as p from "@clack/prompts";
-import { getCustomTemplates, type CustomTemplate } from "../config.js";
+import {
+  getConfigStrategy,
+  getCustomTemplates,
+  type CustomTemplate,
+} from "../config.js";
 import type {
   GenerateOptions,
   LibraryBundler,
@@ -37,6 +41,7 @@ export function getDefaultOptions(
     formatter: inheritedSettings?.formatter ?? "prettier",
     // Libraries get vitest by default, apps don't
     testing: projectType === "library" ? "vitest" : "none",
+    configStrategy: getConfigStrategy(),
   };
 
   if (baseTemplate === "r3f" && integrations) {
@@ -291,6 +296,21 @@ export async function promptForCustomization(
     process.exit(0);
   }
 
+  // Config strategy
+  const configStrategyChoice = await p.select({
+    message: "Config strategy",
+    options: [
+      { value: "stealth", label: "stealth", hint: "configs in .config/" },
+      { value: "root", label: "root", hint: "configs at project root" },
+    ],
+    initialValue: getConfigStrategy(),
+  });
+
+  if (p.isCancel(configStrategyChoice)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
   // Derive final template based on language selection
   const baseTemplate = getBaseTemplate(template);
   const finalTemplate: Template =
@@ -309,6 +329,7 @@ export async function promptForCustomization(
     linter,
     formatter,
     testing: testing as "vitest" | "none",
+    configStrategy: configStrategyChoice as "stealth" | "root",
   };
 
   // For R3F, use the integrations passed in (already selected upfront)
@@ -577,6 +598,7 @@ function customTemplateToOptions(
     linter: inheritedSettings?.linter ?? customTemplate.linter,
     formatter: inheritedSettings?.formatter ?? customTemplate.formatter,
     testing: customTemplate.testing,
+    configStrategy: customTemplate.configStrategy ?? getConfigStrategy(),
   };
 
   if (baseTemplate === "r3f" && customTemplate.integrations) {

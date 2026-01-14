@@ -38,6 +38,7 @@ export type File =
 export type Linter = "eslint" | "oxlint" | "biome";
 export type Formatter = "prettier" | "oxfmt" | "biome";
 export type Testing = "vitest" | "none";
+export type ConfigStrategy = "stealth" | "root";
 
 // Code injection locations for template assembly
 export type CodeInjectionLocation =
@@ -117,6 +118,7 @@ export type GenerateOptions = {
   linter?: Linter;
   formatter?: Formatter;
   testing?: Testing;
+  configStrategy?: ConfigStrategy;
   aiFiles?: AiFileChoice[];
   versions?: PackageVersions;
   fiber?: GenerateFiberOptions;
@@ -151,6 +153,8 @@ export type GenerateOptions = {
 export type Generator = {
   get options(): GenerateOptions;
   get versions(): PackageVersions;
+  /** Returns true if using stealth config strategy (configs in .config/) */
+  isStealthConfig(): boolean;
   addDependency(name: string, semver: string): void;
   addDevDependency(name: string, semver: string): void;
   addFile(path: string, file: File): void;
