@@ -57,6 +57,15 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
   // Root package.json (private workspace root)
   const devDependencies: Record<string, string> = {};
 
+  // Add Node.js types matching the Node version (needed for config files)
+  if (nodeVersion) {
+    const majorVersion = nodeVersion.split(".")[0];
+    devDependencies["@types/node"] = `^${majorVersion}.0.0`;
+  } else {
+    // Fallback to latest LTS if no version specified
+    devDependencies["@types/node"] = "^22.0.0";
+  }
+
   // Add linter to root devDependencies
   if (linter === "oxlint") {
     devDependencies["oxlint"] = "^1.36.0";

@@ -11,6 +11,8 @@ export type TypeScriptConfigParams = {
   useConfigPackage?: boolean;
   /** Config strategy for standalone projects */
   configStrategy?: ConfigStrategy;
+  /** Node.js version to match @types/node version */
+  nodeVersion?: string;
 };
 
 /**
@@ -28,11 +30,20 @@ export function generateTypescriptConfig(
       ? { baseTemplate: baseTemplateOrParams }
       : baseTemplateOrParams;
 
-  const { baseTemplate, useConfigPackage, configStrategy = "stealth" } = params;
+  const { baseTemplate, useConfigPackage, configStrategy = "stealth", nodeVersion } = params;
   const isReact = baseTemplate === "react";
   const isR3f = baseTemplate === "r3f";
   const files: Record<string, File> = {};
   const devDependencies: Record<string, string> = {};
+
+  // Add Node.js types matching the Node version (needed for config files like vite.config.ts)
+  if (nodeVersion) {
+    const majorVersion = nodeVersion.split(".")[0];
+    devDependencies["@types/node"] = `^${majorVersion}.0.0`;
+  } else {
+    // Fallback to latest LTS if no version specified
+    devDependencies["@types/node"] = "^22.0.0";
+  }
 
   // Add React types for React templates
   if (isReact || isR3f) {

@@ -114,6 +114,7 @@ export function generate(options: GenerateOptions) {
       baseTemplate,
       useConfigPackage: clonedOptions.workspaceRoot != null,
       configStrategy: clonedOptions.configStrategy,
+      nodeVersion: clonedOptions.nodeVersion,
     });
     Object.assign(files, tsResult.files);
     Object.assign(devDependencies, tsResult.devDependencies);
