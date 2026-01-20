@@ -34,7 +34,7 @@ export function generateVscodeFiles(params: VscodeParams): Record<string, File> 
     );
     files[".vscode/settings.json"] = {
       type: "text",
-      content: JSON.stringify(sortedSettings, null, "\t"),
+      content: JSON.stringify(sortedSettings, null, 2),
     };
   }
 

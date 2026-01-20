@@ -103,7 +103,7 @@ export type FormatterConfig = {
 
 export const defaultFormatterConfig: FormatterConfig = {
   printWidth: 102,
-  tabWidth: 4,
+  tabWidth: 2,
   useTabs: false,
   semi: true,
   singleQuote: true,
@@ -118,16 +118,12 @@ export const defaultPrettierConfig = {
   ...defaultFormatterConfig,
   overrides: [
     {
-      files: ["*.json", "**/*.json"],
-      options: { tabWidth: 2 },
-    },
-    {
       files: ["*.md", "**/*.md"],
-      options: { tabWidth: 2, semi: false },
+      options: { semi: false },
     },
     {
       files: ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
-      options: { tabWidth: 2, semi: false },
+      options: { semi: false },
     },
   ],
 };

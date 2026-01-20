@@ -1,4 +1,10 @@
-import type { AiPlatform, File, Linter, Formatter } from "../types.js";
+import type {
+  AiPlatform,
+  CodeInjectionLocation,
+  File,
+  Formatter,
+  Linter,
+} from "../types.js";
 import { generateAiFiles } from "./ai-files.js";
 import {
   generateTypescriptConfigPackage,
@@ -7,6 +13,7 @@ import {
   generatePrettierConfigPackage,
   generateOxfmtConfigPackage,
 } from "./config-packages.js";
+import { generateVscodeFiles as generateSharedVscodeFiles } from "./vscode.js";
 
 /**
  * Parameters for generating a monorepo workspace.
@@ -351,10 +358,17 @@ export function generateVscodeFiles(
   };
 
   // settings.json
-  files[".vscode/settings.json"] = {
-    type: "text",
-    content: JSON.stringify(settings, null, "\t"),
-  };
+  const codeSnippets: Partial<Record<CodeInjectionLocation, string[]>> = {};
+  if (recommendations.length > 0) {
+    codeSnippets["vscode-extension-suggestion"] = recommendations;
+  }
+  Object.assign(
+    files,
+    generateSharedVscodeFiles({
+      codeSnippets,
+      vscodeSettings: settings,
+    })
+  );
 }
 
 // Re-export for cli.ts which imports these directly
