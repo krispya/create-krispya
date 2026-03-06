@@ -1,21 +1,56 @@
 {
+  "name": "create-krispya",
+  "version": "0.6.0",
+  "description": "🌹 CLI for creating web projects with (my) sensible defaults",
+  "keywords": [
+    "cli",
+    "r3f",
+    "react",
+    "react-three-fiber",
+    "scaffold",
+    "vite"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "unbuild --config .config/build.config.ts",
+    "release": "pnpm run build && pnpm publish",
     "test": "vitest",
-    "lint": "oxlint",
-    "format": "oxfmt",
-    "release": "pnpm -F create-krispya build && pnpm -F create-krispya publish",
-    "dev": "pnpm -F create-krispya dev"
+    "lint": "oxlint -c .config/oxlint.json",
+    "format": "prettier --config .config/prettier.json --write .",
+    "prepack": "node -e \"require('fs').copyFileSync('../../README.md', 'README.md')\""
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "conf": "^13.0.0",
+    "ora": "^8.2.0",
+    "undici": "^5.28.4"
   },
   "devDependencies": {
-    "json": "^11.0.0",
-    "oxfmt": "^0.21.0",
-    "oxlint": "^1.36.0",
-    "typescript": "^5.8.3",
-    "vitest": "^4.0.0"
+    "@types/node": "^25.3.5",
+    "oxlint": "^1.51.0",
+    "prettier": "^3.8.1",
+    "unbuild": "^3.5.0",
+    "vitest": "^4.0.18"
   },
+  "packageManager": "pnpm@10.30.3",
   "engines": {
-    "node": ">=24.2.0",
-    "pnpm": ">=10.27.0"
-  },
-  "packageManager": "pnpm@10.28.0"
+    "pnpm": ">=10.0.0",
+    "node": ">=25.0.0"
+  }
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { createRequire } from "module";
-import { cwd } from "process";
-import { dirname, join, resolve } from "path";
-import { mkdir, writeFile, readFile, access, unlink } from "fs/promises";
-import { constants } from "fs";
+import { createRequire } from "node:module";
+import { cwd } from "node:process";
+import { dirname, join, resolve } from "node:path";
+import { mkdir, writeFile, readFile, access, unlink } from "node:fs/promises";
+import { constants } from "node:fs";
 import { Command } from "commander";
 import * as p from "@clack/prompts";
 import color from "chalk";
