@@ -30,8 +30,7 @@
     "release": "pnpm run build && pnpm publish",
     "test": "vitest",
     "lint": "oxlint -c .config/oxlint.json",
-    "format": "prettier --config .config/prettier.json --write .",
-    "prepack": "node -e \"require('fs').copyFileSync('../../README.md', 'README.md')\""
+    "format": "prettier --config .config/prettier.json --write ."
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
