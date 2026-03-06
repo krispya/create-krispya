@@ -13,6 +13,7 @@ import {
   generatePrettierConfigPackage,
   generateOxfmtConfigPackage,
 } from "./config-packages.js";
+import { generateGitignore } from "./gitignore.js";
 import { generateVscodeFiles as generateSharedVscodeFiles } from "./vscode.js";
 
 /**
@@ -240,10 +241,7 @@ export default [...base];
   // biome formatter is handled above with linter
 
   // .gitignore
-  files[".gitignore"] = {
-    type: "text",
-    content: ["node_modules", "dist", "*.tsbuildinfo", ".DS_Store"].join("\n"),
-  };
+  files[".gitignore"] = generateGitignore("workspace-root");
 
   // .gitattributes
   files[".gitattributes"] = {

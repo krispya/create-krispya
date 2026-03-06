@@ -44,8 +44,8 @@ export async function getLatestNpmCliVersion(): Promise<string> {
 }
 
 /**
- * Fetches the latest LTS version of Node.js
- * @returns The latest Node.js LTS version string (e.g., "22.13.0")
+ * Fetches the latest stable version of Node.js
+ * @returns The latest Node.js version string (e.g., "25.1.0")
  */
 export async function getLatestNodeVersion(): Promise<string> {
   try {
@@ -54,16 +54,13 @@ export async function getLatestNodeVersion(): Promise<string> {
       version: string;
       lts: boolean | string;
     }>;
-    // Find the first LTS version
-    const ltsVersion = data.find((v) => v.lts);
-    if (ltsVersion) {
-      // Remove the 'v' prefix from version string
-      return ltsVersion.version.replace(/^v/, "");
+    const latestVersion = data[0];
+    if (latestVersion) {
+      return latestVersion.version.replace(/^v/, "");
     }
-    return "22.0.0";
+    return "25.0.0";
   } catch {
-    // Fallback to a known recent LTS version if fetch fails
-    return "22.0.0";
+    return "25.0.0";
   }
 }
 

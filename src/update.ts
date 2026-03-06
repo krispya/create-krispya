@@ -12,6 +12,7 @@ import {
   generateVscodeFiles,
 } from "./generators/monorepo.js";
 import { generateAiFiles, ALL_AI_PLATFORMS } from "./generators/ai-files.js";
+import { generateGitignore } from "./generators/gitignore.js";
 import { parseWorkspaceYamlContent, detectTooling } from "./utils.js";
 
 // =============================================================================
@@ -151,10 +152,7 @@ export function generateExpectedFiles(
 
   // Root Config
   const rootConfig: Record<string, File> = {};
-  rootConfig[".gitignore"] = {
-    type: "text",
-    content: ["node_modules", "dist", "*.tsbuildinfo", ".DS_Store"].join("\n"),
-  };
+  rootConfig[".gitignore"] = generateGitignore("workspace-root");
   rootConfig[".gitattributes"] = {
     type: "text",
     content: `* text=auto eol=lf

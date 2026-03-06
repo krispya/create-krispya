@@ -1,6 +1,7 @@
 import { GitAttributes } from "./constants.js";
 import { generateAiFiles } from "./generators/ai-files.js";
 import {
+  generateGitignore,
   generatePackageJson,
   generateReadme,
   generateSourceFiles,
@@ -358,10 +359,7 @@ export function generate(options: GenerateOptions) {
 
   // Git files (skip for monorepo sub-packages - use workspace root config)
   if (!isMonorepoPackage) {
-    files[".gitignore"] = {
-      type: "text",
-      content: ["node_modules", "dist", "*.tsbuildinfo"].join("\n"),
-    };
+    files[".gitignore"] = generateGitignore("standalone");
     files[".gitattributes"] = { type: "text", content: GitAttributes };
   }
 

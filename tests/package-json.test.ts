@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { generatePackageJson } from "../src/generators/package-json.js";
-''
 
 function readPackageJsonContent(
   file: { type: "text"; content: string } | { type: "remote"; url: string }
@@ -50,5 +49,26 @@ describe("generatePackageJson", () => {
 
     const packageJson = readPackageJsonContent(result.files["package.json"]);
     expect(packageJson.version).toBe("0.1.0");
+  });
+
+  it("uses the selected node version for both types and engines", () => {
+    const result = generatePackageJson({
+      name: "my-app",
+      baseTemplate: "vanilla",
+      language: "javascript",
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: "my-app",
+        nodeVersion: "25.1.0",
+      },
+    });
+
+    const packageJson = readPackageJsonContent(result.files["package.json"]);
+    expect(packageJson.devDependencies["@types/node"]).toBe("^25.0.0");
+    expect(packageJson.engines.node).toBe(">=25.0.0");
   });
 });

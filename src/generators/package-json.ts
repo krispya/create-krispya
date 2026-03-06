@@ -82,11 +82,17 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     }
   }
 
+  const allDevDependencies = { ...devDependencies };
+  if (options.nodeVersion) {
+    const majorVersion = options.nodeVersion.split(".")[0];
+    allDevDependencies["@types/node"] ??= `^${majorVersion}.0.0`;
+  }
+
   packageJson.scripts = scripts;
   packageJson.dependencies = sortKeys(allDependencies);
 
-  if (Object.keys(devDependencies).length > 0) {
-    packageJson.devDependencies = sortKeys(devDependencies);
+  if (Object.keys(allDevDependencies).length > 0) {
+    packageJson.devDependencies = sortKeys(allDevDependencies);
   }
 
   if (isLibrary && Object.keys(peerDependencies).length > 0) {
