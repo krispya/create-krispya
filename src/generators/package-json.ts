@@ -1,5 +1,7 @@
 import type { BaseTemplate, File, GenerateOptions } from "../types.js";
 
+const DEFAULT_LIBRARY_VERSION = "0.1.0";
+
 export type PackageJsonResult = {
   files: Record<string, File>;
 };
@@ -52,6 +54,7 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
 
   // Add library-specific fields (ESM-first)
   if (isLibrary) {
+    packageJson.version = DEFAULT_LIBRARY_VERSION;
     packageJson.main = "./dist/index.mjs";
     packageJson.module = "./dist/index.mjs";
     if (language === "typescript") {

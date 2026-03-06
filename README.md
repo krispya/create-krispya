@@ -2,7 +2,7 @@
 
 > Full AI generated docs can be found [here](./docs/api.md).
 
-A CLI for scaffolding modern web projects that is minimal and robust.
+A CLI for scaffolding modern, clutter-free web projects. 
 
 ## Quick Start
 
@@ -15,6 +15,7 @@ bun create krispya
 # or
 yarn create krispya
 ```
+
 
 
 
