@@ -78,6 +78,7 @@ import {
   formatMigrationChange,
   type CategoryUpdate,
   type MigrationTarget,
+  type WorkspaceConfig,
 } from "./update.js";
 
 const require = createRequire(import.meta.url);
@@ -298,6 +299,20 @@ async function detectMonorepoRoot(): Promise<string | null> {
   }
 
   return null;
+}
+
+async function detectPackageRoot(): Promise<string | null> {
+  let currentDir = cwd();
+  const root = resolve("/");
+
+  while (currentDir !== root) {
+    if (await fileExists(join(currentDir, "package.json"))) {
+      return currentDir;
+    }
+    currentDir = dirname(currentDir);
+  }
+
+  return (await fileExists(join(root, "package.json"))) ? root : null;
 }
 
 /**
@@ -1274,12 +1289,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
  * Handles migration from one linter/formatter to another.
  */
 async function handleMigration(
-  config: {
-    name: string;
-    linter: Linter;
-    formatter: Formatter;
-    packageManager: "pnpm";
-  },
+  config: WorkspaceConfig,
   target: MigrationTarget,
   root: string,
   options: CliOptions
@@ -1381,61 +1391,72 @@ async function handleMigration(
 }
 
 /**
- * Handles the --update command to update a monorepo workspace to latest configuration.
+ * Handles the --update command to update a workspace or standalone project.
  */
 async function handleUpdateCommand(options: CliOptions): Promise<void> {
   const monorepoRoot = await detectMonorepoRoot();
-  if (!monorepoRoot) {
-    console.log(color.red("✗") + " Not a monorepo workspace");
-    console.log(color.dim("  --update only supports pnpm monorepos"));
+  const projectRoot = monorepoRoot ?? (await detectPackageRoot());
+  if (!projectRoot) {
+    console.log(color.red("✗") + " Could not find a project root");
+    console.log(color.dim("  Run this command from inside a generated project"));
     process.exit(1);
   }
+  const isMonorepo = monorepoRoot != null;
 
-  // Step 1: Validate workspace
-  const { valid, errors } = await validateWorkspace(monorepoRoot);
-  if (!valid) {
-    console.log(color.yellow("!") + " Workspace has issues:");
-    for (const error of errors) {
-      console.log(color.dim(`  • ${error}`));
+  if (isMonorepo) {
+    // Step 1: Validate workspace
+    const { valid, errors } = await validateWorkspace(projectRoot);
+    if (!valid) {
+      console.log(color.yellow("!") + " Workspace has issues:");
+      for (const error of errors) {
+        console.log(color.dim(`  • ${error}`));
+      }
+      console.log();
+
+      const shouldFix =
+        options.yes ||
+        (await p.confirm({
+          message: "Run fix first to resolve these issues?",
+          initialValue: true,
+        }));
+
+      if (p.isCancel(shouldFix) || !shouldFix) {
+        console.log(
+          color.dim("  Run `pnpm create krispya --fix` to fix manually")
+        );
+        process.exit(1);
+      }
+
+      // Detect config before fix so we can pass linter/formatter for non-interactive mode
+      const preFixConfig = await detectCurrentConfig(projectRoot);
+
+      // Run fix command with detected linter/formatter for non-interactive mode
+      const fixOptions: CliOptions = {
+        ...options,
+        linter: options.linter ?? preFixConfig.linter,
+        formatter: options.formatter ?? preFixConfig.formatter,
+      };
+      await handleFixCommand(fixOptions);
     }
+  } else if (options.linter || options.formatter) {
+    console.log(
+      color.yellow("!") +
+        " Linter/formatter migrations in --update are currently monorepo-only"
+    );
+    console.log(color.dim("  Continuing with standalone shared config updates"));
     console.log();
-
-    const shouldFix =
-      options.yes ||
-      (await p.confirm({
-        message: "Run fix first to resolve these issues?",
-        initialValue: true,
-      }));
-
-    if (p.isCancel(shouldFix) || !shouldFix) {
-      console.log(
-        color.dim("  Run `pnpm create krispya --fix` to fix manually")
-      );
-      process.exit(1);
-    }
-
-    // Detect config before fix so we can pass linter/formatter for non-interactive mode
-    const preFixConfig = await detectCurrentConfig(monorepoRoot);
-
-    // Run fix command with detected linter/formatter for non-interactive mode
-    const fixOptions: CliOptions = {
-      ...options,
-      linter: options.linter ?? preFixConfig.linter,
-      formatter: options.formatter ?? preFixConfig.formatter,
-    };
-    await handleFixCommand(fixOptions);
   }
 
   // Step 2: Detect current configuration
-  const config = await detectCurrentConfig(monorepoRoot);
+  const config = await detectCurrentConfig(projectRoot, isMonorepo);
 
   // Step 3: Check for migration (if --linter or --formatter flags provided)
   const targetLinter = options.linter as Linter | undefined;
   const targetFormatter = options.formatter as Formatter | undefined;
   const migrationTarget = { linter: targetLinter, formatter: targetFormatter };
 
-  if (needsMigration(config, migrationTarget)) {
-    await handleMigration(config, migrationTarget, monorepoRoot, options);
+  if (isMonorepo && needsMigration(config, migrationTarget)) {
+    await handleMigration(config, migrationTarget, projectRoot, options);
     return;
   }
 
@@ -1447,32 +1468,31 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
 
   // Step 4: Generate expected files and compare
   const expected = generateExpectedFiles(config);
-  const categories = await compareWithDisk(expected, monorepoRoot);
+  const categories = await compareWithDisk(expected, projectRoot);
 
-  // Step 4: Add workspace config updates (merge strategy)
-  const workspaceConfigChanges = await getWorkspaceConfigUpdates(monorepoRoot);
-  const workspaceCategory: CategoryUpdate = {
-    category: "workspace-config",
-    label: "Workspace Config",
-    changes: workspaceConfigChanges,
-    hasUserModifications: workspaceConfigChanges.some(
-      (c) => c.status === "modified"
-    ),
-  };
+  const allCategories = categories.filter((c) => c.category !== "workspace-config");
+  if (isMonorepo) {
+    // Step 4: Add workspace config updates (merge strategy)
+    const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot);
+    const workspaceCategory: CategoryUpdate = {
+      category: "workspace-config",
+      label: "Workspace Config",
+      changes: workspaceConfigChanges,
+      hasUserModifications: workspaceConfigChanges.some(
+        (c) => c.status === "modified"
+      ),
+    };
 
-  // Insert workspace config into categories
-  const allCategories = categories.filter(
-    (c) => c.category !== "workspace-config"
-  );
-  if (workspaceConfigChanges.length > 0) {
     // Insert after config-packages
-    const configPkgIndex = allCategories.findIndex(
-      (c) => c.category === "config-packages"
-    );
-    if (configPkgIndex !== -1) {
-      allCategories.splice(configPkgIndex + 1, 0, workspaceCategory);
-    } else {
-      allCategories.push(workspaceCategory);
+    if (workspaceConfigChanges.length > 0) {
+      const configPkgIndex = allCategories.findIndex(
+        (c) => c.category === "config-packages"
+      );
+      if (configPkgIndex !== -1) {
+        allCategories.splice(configPkgIndex + 1, 0, workspaceCategory);
+      } else {
+        allCategories.push(workspaceCategory);
+      }
     }
   }
 
@@ -1512,7 +1532,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
             });
 
         if (!p.isCancel(applyAi) && applyAi) {
-          await applyUpdates(newChanges, monorepoRoot);
+          await applyUpdates(newChanges, projectRoot);
           console.log(
             color.green("✓") + ` Added ${newChanges.length} AI file(s)`
           );
@@ -1541,7 +1561,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
           });
 
           if (!p.isCancel(updateExisting) && updateExisting) {
-            await applyUpdates(modifiedChanges, monorepoRoot);
+            await applyUpdates(modifiedChanges, projectRoot);
             console.log(color.green("✓") + " Updated existing AI files");
           }
         }
@@ -1644,7 +1664,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
     }
 
     if (changesToApply.length > 0) {
-      await applyUpdates(changesToApply, monorepoRoot);
+      await applyUpdates(changesToApply, projectRoot);
       const addedCount = changesToApply.filter(
         (c) => c.status === "added"
       ).length;

@@ -2,7 +2,7 @@ import { readFile, access, writeFile, mkdir, rm, readdir } from "fs/promises";
 import { constants } from "fs";
 import { join, dirname } from "path";
 
-import type { Linter, Formatter, File } from "./types.js";
+import type { ConfigStrategy, Linter, Formatter, File } from "./types.js";
 import {
   generateTypescriptConfigPackage,
   generateOxlintConfigPackage,
@@ -46,7 +46,9 @@ export type WorkspaceConfig = {
   name: string;
   linter: Linter;
   formatter: Formatter;
-  packageManager: "pnpm";
+  packageManager: string;
+  isMonorepo: boolean;
+  configStrategy?: ConfigStrategy;
 };
 
 export type MigrationTarget = {
@@ -79,16 +81,21 @@ export type MigrationPlan = {
  * Uses scripts → .config/ directories → devDependencies priority.
  */
 export async function detectCurrentConfig(
-  root: string
+  root: string,
+  isMonorepo = true
 ): Promise<WorkspaceConfig> {
   // Read name from package.json or directory
   let name = root.split(/[/\\]/).pop() ?? "workspace";
+  let packageManager = "pnpm";
   try {
     const pkgPath = join(root, "package.json");
     const content = await readFile(pkgPath, "utf-8");
-    const pkgJson = JSON.parse(content) as { name?: string };
+    const pkgJson = JSON.parse(content) as { name?: string; packageManager?: string };
     if (pkgJson.name) {
       name = pkgJson.name.replace(/^@/, "").replace(/\/.*$/, "");
+    }
+    if (pkgJson.packageManager) {
+      packageManager = pkgJson.packageManager.split("@")[0] ?? packageManager;
     }
   } catch {
     // Use directory name
@@ -96,13 +103,29 @@ export async function detectCurrentConfig(
 
   // Detect linter and formatter using standardized detection
   const tooling = await detectTooling(root);
+  const configStrategy = isMonorepo ? undefined : await detectStandaloneConfigStrategy(root);
 
   return {
     name,
     linter: tooling.linter ?? "oxlint",
     formatter: tooling.formatter ?? "prettier",
-    packageManager: "pnpm",
+    packageManager,
+    isMonorepo,
+    configStrategy,
   };
+}
+
+async function detectStandaloneConfigStrategy(
+  root: string
+): Promise<ConfigStrategy> {
+  const hasStealthConfig = await Promise.all([
+    fileExists(join(root, ".config/tsconfig.app.json")),
+    fileExists(join(root, ".config/tsconfig.node.json")),
+    fileExists(join(root, ".config/prettier.json")),
+    fileExists(join(root, ".config/oxlint.json")),
+  ]).then((matches) => matches.some(Boolean));
+
+  return hasStealthConfig ? "stealth" : "root";
 }
 
 // =============================================================================
@@ -115,7 +138,8 @@ export async function detectCurrentConfig(
 export function generateExpectedFiles(
   config: WorkspaceConfig
 ): Record<UpdateCategory, Record<string, File>> {
-  const { name, linter, formatter, packageManager } = config;
+  const { name, linter, formatter, packageManager, isMonorepo, configStrategy } =
+    config;
 
   // AI Files
   const aiFilesMap: Record<string, File> = {};
@@ -124,7 +148,8 @@ export function generateExpectedFiles(
     packageManager,
     linter,
     formatter,
-    isMonorepo: true,
+    isMonorepo,
+    configStrategy,
     platforms: ALL_AI_PLATFORMS,
   });
 
@@ -134,16 +159,18 @@ export function generateExpectedFiles(
 
   // Config Packages
   const configPackages: Record<string, File> = {};
-  generateTypescriptConfigPackage(configPackages);
-  if (linter === "oxlint") {
-    generateOxlintConfigPackage(configPackages);
-  } else if (linter === "eslint") {
-    generateEslintConfigPackage(configPackages);
-  }
-  if (formatter === "oxfmt") {
-    generateOxfmtConfigPackage(configPackages);
-  } else if (formatter === "prettier") {
-    generatePrettierConfigPackage(configPackages);
+  if (isMonorepo) {
+    generateTypescriptConfigPackage(configPackages);
+    if (linter === "oxlint") {
+      generateOxlintConfigPackage(configPackages);
+    } else if (linter === "eslint") {
+      generateEslintConfigPackage(configPackages);
+    }
+    if (formatter === "oxfmt") {
+      generateOxfmtConfigPackage(configPackages);
+    } else if (formatter === "prettier") {
+      generatePrettierConfigPackage(configPackages);
+    }
   }
 
   // Workspace Config (pnpm-workspace.yaml)
@@ -152,7 +179,9 @@ export function generateExpectedFiles(
 
   // Root Config
   const rootConfig: Record<string, File> = {};
-  rootConfig[".gitignore"] = generateGitignore("workspace-root");
+  rootConfig[".gitignore"] = generateGitignore(
+    isMonorepo ? "workspace-root" : "standalone"
+  );
   rootConfig[".gitattributes"] = {
     type: "text",
     content: `* text=auto eol=lf
