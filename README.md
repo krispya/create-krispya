@@ -16,6 +16,4 @@ bun create krispya
 yarn create krispya
 ```
 
-
-
-
+I really hate looking at my repo and there are 20 config files sitting in root. It is noisy and, worst of all, plain ugly. We deserve beautiful code. In pursuit of minimalism, as many files as possible are moved to hidden directories such as `.config`, `.vscode` and `.ai`. 
