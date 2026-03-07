@@ -1,3 +1,12 @@
-See `.ai/` for project rules.
+# create-krispya
 
-- Workspace types like library should be kept in sync between single workspace and multi-workspace (monorepo) installs. 
+- **Type:** standalone project
+- **Package Manager:** pnpm
+- **Linter:** oxlint
+- **Formatter:** prettier
+
+## Commands
+
+- `pnpm test` — run tests
+- `pnpm build` — build
+- `pnpm lint` and `pnpm format` — run before committing

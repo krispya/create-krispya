@@ -25,9 +25,7 @@ export type AiFilesParams = {
 };
 
 /**
- * Generates AI rules:
- * - .ai/workspace.md (project rules)
- * - AGENTS.md and/or CLAUDE.md (pointers to .ai/)
+ * Generates AI rule
  */
 export function generateAiFiles(
   files: Record<string, File>,
@@ -37,21 +35,16 @@ export function generateAiFiles(
 
   if (platforms.length === 0) return;
 
-  // Generate .ai/workspace.md with project rules
-  files[".ai/workspace.md"] = {
-    type: "text",
-    content: generateWorkspace({
-      ...rest,
-      isMonorepo: !!isMonorepo,
-      configStrategy: configStrategy ?? "stealth",
-    }),
-  };
+  // Generate agents content
+  const content = generateWorkspace({
+    ...rest,
+    isMonorepo: !!isMonorepo,
+    configStrategy: configStrategy ?? "stealth",
+  })
 
-  // Generate pointer files
-  const pointer = "See `.ai/` for project rules.\n";
   for (const platform of platforms) {
     const path = platform === "agents" ? "AGENTS.md" : "CLAUDE.md";
-    files[path] = { type: "text", content: pointer };
+    files[path] = { type: "text", content };
   }
 }
 
@@ -86,34 +79,8 @@ function generateWorkspace(ctx: WorkspaceContext): string {
   if (isMonorepo) {
     sections.push(
       "",
-      "## Structure",
-      "",
-      "- `apps/` — applications",
-      "- `packages/` — shared libraries",
-      "- `.config/` — shared config packages",
-      "",
-      "## Monorepo",
-      "",
       "- Use `workspace:*` for internal dependencies",
       `- New packages: \`${packageManager} create krispya <name> --workspace\``
-    );
-  } else if (configStrategy === "root") {
-    sections.push(
-      "",
-      "## Structure",
-      "",
-      "- `src/` — source code",
-      "- `dist/` — generated, don't edit",
-      "- Config files (`tsconfig.json`, etc.) are at project root"
-    );
-  } else {
-    sections.push(
-      "",
-      "## Structure",
-      "",
-      "- `src/` — source code",
-      "- `.config/` — configs, don't move",
-      "- `dist/` — generated, don't edit"
     );
   }
 
