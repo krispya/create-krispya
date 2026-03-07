@@ -41,10 +41,20 @@ export function generateAiFiles(
     isMonorepo: !!isMonorepo,
     configStrategy: configStrategy ?? "stealth",
   })
+  const pointer = "See [`AGENTS.md`](./Agents.md) for agent context.\n"
 
-  for (const platform of platforms) {
-    const path = platform === "agents" ? "AGENTS.md" : "CLAUDE.md";
-    files[path] = { type: "text", content };
+  const hasAgents = platforms.includes("agents")
+  const hasClaude = platforms.includes("claude")
+  const isSingleton = platforms.length === 1
+
+  // Create the anchor AGENTS file
+  if (hasAgents) files["AGENTS.md"] = { type: "text", content };
+  
+  // Generate CLAUDE file based on AGENTS file
+  if (isSingleton && hasClaude) {
+    files["CLAUDE.md"] = { type: "text", content };
+  } else {
+    files["CLAUDE.md"] = {type: "text", content: pointer}
   }
 }
 
