@@ -48,10 +48,12 @@ export function generateAiFiles(files: Record<string, File>, params: AiFilesPara
     if (hasAgents) files['AGENTS.md'] = { type: 'text', content };
 
     // Generate CLAUDE file based on AGENTS file
-    if (isSingleton && hasClaude) {
-        files['CLAUDE.md'] = { type: 'text', content };
-    } else {
-        files['CLAUDE.md'] = { type: 'text', content: pointer };
+    if (hasClaude) {
+        if (isSingleton) {
+            files['CLAUDE.md'] = { type: 'text', content };
+        } else {
+            files['CLAUDE.md'] = { type: 'text', content: pointer };
+        }
     }
 }
 
