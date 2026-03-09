@@ -21,6 +21,9 @@
       "require": "./dist/index.cjs"
     }
   },
+  "bin": {
+    "create-krispya": "./dist/cli.mjs"
+  },
   "files": [
     "dist"
   ],
