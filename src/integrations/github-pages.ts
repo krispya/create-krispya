@@ -1,15 +1,16 @@
-import type { GenerateGithubPagesOptions, Generator } from "../types.js";
+import { getPackageManagerName } from '../package-versions.js';
+import type { GenerateGithubPagesOptions, Generator } from '../types.js';
 
 export function generateGithubPages(
-  generator: Generator,
-  options: GenerateGithubPagesOptions | undefined,
+    generator: Generator,
+    options: GenerateGithubPagesOptions | undefined
 ) {
-  if (options === false || (generator.options.packageManager ?? "npm") != "npm") {
-    return;
-  }
-  generator.addFile(".github/workflows/gh-pages.yml", {
-    type: "text",
-    content: `name: Deploy to Github Pages
+    if (options === false || getPackageManagerName(generator.options.packageManager) !== 'npm') {
+        return;
+    }
+    generator.addFile('.github/workflows/gh-pages.yml', {
+        type: 'text',
+        content: `name: Deploy to Github Pages
 
 on:
   push:
@@ -52,14 +53,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 `,
-  });
+    });
 
-  generator.inject("readme-start", `A github pages deployment action is configurd.`);
-  if (generator.options.githubUserName != null && generator.options.githubRepoName != null) {
-    const address = `${generator.options.githubUserName}.github.io/${generator.options.githubRepoName}`;
-    generator.inject(
-      "readme-start",
-      `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`,
-    );
-  }
+    generator.inject('readme-start', `A github pages deployment action is configurd.`);
+    if (generator.options.githubUserName != null && generator.options.githubRepoName != null) {
+        const address = `${generator.options.githubUserName}.github.io/${generator.options.githubRepoName}`;
+        generator.inject(
+            'readme-start',
+            `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`
+        );
+    }
 }

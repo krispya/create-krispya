@@ -1,85 +1,95 @@
 #!/usr/bin/env node
-import { createRequire } from "node:module";
-import { cwd } from "node:process";
-import { dirname, join, resolve } from "node:path";
-import { mkdir, writeFile, readFile, access, unlink } from "node:fs/promises";
-import { constants } from "node:fs";
-import { Command } from "commander";
 import * as p from "@clack/prompts";
 import color from "chalk";
+import { Command } from "commander";
+import { constants } from "node:fs";
+import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { cwd } from "node:process";
 import { fetch } from "undici";
 
-import type { Linter, Formatter } from "./types.js";
+import type {
+  EngineSpec,
+  Formatter,
+  Linter,
+  PackageManagerName,
+  PackageManagerSpec,
+} from "./types.js";
 
 import {
   editorNames,
   getDefaultProjectName,
   openInEditor,
+  promptForInitialPackage,
   promptForOptions,
   promptForPackageOptions,
-  promptForInitialPackage,
   type CliPresets,
 } from "./cli/index.js";
 import {
   clearConfig,
   EditorChoice,
+  getAiPlatforms,
   getConfigPath,
   getPreferredEditor,
   getReuseWindow,
+  setAiPlatforms,
   setPreferredEditor,
   setReuseWindow,
-  getAiPlatforms,
-  setAiPlatforms,
 } from "./config.js";
-import type { AiPlatform } from "./types.js";
 import {
+  AI_PLATFORM_HINTS,
+  AI_PLATFORM_LABELS,
+  ALL_AI_PLATFORMS,
+  generateAiFiles,
+} from "./generators/ai-files.js";
+import {
+  generateEslintConfigPackage,
+  generateOxfmtConfigPackage,
+  generateOxlintConfigPackage,
+  generatePrettierConfigPackage,
+  generateTypescriptConfigPackage,
+  generateVscodeFiles,
+} from "./generators/monorepo.js";
+import {
+  detectTooling,
   generate,
   getBaseTemplate,
-  getLatestNodeVersion,
-  getLatestNpmCliVersion,
-  getLatestNpmVersion,
-  getLatestPnpmVersion,
-  getLatestYarnVersion,
   parseWorkspaceYamlContent,
-  detectTooling,
   validatePackageName,
   type File,
   type GenerateOptions,
   type LibraryBundler,
-  type PackageVersions,
   type ProjectType,
   type Template,
 } from "./index.js";
-import { validateWorkspace } from "./validate.js";
 import {
-  generateTypescriptConfigPackage,
-  generateOxlintConfigPackage,
-  generateEslintConfigPackage,
-  generateOxfmtConfigPackage,
-  generatePrettierConfigPackage,
-  generateVscodeFiles,
-} from "./generators/monorepo.js";
+  getPackageManagerName,
+  getResolvedPackageVersion,
+  parseEngine,
+  parsePackageManager,
+  resolveEngine,
+  resolveMonorepoRootPackageVersions,
+  resolvePackageManager,
+  resolveProjectPackageVersions,
+} from "./package-versions.js";
+import type { AiPlatform } from "./types.js";
 import {
-  generateAiFiles,
-  ALL_AI_PLATFORMS,
-  AI_PLATFORM_LABELS,
-  AI_PLATFORM_HINTS,
-} from "./generators/ai-files.js";
-import {
-  detectCurrentConfig,
-  generateExpectedFiles,
-  compareWithDisk,
-  getWorkspaceConfigUpdates,
-  applyUpdates,
-  formatFileChange,
-  needsMigration,
-  getMigrationPlan,
   applyMigration,
+  applyUpdates,
+  compareWithDisk,
+  detectCurrentConfig,
+  formatFileChange,
   formatMigrationChange,
+  generateExpectedFiles,
+  getMigrationPlan,
+  getWorkspaceConfigUpdates,
+  needsMigration,
   type CategoryUpdate,
   type MigrationTarget,
   type WorkspaceConfig,
 } from "./update.js";
+import { validateWorkspace } from "./validate.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -107,7 +117,7 @@ interface CliOptions {
   pnpmManageVersions?: boolean;
   triplex?: boolean;
   viverse?: boolean;
-  packageManager?: string;
+  packageManager?: PackageManagerName;
   nodeVersion?: string;
   clearConfig?: boolean;
   dir?: string;
@@ -138,15 +148,15 @@ const META_OPTIONS = [
  */
 function hasConfigOptions(options: CliOptions): boolean {
   return Object.keys(options).some(
-    (key) => !META_OPTIONS.includes(key as (typeof META_OPTIONS)[number])
+    (key) => !META_OPTIONS.includes(key as (typeof META_OPTIONS)[number]),
   );
 }
 
 type InheritedWorkspaceSettings = {
   linter?: "oxlint" | "eslint" | "biome";
   formatter?: "oxfmt" | "prettier" | "biome";
-  packageManager?: string;
-  nodeVersion?: string;
+  packageManager?: PackageManagerSpec;
+  engine?: EngineSpec;
   pnpmManageVersions?: boolean;
 };
 
@@ -181,7 +191,7 @@ async function fileExists(path: string): Promise<boolean> {
  * @returns Selected platforms, or empty array to skip
  */
 async function promptForAiPlatforms(
-  isNonInteractive: boolean
+  isNonInteractive: boolean,
 ): Promise<AiPlatform[]> {
   const savedPlatforms = getAiPlatforms();
 
@@ -247,7 +257,7 @@ async function promptForAiPlatforms(
  */
 async function writeGeneratedFiles(
   basePath: string,
-  files: Record<string, File>
+  files: Record<string, File>,
 ): Promise<void> {
   const filePaths = Object.keys(files).sort();
 
@@ -319,7 +329,7 @@ async function detectPackageRoot(): Promise<string | null> {
  * Parses pnpm-workspace.yaml to extract workspace directories.
  */
 async function parseWorkspaceDirectories(
-  monorepoRoot: string
+  monorepoRoot: string,
 ): Promise<string[]> {
   try {
     const workspaceFile = join(monorepoRoot, "pnpm-workspace.yaml");
@@ -335,7 +345,7 @@ async function parseWorkspaceDirectories(
  * Uses standardized detection: scripts → .config/ directories → devDependencies
  */
 async function detectWorkspaceSettings(
-  monorepoRoot: string
+  monorepoRoot: string,
 ): Promise<InheritedWorkspaceSettings> {
   try {
     // Use standardized tooling detection
@@ -345,23 +355,11 @@ async function detectWorkspaceSettings(
     const content = await readFile(pkgPath, "utf-8");
     const pkgJson = JSON.parse(content) as {
       packageManager?: string;
-      engines?: { node?: string };
+      engines?: Record<string, string>;
     };
 
-    // Extract package manager from packageManager field (e.g., "pnpm@9.15.4")
-    let packageManager: string | undefined;
-    if (pkgJson.packageManager) {
-      packageManager = pkgJson.packageManager.split("@")[0];
-    }
-
-    // Extract node version from engines.node (e.g., ">=22.0.0" -> "22")
-    let nodeVersion: string | undefined;
-    if (pkgJson.engines?.node) {
-      const match = pkgJson.engines.node.match(/(\d+)/);
-      if (match) {
-        nodeVersion = match[1];
-      }
-    }
+    const packageManager = parsePackageManager(pkgJson.packageManager);
+    const engine = parseEngine(pkgJson.engines);
 
     // Check pnpm-workspace.yaml for manage-package-manager-versions
     let pnpmManageVersions: boolean | undefined;
@@ -369,7 +367,7 @@ async function detectWorkspaceSettings(
       const workspaceFile = join(monorepoRoot, "pnpm-workspace.yaml");
       const workspaceContent = await readFile(workspaceFile, "utf-8");
       pnpmManageVersions = workspaceContent.includes(
-        "manage-package-manager-versions: true"
+        "manage-package-manager-versions: true",
       );
     } catch {
       // pnpm-workspace.yaml doesn't exist or can't be read
@@ -379,7 +377,7 @@ async function detectWorkspaceSettings(
       linter: tooling.linter,
       formatter: tooling.formatter,
       packageManager,
-      nodeVersion,
+      engine,
       pnpmManageVersions,
     };
   } catch {
@@ -391,7 +389,7 @@ async function detectWorkspaceSettings(
  * Detects existing root config files that may need migration.
  */
 async function detectExistingConfigs(
-  monorepoRoot: string
+  monorepoRoot: string,
 ): Promise<ExistingConfigs> {
   const configs: ExistingConfigs = {};
 
@@ -450,7 +448,7 @@ async function getWorkspacePackages(monorepoRoot: string): Promise<string[]> {
       try {
         const content = await readFile(
           join(packagesDir, entry.name, "package.json"),
-          "utf-8"
+          "utf-8",
         );
         const pkg = JSON.parse(content) as { name?: string };
         if (pkg.name) names.push(pkg.name);
@@ -489,7 +487,7 @@ async function ensureConfigInWorkspace(monorepoRoot: string): Promise<void> {
 
   const lines = content.split("\n");
   const packagesIndex = lines.findIndex((line) =>
-    line.trim().startsWith("packages:")
+    line.trim().startsWith("packages:"),
   );
 
   if (packagesIndex === -1) {
@@ -513,7 +511,7 @@ ${content}`;
  */
 async function migrateEslintConfig(
   monorepoRoot: string,
-  files: Record<string, { type: "text"; content: string }>
+  files: Record<string, { type: "text"; content: string }>,
 ): Promise<void> {
   const configBasePath = ".config/eslint";
   const existingConfigPath = join(monorepoRoot, "eslint.config.js");
@@ -540,7 +538,7 @@ async function migrateEslintConfig(
         },
       },
       null,
-      2
+      2,
     ),
   };
 
@@ -604,7 +602,7 @@ export default [
  */
 async function migratePrettierConfig(
   monorepoRoot: string,
-  files: Record<string, { type: "text"; content: string }>
+  files: Record<string, { type: "text"; content: string }>,
 ): Promise<void> {
   const configBasePath = ".config/prettier";
   const existingConfigPath = join(monorepoRoot, ".prettierrc.json");
@@ -629,7 +627,7 @@ async function migratePrettierConfig(
         },
       },
       null,
-      2
+      2,
     ),
   };
 
@@ -677,9 +675,9 @@ Or in \`package.json\`:
  */
 async function createPackageInWorkspace(
   monorepoRoot: string,
-  packageManager: string,
+  packageManager: PackageManagerName,
   inheritedSettings: InheritedWorkspaceSettings,
-  scope: string
+  scope: string,
 ): Promise<boolean> {
   const workspaceDirectories = await parseWorkspaceDirectories(monorepoRoot);
   const defaultDirectories = ["apps", "packages"];
@@ -732,7 +730,7 @@ async function createPackageInWorkspace(
   const packageOptions = await promptForPackageOptions(
     scopedName,
     packageType,
-    inheritedSettings
+    inheritedSettings,
   );
 
   let targetDir = defaultDir;
@@ -770,87 +768,9 @@ async function createPackageInWorkspace(
   packageOptions.workspaceRoot = workspaceRoot;
   packageOptions.name = scopedName;
 
-  // Fetch package manager versions
-  if (packageManager === "pnpm") {
-    packageOptions.pnpmVersion = await getLatestPnpmVersion();
-  } else if (packageManager === "yarn") {
-    packageOptions.yarnVersion = await getLatestYarnVersion();
-  } else if (packageManager === "npm") {
-    packageOptions.npmVersion = await getLatestNpmCliVersion();
-  }
-
-  const nodeVersion = packageOptions.nodeVersion ?? "latest";
-  if (nodeVersion === "latest") {
-    packageOptions.nodeVersion = await getLatestNodeVersion();
-  }
-
-  // Fetch package versions
-  const versions: PackageVersions = {};
-  const versionPromises: Promise<void>[] = [];
-
-  const pkgIsLibrary = packageOptions.projectType === "library";
-  const pkgTesting =
-    packageOptions.testing ?? (pkgIsLibrary ? "vitest" : "none");
-  if (pkgTesting === "vitest") {
-    versionPromises.push(
-      getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-        versions.vitest = v;
-      })
-    );
-  }
-
-  if (!pkgIsLibrary) {
-    versionPromises.push(
-      getLatestNpmVersion("vite", "6.3.4").then((v) => {
-        versions.vite = v;
-      })
-    );
-  }
-
-  const linter = packageOptions.linter ?? "oxlint";
-  if (linter === "eslint") {
-    versionPromises.push(
-      getLatestNpmVersion("eslint", "9.17.0").then((v) => {
-        versions.eslint = v;
-      })
-    );
-  } else if (linter === "oxlint") {
-    versionPromises.push(
-      getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
-        versions.oxlint = v;
-      })
-    );
-  } else if (linter === "biome") {
-    versionPromises.push(
-      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-        versions.biome = v;
-      })
-    );
-  }
-
-  const formatter = packageOptions.formatter ?? "prettier";
-  if (formatter === "prettier") {
-    versionPromises.push(
-      getLatestNpmVersion("prettier", "3.4.2").then((v) => {
-        versions.prettier = v;
-      })
-    );
-  } else if (formatter === "oxfmt") {
-    versionPromises.push(
-      getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
-        versions.oxfmt = v;
-      })
-    );
-  } else if (formatter === "biome" && linter !== "biome") {
-    versionPromises.push(
-      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-        versions.biome = v;
-      })
-    );
-  }
-
-  await Promise.all(versionPromises);
-  packageOptions.versions = versions;
+  packageOptions.packageManager = await resolvePackageManager(packageOptions);
+  packageOptions.engine = await resolveEngine(packageOptions);
+  packageOptions.versions = await resolveProjectPackageVersions(packageOptions);
 
   // For apps, prompt for workspace dependencies
   const workspacePackages =
@@ -876,7 +796,7 @@ async function createPackageInWorkspace(
     await writeGeneratedFiles(outputPath, files);
 
     spinner.stop(
-      color.green.inverse(` ✓ Package created at ${relativePkgPath}! `)
+      color.green.inverse(` ✓ Package created at ${relativePkgPath}! `),
     );
 
     const addAnother = await p.select({
@@ -932,9 +852,7 @@ async function promptAndOpenEditor(projectPath: string): Promise<void> {
       selectedEditor = openEditor as EditorChoice;
 
       const saveChoice = await p.confirm({
-        message: `Save ${
-          editorNames[selectedEditor] ?? "Skip"
-        } as default editor?`,
+        message: `Save ${editorNames[selectedEditor] ?? "Skip"} as default editor?`,
         initialValue: true,
       });
 
@@ -960,12 +878,12 @@ async function promptAndOpenEditor(projectPath: string): Promise<void> {
       await openInEditor(
         selectedEditor as "cursor" | "code" | "webstorm",
         projectPath,
-        getReuseWindow()
+        getReuseWindow(),
       );
       p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
     } catch {
       p.log.warn(
-        `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
+        `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`,
       );
     }
   }
@@ -1114,7 +1032,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
     const files: Record<string, { type: "text"; content: string }> = {};
 
     const tsConfigExists = await fileExists(
-      join(monorepoRoot, ".config/typescript/package.json")
+      join(monorepoRoot, ".config/typescript/package.json"),
     );
     if (!tsConfigExists) {
       generateTypescriptConfigPackage(files);
@@ -1122,12 +1040,12 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 
     if (linter === "oxlint") {
       const oxlintExists = await fileExists(
-        join(monorepoRoot, ".config/oxlint/package.json")
+        join(monorepoRoot, ".config/oxlint/package.json"),
       );
       if (!oxlintExists) generateOxlintConfigPackage(files);
     } else if (linter === "eslint") {
       const eslintPkgExists = await fileExists(
-        join(monorepoRoot, ".config/eslint/package.json")
+        join(monorepoRoot, ".config/eslint/package.json"),
       );
       if (!eslintPkgExists) {
         if (existingConfigs.eslintConfigPath) {
@@ -1140,12 +1058,12 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 
     if (formatter === "oxfmt") {
       const oxfmtExists = await fileExists(
-        join(monorepoRoot, ".config/oxfmt/package.json")
+        join(monorepoRoot, ".config/oxfmt/package.json"),
       );
       if (!oxfmtExists) generateOxfmtConfigPackage(files);
     } else if (formatter === "prettier") {
       const prettierPkgExists = await fileExists(
-        join(monorepoRoot, ".config/prettier/package.json")
+        join(monorepoRoot, ".config/prettier/package.json"),
       );
       if (!prettierPkgExists) {
         if (existingConfigs.prettierConfigPath) {
@@ -1161,8 +1079,16 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
       (linter === "biome" || formatter === "biome") &&
       !existingConfigs.biomeConfigPath
     ) {
+      const versions = await resolveMonorepoRootPackageVersions({
+        linter,
+        formatter,
+      });
+      const biomeVersion = getResolvedPackageVersion(
+        versions,
+        "@biomejs/biome",
+      );
       const biomeConfig = {
-        $schema: "https://biomejs.dev/schemas/1.9.4/schema.json",
+        $schema: `https://biomejs.dev/schemas/${biomeVersion}/schema.json`,
         vcs: {
           enabled: true,
           clientKind: "git",
@@ -1206,7 +1132,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
     spinner.stop(color.green("✓") + " Workspace fixed!");
 
     const generated = Object.keys(files).filter((f) =>
-      f.endsWith("package.json")
+      f.endsWith("package.json"),
     );
     for (const pkgFile of generated) {
       const pkgName = pkgFile.replace("/package.json", "");
@@ -1215,10 +1141,10 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 
     // VS Code files
     const vscodeSettingsExists = await fileExists(
-      join(monorepoRoot, ".vscode/settings.json")
+      join(monorepoRoot, ".vscode/settings.json"),
     );
     const vscodeExtensionsExists = await fileExists(
-      join(monorepoRoot, ".vscode/extensions.json")
+      join(monorepoRoot, ".vscode/extensions.json"),
     );
     const vscodeExists = vscodeSettingsExists && vscodeExtensionsExists;
 
@@ -1250,7 +1176,7 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 
     // AI rules - check if .ai/ folder exists
     const aiRulesExist = await fileExists(
-      join(monorepoRoot, ".ai/workspace.md")
+      join(monorepoRoot, ".ai/workspace.md"),
     );
 
     if (!aiRulesExist) {
@@ -1292,7 +1218,7 @@ async function handleMigration(
   config: WorkspaceConfig,
   target: MigrationTarget,
   root: string,
-  options: CliOptions
+  options: CliOptions,
 ): Promise<void> {
   const plan = await getMigrationPlan(config, target, root);
 
@@ -1300,14 +1226,12 @@ async function handleMigration(
   console.log(color.cyan("Migration:"));
   if (plan.fromLinter !== plan.toLinter) {
     console.log(
-      `  Linter: ${color.dim(plan.fromLinter)} → ${color.green(plan.toLinter)}`
+      `  Linter: ${color.dim(plan.fromLinter)} → ${color.green(plan.toLinter)}`,
     );
   }
   if (plan.fromFormatter !== plan.toFormatter) {
     console.log(
-      `  Formatter: ${color.dim(plan.fromFormatter)} → ${color.green(
-        plan.toFormatter
-      )}`
+      `  Formatter: ${color.dim(plan.fromFormatter)} → ${color.green(plan.toFormatter)}`,
     );
   }
   console.log();
@@ -1384,7 +1308,7 @@ async function handleMigration(
 
   console.log();
   console.log(
-    color.green("✓") + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`
+    color.green("✓") + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`,
   );
   console.log(color.dim("  Run `pnpm install` to update dependencies"));
   process.exit(0);
@@ -1398,7 +1322,9 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
   const projectRoot = monorepoRoot ?? (await detectPackageRoot());
   if (!projectRoot) {
     console.log(color.red("✗") + " Could not find a project root");
-    console.log(color.dim("  Run this command from inside a generated project"));
+    console.log(
+      color.dim("  Run this command from inside a generated project"),
+    );
     process.exit(1);
   }
   const isMonorepo = monorepoRoot != null;
@@ -1422,7 +1348,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
 
       if (p.isCancel(shouldFix) || !shouldFix) {
         console.log(
-          color.dim("  Run `pnpm create krispya --fix` to fix manually")
+          color.dim("  Run `pnpm create krispya --fix` to fix manually"),
         );
         process.exit(1);
       }
@@ -1441,9 +1367,11 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
   } else if (options.linter || options.formatter) {
     console.log(
       color.yellow("!") +
-        " Linter/formatter migrations in --update are currently monorepo-only"
+        " Linter/formatter migrations in --update are currently monorepo-only",
     );
-    console.log(color.dim("  Continuing with standalone shared config updates"));
+    console.log(
+      color.dim("  Continuing with standalone shared config updates"),
+    );
     console.log();
   }
 
@@ -1462,15 +1390,17 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
 
   console.log(
     color.cyan("Checking for updates...") +
-      color.dim(` (${config.linter}/${config.formatter})`)
+      color.dim(` (${config.linter}/${config.formatter})`),
   );
   console.log();
 
   // Step 4: Generate expected files and compare
-  const expected = generateExpectedFiles(config);
+  const expected = await generateExpectedFiles(config);
   const categories = await compareWithDisk(expected, projectRoot);
 
-  const allCategories = categories.filter((c) => c.category !== "workspace-config");
+  const allCategories = categories.filter(
+    (c) => c.category !== "workspace-config",
+  );
   if (isMonorepo) {
     // Step 4: Add workspace config updates (merge strategy)
     const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot);
@@ -1479,14 +1409,14 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
       label: "Workspace Config",
       changes: workspaceConfigChanges,
       hasUserModifications: workspaceConfigChanges.some(
-        (c) => c.status === "modified"
+        (c) => c.status === "modified",
       ),
     };
 
     // Insert after config-packages
     if (workspaceConfigChanges.length > 0) {
       const configPkgIndex = allCategories.findIndex(
-        (c) => c.category === "config-packages"
+        (c) => c.category === "config-packages",
       );
       if (configPkgIndex !== -1) {
         allCategories.splice(configPkgIndex + 1, 0, workspaceCategory);
@@ -1503,7 +1433,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
   for (const category of allCategories) {
     const newChanges = category.changes.filter((c) => c.status === "added");
     const modifiedChanges = category.changes.filter(
-      (c) => c.status === "modified"
+      (c) => c.status === "modified",
     );
     const hasNew = newChanges.length > 0;
     const hasModified = modifiedChanges.length > 0;
@@ -1519,7 +1449,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
       if (hasNew) {
         console.log(color.cyan(category.label + ":"));
         console.log(
-          color.dim(`  ${newChanges.length} AI file(s) can be added`)
+          color.dim(`  ${newChanges.length} AI file(s) can be added`),
         );
         console.log();
 
@@ -1534,7 +1464,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
         if (!p.isCancel(applyAi) && applyAi) {
           await applyUpdates(newChanges, projectRoot);
           console.log(
-            color.green("✓") + ` Added ${newChanges.length} AI file(s)`
+            color.green("✓") + ` Added ${newChanges.length} AI file(s)`,
           );
           updatedCount++;
         } else {
@@ -1616,7 +1546,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
 
       if (selectedFiles.length > 0) {
         changesToApply = allChanges.filter((c) =>
-          selectedFiles.includes(c.path)
+          selectedFiles.includes(c.path),
         );
       }
     } else if (hasNew) {
@@ -1666,10 +1596,10 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
     if (changesToApply.length > 0) {
       await applyUpdates(changesToApply, projectRoot);
       const addedCount = changesToApply.filter(
-        (c) => c.status === "added"
+        (c) => c.status === "added",
       ).length;
       const updatedFilesCount = changesToApply.filter(
-        (c) => c.status === "modified"
+        (c) => c.status === "modified",
       ).length;
       const parts = [];
       if (addedCount > 0) parts.push(`added ${addedCount}`);
@@ -1689,9 +1619,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
   } else if (updatedCount > 0) {
     console.log(
       color.green("✓") +
-        ` Updated ${updatedCount} ${
-          updatedCount === 1 ? "category" : "categories"
-        }`
+        ` Updated ${updatedCount} ${updatedCount === 1 ? "category" : "categories"}`,
     );
     if (skippedCount > 0) {
       console.log(color.dim(`  Skipped ${skippedCount}`));
@@ -1706,24 +1634,25 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
  */
 async function handleWorkspaceCommand(
   name: string,
-  options: CliOptions
+  options: CliOptions,
 ): Promise<void> {
   const monorepoRoot = await detectMonorepoRoot();
   if (!monorepoRoot) {
     console.error(
-      color.red("Error:") + " --workspace flag requires being inside a monorepo"
+      color.red("Error:") +
+        " --workspace flag requires being inside a monorepo",
     );
     process.exit(1);
   }
 
   if (!name) {
     console.error(
-      color.red("Error:") + " Package name is required with --workspace flag"
+      color.red("Error:") + " Package name is required with --workspace flag",
     );
     console.log(
       color.dim(
-        "  Example: pnpm create krispya my-lib --workspace --type library"
-      )
+        "  Example: pnpm create krispya my-lib --workspace --type library",
+      ),
     );
     process.exit(1);
   }
@@ -1743,34 +1672,23 @@ async function handleWorkspaceCommand(
   try {
     await access(fullPackagePath, constants.F_OK);
     console.error(
-      color.red("Error:") + ` Directory ${targetDir}/${name} already exists`
+      color.red("Error:") + ` Directory ${targetDir}/${name} already exists`,
     );
     process.exit(1);
   } catch {
     // Directory doesn't exist, which is what we want
   }
 
-  // Fetch versions
-  const versions: PackageVersions = {};
-  const versionPromises: Promise<void>[] = [];
-
-  const isLibrary = projectType === "library";
-  if (!isLibrary) {
-    versionPromises.push(
-      getLatestNpmVersion("vite", "6.3.4").then((v) => {
-        versions.vite = v;
-      })
-    );
-  }
-
   const linter = inheritedSettings.linter ?? options.linter ?? "oxlint";
   const formatter =
     inheritedSettings.formatter ?? options.formatter ?? "prettier";
-  const packageManager = inheritedSettings.packageManager ?? "pnpm";
-  const nodeVersion = inheritedSettings.nodeVersion ?? "latest";
+  const packageManager = inheritedSettings.packageManager?.name ?? "pnpm";
+  const engine = inheritedSettings.engine ?? {
+    name: "node",
+    version: "latest",
+  };
   const pnpmManageVersions = inheritedSettings.pnpmManageVersions ?? true;
-
-  await Promise.all(versionPromises);
+  const isLibrary = projectType === "library";
 
   const relativePkgPath = join(targetDir, name);
   const workspaceRoot = calculateWorkspaceRoot(relativePkgPath);
@@ -1778,15 +1696,14 @@ async function handleWorkspaceCommand(
   const generateOptions: GenerateOptions = {
     name: scopedName,
     projectType,
-    libraryBundler: isLibrary ? options.bundler ?? "unbuild" : undefined,
+    libraryBundler: isLibrary ? (options.bundler ?? "unbuild") : undefined,
     template,
     linter,
     formatter,
-    packageManager,
-    nodeVersion,
+    packageManager: { name: packageManager },
+    engine,
     pnpmManageVersions,
     workspaceRoot,
-    versions,
     ...(baseTemplate === "r3f" && {
       drei: options.drei ? {} : undefined,
       handle: options.handle ? {} : undefined,
@@ -1803,8 +1720,13 @@ async function handleWorkspaceCommand(
     }),
   };
 
+  generateOptions.packageManager = await resolvePackageManager(generateOptions);
+  generateOptions.engine = await resolveEngine(generateOptions);
+  generateOptions.versions =
+    await resolveProjectPackageVersions(generateOptions);
+
   console.log(
-    color.cyan("Creating") + ` ${scopedName} in ${targetDir}/${name}...`
+    color.cyan("Creating") + ` ${scopedName} in ${targetDir}/${name}...`,
   );
 
   try {
@@ -1812,7 +1734,7 @@ async function handleWorkspaceCommand(
     await writeGeneratedFiles(fullPackagePath, files);
 
     console.log(
-      color.green("✓") + ` Created ${scopedName} at ${targetDir}/${name}`
+      color.green("✓") + ` Created ${scopedName} at ${targetDir}/${name}`,
     );
     process.exit(0);
   } catch (error) {
@@ -1827,23 +1749,18 @@ async function handleWorkspaceCommand(
  */
 async function handleMonorepoCreation(
   generateOptions: GenerateOptions,
-  isNonInteractive: boolean
+  isNonInteractive: boolean,
 ): Promise<void> {
   const { generateMonorepo } = await import("./generators/monorepo.js");
 
-  const packageManager = generateOptions.packageManager || "pnpm";
-  if (packageManager === "pnpm") {
-    generateOptions.pnpmVersion = await getLatestPnpmVersion();
-  } else if (packageManager === "yarn") {
-    generateOptions.yarnVersion = await getLatestYarnVersion();
-  } else if (packageManager === "npm") {
-    generateOptions.npmVersion = await getLatestNpmCliVersion();
-  }
-
-  const nodeVersion = generateOptions.nodeVersion ?? "latest";
-  if (nodeVersion === "latest") {
-    generateOptions.nodeVersion = await getLatestNodeVersion();
-  }
+  const packageManager = getPackageManagerName(generateOptions.packageManager);
+  generateOptions.packageManager = await resolvePackageManager(generateOptions);
+  generateOptions.engine = await resolveEngine(generateOptions);
+  generateOptions.versions = await resolveMonorepoRootPackageVersions({
+    linter: generateOptions.linter ?? "oxlint",
+    formatter: generateOptions.formatter ?? "prettier",
+    versions: generateOptions.versions,
+  });
 
   // Prompt for AI platforms
   const aiPlatforms = await promptForAiPlatforms(isNonInteractive);
@@ -1857,10 +1774,12 @@ async function handleMonorepoCreation(
       name: generateOptions.name,
       linter: generateOptions.linter ?? "oxlint",
       formatter: generateOptions.formatter ?? "prettier",
-      packageManager,
-      pnpmVersion: generateOptions.pnpmVersion,
+      packageManager: generateOptions.packageManager ?? {
+        name: packageManager,
+      },
       pnpmManageVersions: generateOptions.pnpmManageVersions,
-      nodeVersion: generateOptions.nodeVersion,
+      engine: generateOptions.engine,
+      versions: generateOptions.versions,
       aiPlatforms: aiPlatforms.length > 0 ? aiPlatforms : undefined,
     });
 
@@ -1885,8 +1804,10 @@ async function handleMonorepoCreation(
     const newWorkspaceSettings: InheritedWorkspaceSettings = {
       linter: generateOptions.linter,
       formatter: generateOptions.formatter,
-      packageManager,
-      nodeVersion: generateOptions.nodeVersion,
+      packageManager: generateOptions.packageManager ?? {
+        name: packageManager,
+      },
+      engine: generateOptions.engine,
       pnpmManageVersions: generateOptions.pnpmManageVersions,
     };
 
@@ -1898,7 +1819,7 @@ async function handleMonorepoCreation(
         projectPath,
         packageManager,
         newWorkspaceSettings,
-        scope
+        scope,
       );
     }
 
@@ -1926,17 +1847,19 @@ async function handleMonorepoCreation(
  */
 async function handleStandaloneProjectCreation(
   generateOptions: GenerateOptions,
-  isNonInteractive: boolean
+  isNonInteractive: boolean,
 ): Promise<void> {
   const base = generateOptions.template
     ? getBaseTemplate(generateOptions.template)
     : "vanilla";
+
   const defaultFallbackName =
     base === "vanilla"
       ? "vanilla-app"
       : base === "react"
-      ? "react-app"
-      : "react-three-app";
+        ? "react-app"
+        : "react-three-app";
+
   generateOptions.name ??= defaultFallbackName;
 
   // Prompt for AI platforms
@@ -1945,87 +1868,21 @@ async function handleStandaloneProjectCreation(
     generateOptions.aiPlatforms = aiPlatforms;
   }
 
-  const packageManager = generateOptions.packageManager || "pnpm";
-  if (packageManager === "pnpm") {
-    generateOptions.pnpmVersion = await getLatestPnpmVersion();
-  } else if (packageManager === "yarn") {
-    generateOptions.yarnVersion = await getLatestYarnVersion();
-  } else if (packageManager === "npm") {
-    generateOptions.npmVersion = await getLatestNpmCliVersion();
-  }
-
-  const nodeVersion = generateOptions.nodeVersion ?? "latest";
-  if (nodeVersion === "latest") {
-    generateOptions.nodeVersion = await getLatestNodeVersion();
-  }
-
-  // Fetch latest package versions in parallel
-  const versions: PackageVersions = {};
-  const versionPromises: Promise<void>[] = [];
-
+  /**
+   * Resolve: All of the user's settings are resolved into one options object
+   * with the latest package versions from NPM.
+   */
+  const packageManager = getPackageManagerName(generateOptions.packageManager);
   const isLibrary = generateOptions.projectType === "library";
-  const testing = generateOptions.testing ?? (isLibrary ? "vitest" : "none");
-  if (testing === "vitest") {
-    versionPromises.push(
-      getLatestNpmVersion("vitest", "4.0.0").then((v) => {
-        versions.vitest = v;
-      })
-    );
-  }
 
-  if (!isLibrary) {
-    versionPromises.push(
-      getLatestNpmVersion("vite", "6.3.4").then((v) => {
-        versions.vite = v;
-      })
-    );
-  }
+  generateOptions.packageManager = await resolvePackageManager(generateOptions);
+  generateOptions.engine = await resolveEngine(generateOptions);
+  generateOptions.versions =
+    await resolveProjectPackageVersions(generateOptions);
 
-  const linter = generateOptions.linter ?? "oxlint";
-  if (linter === "eslint") {
-    versionPromises.push(
-      getLatestNpmVersion("eslint", "9.17.0").then((v) => {
-        versions.eslint = v;
-      })
-    );
-  } else if (linter === "oxlint") {
-    versionPromises.push(
-      getLatestNpmVersion("oxlint", "0.16.0").then((v) => {
-        versions.oxlint = v;
-      })
-    );
-  } else if (linter === "biome") {
-    versionPromises.push(
-      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-        versions.biome = v;
-      })
-    );
-  }
-
-  const formatter = generateOptions.formatter ?? "prettier";
-  if (formatter === "prettier") {
-    versionPromises.push(
-      getLatestNpmVersion("prettier", "3.4.2").then((v) => {
-        versions.prettier = v;
-      })
-    );
-  } else if (formatter === "oxfmt") {
-    versionPromises.push(
-      getLatestNpmVersion("oxfmt", "0.1.0").then((v) => {
-        versions.oxfmt = v;
-      })
-    );
-  } else if (formatter === "biome" && linter !== "biome") {
-    versionPromises.push(
-      getLatestNpmVersion("@biomejs/biome", "1.9.4").then((v) => {
-        versions.biome = v;
-      })
-    );
-  }
-
-  await Promise.all(versionPromises);
-  generateOptions.versions = versions;
-
+  /**
+   * Render: Create files from the resolved options
+   */
   const projectPath = join(cwd(), generateOptions.name);
   const spinner = p.spinner();
   spinner.start("Creating project...");
@@ -2037,9 +1894,7 @@ async function handleStandaloneProjectCreation(
     spinner.stop(color.green.inverse(" ✓ Project created! "));
 
     // In non-interactive mode, just exit
-    if (isNonInteractive) {
-      process.exit(0);
-    }
+    if (isNonInteractive) process.exit(0);
 
     const nextSteps = isLibrary
       ? [
@@ -2069,7 +1924,7 @@ async function handleStandaloneProjectCreation(
  * Handles interactive mode when inside a monorepo.
  */
 async function handleInteractiveMonorepoMode(
-  monorepoRoot: string
+  monorepoRoot: string,
 ): Promise<void> {
   const choice = await p.select({
     message: "Detected monorepo workspace",
@@ -2094,7 +1949,7 @@ async function handleInteractiveMonorepoMode(
         inheritedSettings.formatter &&
           `formatter: ${inheritedSettings.formatter}`,
         inheritedSettings.packageManager &&
-          `pm: ${inheritedSettings.packageManager}`,
+          `pm: ${inheritedSettings.packageManager.name}`,
       ]
         .filter(Boolean)
         .join(", ");
@@ -2107,15 +1962,15 @@ async function handleInteractiveMonorepoMode(
     while (addMore) {
       addMore = await createPackageInWorkspace(
         monorepoRoot,
-        inheritedSettings.packageManager ?? "pnpm",
+        inheritedSettings.packageManager?.name ?? "pnpm",
         inheritedSettings,
-        scope
+        scope,
       );
     }
 
     p.note(
       [`cd ${monorepoRoot}`, "pnpm install", "pnpm run dev"].join("\n"),
-      "Next steps"
+      "Next steps",
     );
 
     await promptAndOpenEditor(monorepoRoot);
@@ -2134,25 +1989,25 @@ async function main() {
   const program = new Command()
     .name("create-krispya")
     .description(
-      "CLI for creating Vanilla, React, and React Three Fiber projects"
+      "CLI for creating Vanilla, React, and React Three Fiber projects",
     )
     .argument("[name]", "name for the project")
     .option("--type <type>", "project type: app or library (default: app)")
     .option(
       "--bundler <bundler>",
-      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)"
+      "library bundler: unbuild or tsdown (default: unbuild, only for libraries)",
     )
     .option(
       "--template <type>",
-      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)"
+      "project template: vanilla, vanilla-js, react, react-js, r3f, r3f-js (default: vanilla)",
     )
     .option(
       "--linter <type>",
-      "linter: eslint, oxlint, or biome (default: oxlint)"
+      "linter: eslint, oxlint, or biome (default: oxlint)",
     )
     .option(
       "--formatter <type>",
-      "formatter: prettier, oxfmt, or biome (default: prettier)"
+      "formatter: prettier, oxfmt, or biome (default: prettier)",
     )
     .option("--drei", "add @react-three/drei (r3f only)")
     .option("--handle", "add @react-three/handle (r3f only)")
@@ -2168,40 +2023,40 @@ async function main() {
     .option("--viverse", "set up viverse deployment (r3f only)")
     .option(
       "--package-manager <manager>",
-      "specify package manager (e.g. npm, yarn, pnpm)"
+      "specify package manager (e.g. npm, yarn, pnpm)",
     )
     .option(
       "--pnpm-manage-versions",
-      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)"
+      "enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)",
     )
     .option(
       "--no-pnpm-manage-versions",
-      "disable manage-package-manager-versions in pnpm-workspace.yaml"
+      "disable manage-package-manager-versions in pnpm-workspace.yaml",
     )
     .option(
       "--node-version <version>",
-      'set Node.js version for engines.node field (default: "latest")'
+      'set Node.js version for engines.node field (default: "latest")',
     )
     .option(
       "--workspace",
-      "Add package to current monorepo workspace (non-interactive)"
+      "Add package to current monorepo workspace (non-interactive)",
     )
     .option(
       "--dir <directory>",
-      "Target directory for --workspace (default: apps/ or packages/)"
+      "Target directory for --workspace (default: apps/ or packages/)",
     )
     .option("--clear-config", "Clear saved preferences (e.g. editor choice)")
     .option("--config-path", "Print the path to the config file")
     .option(
       "--check",
-      "Check if current directory is in a valid monorepo workspace"
+      "Check if current directory is in a valid monorepo workspace",
     )
     .option("--fix", "Fix monorepo by generating missing .config packages")
     .option("--update", "Update monorepo workspace to latest configuration")
     .option("-y, --yes", "Non-interactive mode - accept all prompts")
     .option(
       "--path <directory>",
-      "Run in specified directory instead of current working directory"
+      "Run in specified directory instead of current working directory",
     )
     .action(async (name: string | undefined, options: CliOptions) => {
       // Change working directory if --path is provided
@@ -2277,8 +2132,8 @@ async function main() {
         console.error(color.red("Error:") + " --dir requires --workspace flag");
         console.log(
           color.dim(
-            "  Example: pnpm create krispya my-lib --workspace --dir examples"
-          )
+            "  Example: pnpm create krispya my-lib --workspace --dir examples",
+          ),
         );
         process.exit(1);
       }
@@ -2313,7 +2168,7 @@ async function main() {
           projectType,
           libraryBundler:
             projectType === "library"
-              ? options.bundler ?? "unbuild"
+              ? (options.bundler ?? "unbuild")
               : undefined,
           template,
           linter: options.linter ?? "oxlint",
@@ -2332,9 +2187,11 @@ async function main() {
             viverse: options.viverse ? {} : undefined,
             triplex: options.triplex ? {} : undefined,
           }),
-          packageManager: options.packageManager,
+          packageManager: options.packageManager
+            ? { name: options.packageManager }
+            : undefined,
           pnpmManageVersions: options.pnpmManageVersions,
-          nodeVersion: options.nodeVersion ?? "latest",
+          engine: { name: "node", version: options.nodeVersion ?? "latest" },
         };
       } else {
         // Interactive mode: build presets from CLI flags to pre-fill prompts
@@ -2346,7 +2203,9 @@ async function main() {
               linter: options.linter,
               formatter: options.formatter,
               packageManager: options.packageManager,
-              nodeVersion: options.nodeVersion,
+              engine: options.nodeVersion
+                ? { name: "node", version: options.nodeVersion }
+                : undefined,
               pnpmManageVersions: options.pnpmManageVersions,
               drei: options.drei,
               handle: options.handle,
@@ -2371,7 +2230,10 @@ async function main() {
       if (generateOptions.projectType === "monorepo") {
         await handleMonorepoCreation(generateOptions, isNonInteractive);
       } else {
-        await handleStandaloneProjectCreation(generateOptions, isNonInteractive);
+        await handleStandaloneProjectCreation(
+          generateOptions,
+          isNonInteractive,
+        );
       }
     });
 

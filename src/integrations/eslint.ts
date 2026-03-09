@@ -1,110 +1,109 @@
-import { defaultLinterConfig } from "../constants.js";
-import { getBaseTemplate, getLanguageFromTemplate, type Generator } from "../types.js";
+import { defaultLinterConfig } from '../constants.js';
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../types.js';
 
 export type GenerateEslintOptions = {} | boolean;
 
 // Helper to convert level to eslint format
-function toEslintLevel(level: "off" | "warn" | "error"): string {
-  return level;
+function toEslintLevel(level: 'off' | 'warn' | 'error'): string {
+    return level;
 }
 
 export function generateEslint(generator: Generator, options: GenerateEslintOptions | undefined) {
-  if (options == null) {
-    return;
-  }
+    if (options == null) {
+        return;
+    }
 
-  const version = generator.versions.eslint ?? "9.17.0";
-  generator.addDevDependency("eslint", `^${version}`);
+    generator.addDevDependency('eslint');
 
-  // Add eslint flat config
-  const template = generator.options.template ?? "vanilla";
-  const baseTemplate = getBaseTemplate(template);
-  const isTypescript = getLanguageFromTemplate(template) === "typescript";
-  const isReact = baseTemplate === "react" || baseTemplate === "r3f";
+    // Add eslint flat config
+    const template = generator.options.template ?? 'vanilla';
+    const baseTemplate = getBaseTemplate(template);
+    const isTypescript = getLanguageFromTemplate(template) === 'typescript';
+    const isReact = baseTemplate === 'react' || baseTemplate === 'r3f';
 
-  const { rules } = defaultLinterConfig;
+    const { rules } = defaultLinterConfig;
 
-  const imports: string[] = ['import js from "@eslint/js"'];
-  const configs: string[] = ["js.configs.recommended"];
+    const imports: string[] = ['import js from "@eslint/js"'];
+    const configs: string[] = ['js.configs.recommended'];
 
-  if (isTypescript) {
-    generator.addDevDependency("typescript-eslint", "^8.18.0");
-    imports.push('import tseslint from "typescript-eslint"');
-    configs.push("...tseslint.configs.recommended");
-  }
+    if (isTypescript) {
+        generator.addDevDependency('typescript-eslint');
+        imports.push('import tseslint from "typescript-eslint"');
+        configs.push('...tseslint.configs.recommended');
+    }
 
-  if (isReact) {
-    generator.addDevDependency("eslint-plugin-react-hooks", "^5.1.0");
-    imports.push('import reactHooks from "eslint-plugin-react-hooks"');
-  }
+    if (isReact) {
+        generator.addDevDependency('eslint-plugin-react-hooks');
+        imports.push('import reactHooks from "eslint-plugin-react-hooks"');
+    }
 
-  // Build ignore patterns string
-  const ignoresArray = JSON.stringify(defaultLinterConfig.ignorePatterns);
+    // Build ignore patterns string
+    const ignoresArray = JSON.stringify(defaultLinterConfig.ignorePatterns);
 
-  // Build rules object - use @typescript-eslint/no-unused-vars for TS projects
-  const unusedVarsRule = isTypescript ? "@typescript-eslint/no-unused-vars" : "no-unused-vars";
-  const rulesConfig = {
-    [unusedVarsRule]: [
-      toEslintLevel(rules.noUnusedVars.level),
-      {
-        argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
-        varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
-        caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
-      },
-    ],
-    "no-unused-expressions": [
-      toEslintLevel(rules.noUnusedExpressions.level),
-      { allowShortCircuit: rules.noUnusedExpressions.allowShortCircuit },
-    ],
-  };
+    // Build rules object - use @typescript-eslint/no-unused-vars for TS projects
+    const unusedVarsRule = isTypescript ? '@typescript-eslint/no-unused-vars' : 'no-unused-vars';
+    const rulesConfig = {
+        [unusedVarsRule]: [
+            toEslintLevel(rules.noUnusedVars.level),
+            {
+                argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
+                varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
+                caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+            },
+        ],
+        'no-unused-expressions': [
+            toEslintLevel(rules.noUnusedExpressions.level),
+            { allowShortCircuit: rules.noUnusedExpressions.allowShortCircuit },
+        ],
+    };
 
-  const rulesString = JSON.stringify(rulesConfig, null, 4).replace(/\n/g, "\n    ");
+    const rulesString = JSON.stringify(rulesConfig, null, 4).replace(/\n/g, '\n    ');
 
-  const configContent = [
-    ...imports,
-    "",
-    "export default [",
-    `  { ignores: ${ignoresArray} },`,
-    `  ${configs.join(",\n  ")},`,
-    isReact
-      ? `  {
+    const configContent = [
+        ...imports,
+        '',
+        'export default [',
+        `  { ignores: ${ignoresArray} },`,
+        `  ${configs.join(',\n  ')},`,
+        isReact
+            ? `  {
     plugins: {
       "react-hooks": reactHooks,
     },
     rules: reactHooks.configs.recommended.rules,
   },`
-      : "",
-    `  {
+            : '',
+        `  {
     rules: ${rulesString},
   },`,
-    "]",
-  ]
-    .filter(Boolean)
-    .join("\n");
+        ']',
+    ]
+        .filter(Boolean)
+        .join('\n');
 
-  const isStealth = generator.isStealthConfig();
+    const isStealth = generator.isStealthConfig();
 
-  if (isStealth) {
-    generator.addFile(".config/eslint.config.js", {
-      type: "text",
-      content: configContent,
-    });
-    generator.addScript("lint", "eslint --config .config/eslint.config.js .");
-    generator.addVscodeSetting("eslint.options", {
-      overrideConfigFile: ".config/eslint.config.js",
-    });
-  } else {
-    generator.addFile("eslint.config.js", {
-      type: "text",
-      content: configContent,
-    });
-    generator.addScript("lint", "eslint .");
-  }
+    if (isStealth) {
+        generator.addFile('.config/eslint.config.js', {
+            type: 'text',
+            content: configContent,
+        });
+        generator.addScript('lint', 'eslint --config .config/eslint.config.js .');
+        generator.addVscodeSetting('eslint.options', {
+            overrideConfigFile: '.config/eslint.config.js',
+        });
+    } else {
+        generator.addFile('eslint.config.js', {
+            type: 'text',
+            content: configContent,
+        });
+        generator.addScript('lint', 'eslint .');
+    }
 
-  generator.inject(
-    "readme-tools",
-    "[ESLint](https://eslint.org/) - Linter for JavaScript and TypeScript",
-  );
-  generator.inject("vscode-extension-suggestion", "dbaeumer.vscode-eslint");
-  generator.addVscodeSetting("eslint.enable", true);
+    generator.inject(
+        'readme-tools',
+        '[ESLint](https://eslint.org/) - Linter for JavaScript and TypeScript'
+    );
+    generator.inject('vscode-extension-suggestion', 'dbaeumer.vscode-eslint');
+    generator.addVscodeSetting('eslint.enable', true);
 }

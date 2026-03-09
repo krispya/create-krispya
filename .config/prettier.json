@@ -10,31 +10,20 @@
   "arrowParens": "always",
   "overrides": [
     {
-      "files": [
-        "*.json",
-        "**/*.json"
-      ],
+      "files": ["*.json", "**/*.json"],
       "options": {
         "tabWidth": 2
       }
     },
     {
-      "files": [
-        "*.md",
-        "**/*.md"
-      ],
+      "files": ["*.md", "**/*.md"],
       "options": {
         "tabWidth": 2,
         "semi": false
       }
     },
     {
-      "files": [
-        "*.yml",
-        "*.yaml",
-        "**/*.yml",
-        "**/*.yaml"
-      ],
+      "files": ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
       "options": {
         "tabWidth": 2,
         "semi": false

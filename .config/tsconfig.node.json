@@ -4,9 +4,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": [
-      "ESNext"
-    ],
+    "lib": ["ESNext"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
@@ -15,8 +13,5 @@
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true
   },
-  "include": [
-    "../*.config.ts",
-    "./*.ts"
-  ]
+  "include": ["../*.config.ts", "./*.ts"]
 }

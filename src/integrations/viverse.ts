@@ -1,13 +1,14 @@
-import type { GenerateViverseOptions, Generator } from "../types.js";
+import { getPackageManagerName } from '../package-versions.js';
+import type { GenerateViverseOptions, Generator } from '../types.js';
 
 export function generateViverse(generator: Generator, options: GenerateViverseOptions | undefined) {
-  if (options == null || (generator.options.packageManager ?? "npm") != "npm") {
-    return;
-  }
+    if (options == null || getPackageManagerName(generator.options.packageManager) !== 'npm') {
+        return;
+    }
 
-  generator.addFile(".github/workflows/viverse.yml", {
-    type: "text",
-    content: `name: Deploy to Viverse
+    generator.addFile('.github/workflows/viverse.yml', {
+        type: 'text',
+        content: `name: Deploy to Viverse
 
 on:
   push:
@@ -59,13 +60,13 @@ jobs:
         run: npx viverse-cli app publish ./dist --auto-create-app --name ${generator.options.name}
 
 `,
-  });
+    });
 
-  generator.addDependency("@viverse/cli", "^0.9.5-beta.8");
+    generator.addDependency('@viverse/cli');
 
-  generator.inject(
-    "readme-start",
-    `A GitHub CI/CD workflow for publishing to Viverse is configured.
+    generator.inject(
+        'readme-start',
+        `A GitHub CI/CD workflow for publishing to Viverse is configured.
 
 To use publish to viverse via the CI/CD workflow:
 1. Set \`VIVERSE_EMAIL\` and \`VIVERSE_PASSWORD\` secrets in your repository settings under \`Secrets and Variables\` > \`Actions\` > \`New repository secret\`
@@ -77,6 +78,6 @@ You can also upload your project manually using the Viverse CLI:
 viverse-cli auth login -e <email> -p <password>
 npm run build
 viverse-cli app publish ./dist --auto-create-app --name ${generator.options.name}
-\`\`\`\n`,
-  );
+\`\`\`\n`
+    );
 }

@@ -1,33 +1,33 @@
-import type { GenerateXrOptions, Generator } from "../types.js";
+import type { GenerateXrOptions, Generator } from '../types.js';
 
 export function generateXr(generator: Generator, options: GenerateXrOptions | undefined) {
-  if (options == null || options === false) {
-    return;
-  }
-  if (options === true) {
-    options = {};
-  }
-  generator.addDependency("@react-three/xr", "^6.6.16");
-  generator.addDependency("@vitejs/plugin-basic-ssl", "^2.0.0");
-  generator.inject("import", "import { XR, createXRStore } from '@react-three/xr'");
-  generator.inject(
-    `global-start`,
-    `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`,
-  );
-  generator.inject("scene-start", "<XR store={store}>");
-  generator.inject("scene-end", "</XR>");
+    if (options == null || options === false) {
+        return;
+    }
+    if (options === true) {
+        options = {};
+    }
+    generator.addDependency('@react-three/xr');
+    generator.addDependency('@vitejs/plugin-basic-ssl');
+    generator.inject('import', "import { XR, createXRStore } from '@react-three/xr'");
+    generator.inject(
+        `global-start`,
+        `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`
+    );
+    generator.inject('scene-start', '<XR store={store}>');
+    generator.inject('scene-end', '</XR>');
 
-  generator.inject("vite-config-import", "import basicSsl from '@vitejs/plugin-basic-ssl'");
-  generator.configureVite({
-    server: {
-      host: true,
-    },
-    plugins: ["$raw:basicSsl()"],
-  });
+    generator.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl'");
+    generator.configureVite({
+        server: {
+            host: true,
+        },
+        plugins: ['$raw:basicSsl()'],
+    });
 
-  generator.inject(
-    "dom-start",
-    `<div style={{
+    generator.inject(
+        'dom-start',
+        `<div style={{
         display: "flex",
           flexDirection: "row",
           gap: "1rem",
@@ -55,10 +55,10 @@ export function generateXr(generator: Generator, options: GenerateXrOptions | un
         onClick={() => store.enterVR()}
       >
         Enter VR
-      </button></div>`,
-  );
-  generator.inject(
-    "readme-libraries",
-    `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`,
-  );
+      </button></div>`
+    );
+    generator.inject(
+        'readme-libraries',
+        `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`
+    );
 }

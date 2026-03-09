@@ -1,129 +1,119 @@
-import { defaultFormatterConfig, defaultLinterConfig } from "../constants.js";
-import type { Generator } from "../types.js";
+import { defaultFormatterConfig, defaultLinterConfig } from '../constants.js';
+import type { Generator } from '../types.js';
 
 export type GenerateBiomeOptions = {
-  /** Whether biome is used as a linter */
-  linter?: boolean;
-  /** Whether biome is used as a formatter */
-  formatter?: boolean;
+    /** Whether biome is used as a linter */
+    linter?: boolean;
+    /** Whether biome is used as a formatter */
+    formatter?: boolean;
 };
 
 // Helper to convert level to Biome format
-function toBiomeLevel(level: "off" | "warn" | "error"): string {
-  return level;
+function toBiomeLevel(level: 'off' | 'warn' | 'error'): string {
+    return level;
 }
 
-export function generateBiome(
-  generator: Generator,
-  options: GenerateBiomeOptions | undefined
-) {
-  if (options == null || (!options.linter && !options.formatter)) {
-    return;
-  }
+export function generateBiome(generator: Generator, options: GenerateBiomeOptions | undefined) {
+    if (options == null || (!options.linter && !options.formatter)) {
+        return;
+    }
 
-  const version = generator.versions.biome ?? "2.0.0";
-  generator.addDevDependency("@biomejs/biome", `^${version}`);
+    const version = generator.getVersion('@biomejs/biome');
+    generator.addDevDependency('@biomejs/biome');
 
-  const { rules } = defaultLinterConfig;
+    const { rules } = defaultLinterConfig;
 
-  // Build biome config based on roles
-  // Note: Biome v2 ignores dist/node_modules by default, no need to specify
-  const biomeConfig: Record<string, unknown> = {
-    $schema: `https://biomejs.dev/schemas/${version}/schema.json`,
-  };
-
-  if (options.linter) {
-    biomeConfig.linter = {
-      enabled: true,
-      rules: {
-        recommended: true,
-        correctness: {
-          noUnusedVariables: toBiomeLevel(rules.noUnusedVars.level),
-        },
-      },
+    // Build biome config based on roles
+    // Note: Biome v2 ignores dist/node_modules by default, no need to specify
+    const biomeConfig: Record<string, unknown> = {
+        $schema: `https://biomejs.dev/schemas/${version}/schema.json`,
     };
-  } else {
-    biomeConfig.linter = {
-      enabled: false,
-    };
-  }
 
-  if (options.formatter) {
-    // Translate common formatter settings to Biome format
-    biomeConfig.formatter = {
-      enabled: true,
-      lineWidth: defaultFormatterConfig.printWidth,
-      indentWidth: defaultFormatterConfig.tabWidth,
-      indentStyle: defaultFormatterConfig.useTabs ? "tab" : "space",
-    };
-    biomeConfig.javascript = {
-      formatter: {
-        semicolons: defaultFormatterConfig.semi ? "always" : "asNeeded",
-        quoteStyle: defaultFormatterConfig.singleQuote ? "single" : "double",
-        trailingCommas: defaultFormatterConfig.trailingComma,
-        bracketSpacing: defaultFormatterConfig.bracketSpacing,
-        arrowParentheses:
-          defaultFormatterConfig.arrowParens === "always"
-            ? "always"
-            : "asNeeded",
-      },
-    };
-    // JSON uses 2-space indentation
-    biomeConfig.json = {
-      formatter: {
-        indentWidth: 2,
-      },
-    };
-  } else {
-    biomeConfig.formatter = {
-      enabled: false,
-    };
-  }
-
-  const isStealth = generator.isStealthConfig();
-
-  if (isStealth) {
-    generator.addFile(".config/biome.json", {
-      type: "text",
-      content: JSON.stringify(biomeConfig, null, 2),
-    });
     if (options.linter) {
-      generator.addScript("lint", "biome lint --config-path .config .");
+        biomeConfig.linter = {
+            enabled: true,
+            rules: {
+                recommended: true,
+                correctness: {
+                    noUnusedVariables: toBiomeLevel(rules.noUnusedVars.level),
+                },
+            },
+        };
+    } else {
+        biomeConfig.linter = {
+            enabled: false,
+        };
     }
+
     if (options.formatter) {
-      generator.addScript(
-        "format",
-        "biome format --config-path .config --write ."
-      );
+        // Translate common formatter settings to Biome format
+        biomeConfig.formatter = {
+            enabled: true,
+            lineWidth: defaultFormatterConfig.printWidth,
+            indentWidth: defaultFormatterConfig.tabWidth,
+            indentStyle: defaultFormatterConfig.useTabs ? 'tab' : 'space',
+        };
+        biomeConfig.javascript = {
+            formatter: {
+                semicolons: defaultFormatterConfig.semi ? 'always' : 'asNeeded',
+                quoteStyle: defaultFormatterConfig.singleQuote ? 'single' : 'double',
+                trailingCommas: defaultFormatterConfig.trailingComma,
+                bracketSpacing: defaultFormatterConfig.bracketSpacing,
+                arrowParentheses:
+                    defaultFormatterConfig.arrowParens === 'always' ? 'always' : 'asNeeded',
+            },
+        };
+        // JSON uses 2-space indentation
+        biomeConfig.json = {
+            formatter: {
+                indentWidth: 2,
+            },
+        };
+    } else {
+        biomeConfig.formatter = {
+            enabled: false,
+        };
     }
-    generator.addVscodeSetting("biome.linter.configPath", ".config/biome.json");
-  } else {
-    generator.addFile("biome.json", {
-      type: "text",
-      content: JSON.stringify(biomeConfig, null, 2),
-    });
-    if (options.linter) {
-      generator.addScript("lint", "biome lint .");
+
+    const isStealth = generator.isStealthConfig();
+
+    if (isStealth) {
+        generator.addFile('.config/biome.json', {
+            type: 'text',
+            content: JSON.stringify(biomeConfig, null, 2),
+        });
+        if (options.linter) {
+            generator.addScript('lint', 'biome lint --config-path .config .');
+        }
+        if (options.formatter) {
+            generator.addScript('format', 'biome format --config-path .config --write .');
+        }
+        generator.addVscodeSetting('biome.linter.configPath', '.config/biome.json');
+    } else {
+        generator.addFile('biome.json', {
+            type: 'text',
+            content: JSON.stringify(biomeConfig, null, 2),
+        });
+        if (options.linter) {
+            generator.addScript('lint', 'biome lint .');
+        }
+        if (options.formatter) {
+            generator.addScript('format', 'biome format --write .');
+        }
     }
+
+    const roles: string[] = [];
+    if (options.linter) roles.push('linter');
+    if (options.formatter) roles.push('formatter');
+
+    generator.inject(
+        'readme-tools',
+        `[Biome](https://biomejs.dev/) - Fast ${roles.join(' and ')} for JavaScript and TypeScript`
+    );
+    generator.inject('vscode-extension-suggestion', 'biomejs.biome');
+    generator.addVscodeSetting('biome.enabled', true);
+
     if (options.formatter) {
-      generator.addScript("format", "biome format --write .");
+        generator.addVscodeSetting('editor.defaultFormatter', 'biomejs.biome');
     }
-  }
-
-  const roles: string[] = [];
-  if (options.linter) roles.push("linter");
-  if (options.formatter) roles.push("formatter");
-
-  generator.inject(
-    "readme-tools",
-    `[Biome](https://biomejs.dev/) - Fast ${roles.join(
-      " and "
-    )} for JavaScript and TypeScript`
-  );
-  generator.inject("vscode-extension-suggestion", "biomejs.biome");
-  generator.addVscodeSetting("biome.enabled", true);
-
-  if (options.formatter) {
-    generator.addVscodeSetting("editor.defaultFormatter", "biomejs.biome");
-  }
 }

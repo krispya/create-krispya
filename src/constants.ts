@@ -64,116 +64,116 @@ a {
 }`;
 
 export const GitAttributes = [
-  "* text eol=lf",
-  "*.png binary",
-  "*.jpg binary",
-  "*.jpeg binary",
-  "*.gif binary",
-  "*.ico binary",
-  "*.mov binary",
-  "*.mp4 binary",
-  "*.mp3 binary",
-  "*.flv binary",
-  "*.fla binary",
-  "*.wav binary",
-  "*.swf binary",
-  "*.gz binary",
-  "*.zip binary",
-  "*.7z binary",
-  "*.ttf binary",
-  "*.eot binary",
-  "*.woff binary",
-  "*.pyc binary",
-  "*.pdf binary",
-  "*.glb binary",
-  "*.gltf binary",
-].join("\n");
+    '* text eol=lf',
+    '*.png binary',
+    '*.jpg binary',
+    '*.jpeg binary',
+    '*.gif binary',
+    '*.ico binary',
+    '*.mov binary',
+    '*.mp4 binary',
+    '*.mp3 binary',
+    '*.flv binary',
+    '*.fla binary',
+    '*.wav binary',
+    '*.swf binary',
+    '*.gz binary',
+    '*.zip binary',
+    '*.7z binary',
+    '*.ttf binary',
+    '*.eot binary',
+    '*.woff binary',
+    '*.pyc binary',
+    '*.pdf binary',
+    '*.glb binary',
+    '*.gltf binary',
+].join('\n');
 
 // Common formatter configuration (Prettier-style format)
 export type FormatterConfig = {
-  printWidth: number;
-  tabWidth: number;
-  useTabs: boolean;
-  semi: boolean;
-  singleQuote: boolean;
-  trailingComma: "none" | "es5" | "all";
-  bracketSpacing: boolean;
-  arrowParens: "always" | "avoid";
+    printWidth: number;
+    tabWidth: number;
+    useTabs: boolean;
+    semi: boolean;
+    singleQuote: boolean;
+    trailingComma: 'none' | 'es5' | 'all';
+    bracketSpacing: boolean;
+    arrowParens: 'always' | 'avoid';
 };
 
 export const defaultFormatterConfig: FormatterConfig = {
-  printWidth: 102,
-  tabWidth: 2,
-  useTabs: false,
-  semi: true,
-  singleQuote: true,
-  trailingComma: "es5",
-  bracketSpacing: true,
-  arrowParens: "always",
+    printWidth: 102,
+    tabWidth: 2,
+    useTabs: false,
+    semi: true,
+    singleQuote: true,
+    trailingComma: 'es5',
+    bracketSpacing: true,
+    arrowParens: 'always',
 };
 
 // Full Prettier config with schema and overrides
 export const defaultPrettierConfig = {
-  $schema: "https://json.schemastore.org/prettierrc",
-  ...defaultFormatterConfig,
-  overrides: [
-    {
-      files: ["*.md", "**/*.md"],
-      options: { semi: false },
-    },
-    {
-      files: ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
-      options: { semi: false },
-    },
-  ],
+    $schema: 'https://json.schemastore.org/prettierrc',
+    ...defaultFormatterConfig,
+    overrides: [
+        {
+            files: ['*.md', '**/*.md'],
+            options: { semi: false },
+        },
+        {
+            files: ['*.yml', '*.yaml', '**/*.yml', '**/*.yaml'],
+            options: { semi: false },
+        },
+    ],
 };
 
 // Full oxfmt config (Prettier-compatible subset)
 export const defaultOxfmtConfig = {
-  printWidth: defaultFormatterConfig.printWidth,
-  tabWidth: defaultFormatterConfig.tabWidth,
-  useTabs: defaultFormatterConfig.useTabs,
-  semi: defaultFormatterConfig.semi,
-  singleQuote: defaultFormatterConfig.singleQuote,
-  trailingComma: defaultFormatterConfig.trailingComma,
-  bracketSpacing: defaultFormatterConfig.bracketSpacing,
-  arrowParens: defaultFormatterConfig.arrowParens,
+    printWidth: defaultFormatterConfig.printWidth,
+    tabWidth: defaultFormatterConfig.tabWidth,
+    useTabs: defaultFormatterConfig.useTabs,
+    semi: defaultFormatterConfig.semi,
+    singleQuote: defaultFormatterConfig.singleQuote,
+    trailingComma: defaultFormatterConfig.trailingComma,
+    bracketSpacing: defaultFormatterConfig.bracketSpacing,
+    arrowParens: defaultFormatterConfig.arrowParens,
 };
 
 // Common linter configuration
 export type LinterConfig = {
-  // Ignore patterns (files/directories to skip)
-  ignorePatterns: string[];
+    // Ignore patterns (files/directories to skip)
+    ignorePatterns: string[];
 
-  // Common rule configurations
-  rules: {
-    // Unused vars handling with underscore prefix pattern
-    noUnusedVars: {
-      level: "off" | "warn" | "error";
-      argsIgnorePattern: string;
-      varsIgnorePattern: string;
-      caughtErrorsIgnorePattern: string;
+    // Common rule configurations
+    rules: {
+        // Unused vars handling with underscore prefix pattern
+        noUnusedVars: {
+            level: 'off' | 'warn' | 'error';
+            argsIgnorePattern: string;
+            varsIgnorePattern: string;
+            caughtErrorsIgnorePattern: string;
+        };
+        // Allow short-circuit expressions like `foo && bar()`
+        noUnusedExpressions: {
+            level: 'off' | 'warn' | 'error';
+            allowShortCircuit: boolean;
+        };
     };
-    // Allow short-circuit expressions like `foo && bar()`
-    noUnusedExpressions: {
-      level: "off" | "warn" | "error";
-      allowShortCircuit: boolean;
-    };
-  };
 };
 
 export const defaultLinterConfig: LinterConfig = {
-  ignorePatterns: ["dist"],
-  rules: {
-    noUnusedVars: {
-      level: "warn",
-      argsIgnorePattern: "^_",
-      varsIgnorePattern: "^_",
-      caughtErrorsIgnorePattern: "^_",
+    ignorePatterns: ['dist'],
+    rules: {
+        noUnusedVars: {
+            level: 'warn',
+            argsIgnorePattern: '^_',
+            varsIgnorePattern: '^_',
+            caughtErrorsIgnorePattern: '^_',
+        },
+        noUnusedExpressions: {
+            level: 'warn',
+            allowShortCircuit: true,
+        },
     },
-    noUnusedExpressions: {
-      level: "warn",
-      allowShortCircuit: true,
-    },
-  },
 };
