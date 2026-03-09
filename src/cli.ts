@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+
+/**
+ * @todo Refactor this file into some more logical splits.
+ * Here are some ideas from the bot:
+ *
+ * src/cli.ts: executable entry only
+ * src/cli/commands/create.ts: standalone create flow
+ * src/cli/commands/workspace.ts: --workspace
+ * src/cli/commands/update.ts: --update
+ * src/cli/commands/fix.ts: --fix
+ * src/cli/commands/check.ts: --check
+ * src/cli/monorepo.ts: detect/parse workspace helpers
+ * src/cli/options.ts: CliOptions, preset mapping, hasConfigOptions
+ * src/cli/write.ts: file writing / disk apply helpers
+ */
+
 import * as p from "@clack/prompts";
 import color from "chalk";
 import { Command } from "commander";
