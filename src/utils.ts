@@ -14,6 +14,46 @@ export async function getLatestNpmVersion(packageName: string, fallback: string)
     }
 }
 
+function compareNumericSemver(a: string, b: string): number {
+    const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const bParts = b.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const maxLength = Math.max(aParts.length, bParts.length);
+
+    for (let index = 0; index < maxLength; index += 1) {
+        const difference = (aParts[index] ?? 0) - (bParts[index] ?? 0);
+        if (difference !== 0) {
+            return difference;
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Fetches the latest npm version within a specific major version.
+ * @param packageName The name of the npm package
+ * @param majorVersion The required major version
+ * @param fallback Fallback version if fetch fails or no match exists
+ * @returns The latest matching version string (e.g., "25.3.5")
+ */
+export async function getLatestNpmMajorVersion(
+    packageName: string,
+    majorVersion: string,
+    fallback: string
+): Promise<string> {
+    try {
+        const response = await fetch(`https://registry.npmjs.org/${packageName}`);
+        const data = (await response.json()) as { versions?: Record<string, unknown> };
+        const latestMatchingVersion = Object.keys(data.versions ?? {})
+            .filter((version) => version.split('.')[0] === majorVersion)
+            .sort((a, b) => compareNumericSemver(b, a))[0];
+
+        return latestMatchingVersion ?? fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 /**
  * Fetches the latest version of pnpm from the npm registry
  * @returns The latest pnpm version string (e.g., "10.24.0")

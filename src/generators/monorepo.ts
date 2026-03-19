@@ -11,6 +11,7 @@ import type {
 import { generateAiFiles } from './ai-files.js';
 import {
     assignResolvedPackageVersion,
+    formatNodeTypesVersion,
     formatPackageManager,
     getResolvedPackageVersion,
 } from '../package-versions.js';
@@ -75,8 +76,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
 
     // Add Node.js types matching the Node version (needed for config files)
     if (engine?.name === 'node' && engine.version) {
-        const majorVersion = engine.version.split('.')[0];
-        devDependencies['@types/node'] = `^${majorVersion}.0.0`;
+        devDependencies['@types/node'] = formatNodeTypesVersion(versions, engine);
     } else {
         // Fallback to latest LTS if no version specified
         devDependencies['@types/node'] = '^22.0.0';

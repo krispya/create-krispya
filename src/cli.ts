@@ -1661,6 +1661,7 @@ async function handleMonorepoCreation(
     generateOptions.versions = await resolveMonorepoRootPackageVersions({
         linter: generateOptions.linter ?? 'oxlint',
         formatter: generateOptions.formatter ?? 'prettier',
+        engine: generateOptions.engine,
         versions: generateOptions.versions,
     });
 

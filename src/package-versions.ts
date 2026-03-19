@@ -12,6 +12,7 @@ import {
 } from './types.js';
 import {
     getLatestNodeVersion,
+    getLatestNpmMajorVersion,
     getLatestNpmCliVersion,
     getLatestNpmVersion,
     getLatestPnpmVersion,
@@ -184,10 +185,46 @@ export async function resolvePackageManager(options: GenerateOptions) {
 
 export async function resolveEngine(options: GenerateOptions) {
     const engine = getEngineSpec(options.engine);
-    if (engine.version == null && engine.name === 'node') {
+    if ((engine.version == null || engine.version === 'latest') && engine.name === 'node') {
         engine.version = await getLatestNodeVersion();
     }
     return engine;
+}
+
+export function formatNodeTypesVersion(
+    versions: PackageVersions = {},
+    engine?: EngineSpec
+): string {
+    const resolvedVersion = versions['@types/node'];
+    if (resolvedVersion != null) {
+        return `^${resolvedVersion}`;
+    }
+
+    const engineSpec = getEngineSpec(engine);
+    if (engineSpec.name === 'node' && engineSpec.version) {
+        const majorVersion = engineSpec.version.split('.')[0];
+        return `^${majorVersion}.0.0`;
+    }
+
+    return '^22.0.0';
+}
+
+async function resolveNodeTypesVersion(
+    engine?: EngineSpec,
+    versions: PackageVersions = {}
+): Promise<string | undefined> {
+    if (versions['@types/node'] != null) {
+        return versions['@types/node'];
+    }
+
+    const engineSpec = getEngineSpec(engine);
+    if (engineSpec.name !== 'node') {
+        return undefined;
+    }
+
+    const nodeVersion = engineSpec.version ?? (await getLatestNodeVersion());
+    const majorVersion = nodeVersion.split('.')[0];
+    return getLatestNpmMajorVersion('@types/node', majorVersion, `${majorVersion}.0.0`);
 }
 
 export async function resolvePackageVersions(
@@ -214,12 +251,24 @@ export async function resolvePackageVersions(
 export async function resolveProjectPackageVersions(
     options: GenerateOptions
 ): Promise<PackageVersions> {
-    return resolvePackageVersions(collectProjectPackageNames(options), options.versions);
+    const packageNames = collectProjectPackageNames(options);
+    const versions = await resolvePackageVersions(
+        packageNames.filter((packageName) => packageName !== '@types/node'),
+        options.versions
+    );
+    const nodeTypesVersion = await resolveNodeTypesVersion(options.engine, versions);
+
+    if (nodeTypesVersion != null) {
+        versions['@types/node'] = nodeTypesVersion;
+    }
+
+    return versions;
 }
 
 export async function resolveMonorepoRootPackageVersions(params: {
     linter: Linter;
     formatter: Formatter;
+    engine?: EngineSpec;
     versions?: PackageVersions;
 }): Promise<PackageVersions> {
     const packageNames = new Set<string>();
@@ -228,7 +277,14 @@ export async function resolveMonorepoRootPackageVersions(params: {
     if (params.formatter !== 'biome' || params.linter !== 'biome') {
         addPackageName(packageNames, explicitVersions, getFormatterPackage(params.formatter));
     }
-    return resolvePackageVersions(packageNames, params.versions);
+    const versions = await resolvePackageVersions(packageNames, params.versions);
+    const nodeTypesVersion = await resolveNodeTypesVersion(params.engine, versions);
+
+    if (nodeTypesVersion != null) {
+        versions['@types/node'] = nodeTypesVersion;
+    }
+
+    return versions;
 }
 
 function collectProjectPackageNames(options: GenerateOptions): string[] {
@@ -247,6 +303,11 @@ function collectProjectPackageNames(options: GenerateOptions): string[] {
     const formatter = options.formatter ?? 'prettier';
     const bundler = options.libraryBundler ?? 'unbuild';
     const packageManager = getPackageManagerName(options.packageManager);
+    const engine = getEngineSpec(options.engine);
+
+    if (getEngineName(engine) === 'node') {
+        addPackageName(packageNames, explicitVersions, '@types/node');
+    }
 
     if (!isLibrary) {
         addPackageName(packageNames, explicitVersions, 'vite');

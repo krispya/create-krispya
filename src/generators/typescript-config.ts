@@ -1,4 +1,8 @@
-import { assignResolvedPackageVersion, getEngineName, getEngineSpec } from '../package-versions.js';
+import {
+    assignResolvedPackageVersion,
+    formatNodeTypesVersion,
+    getEngineName,
+} from '../package-versions.js';
 import type { BaseTemplate, ConfigStrategy, EngineSpec, File, PackageVersions } from '../types.js';
 
 export type TypeScriptConfigResult = {
@@ -46,9 +50,8 @@ export function generateTypescriptConfig(
     const devDependencies: Record<string, string> = {};
 
     // Add Node.js types when using the Node engine.
-    if (getEngineName(engine) === 'node' && getEngineSpec(engine).version) {
-        const majorVersion = getEngineSpec(engine).version!.split('.')[0];
-        devDependencies['@types/node'] = `^${majorVersion}.0.0`;
+    if (getEngineName(engine) === 'node') {
+        devDependencies['@types/node'] = formatNodeTypesVersion(versions, engine);
     } else {
         // Fallback to latest LTS if no version specified
         devDependencies['@types/node'] = '^22.0.0';

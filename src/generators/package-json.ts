@@ -1,4 +1,5 @@
 import {
+    formatNodeTypesVersion,
     formatPackageManager,
     getEngineName,
     getEngineSpec,
@@ -86,8 +87,10 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     const allDevDependencies = { ...devDependencies };
     const engine = getEngineSpec(options.engine);
     if (getEngineName(engine) === 'node' && engine.version) {
-        const majorVersion = engine.version.split('.')[0];
-        allDevDependencies['@types/node'] ??= `^${majorVersion}.0.0`;
+        allDevDependencies['@types/node'] ??= formatNodeTypesVersion(
+            options.versions,
+            options.engine
+        );
     }
 
     packageJson.scripts = scripts;

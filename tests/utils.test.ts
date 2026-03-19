@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getLatestNodeVersion } from '../src/utils.js';
+import { getLatestNodeVersion, getLatestNpmMajorVersion } from '../src/utils.js';
 
 describe('getLatestNodeVersion', () => {
     afterEach(() => {
@@ -21,5 +21,42 @@ describe('getLatestNodeVersion', () => {
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
 
         await expect(getLatestNodeVersion()).resolves.toBe('25.0.0');
+    });
+});
+
+describe('getLatestNpmMajorVersion', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('returns the newest version for the requested major', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            json: async () => ({
+                versions: {
+                    '24.9.1': {},
+                    '25.0.0': {},
+                    '25.3.5': {},
+                    '25.1.2': {},
+                },
+            }),
+        } as Response);
+
+        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe(
+            '25.3.5'
+        );
+    });
+
+    it('falls back when no version matches the requested major', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            json: async () => ({
+                versions: {
+                    '24.9.1': {},
+                },
+            }),
+        } as Response);
+
+        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe(
+            '25.0.0'
+        );
     });
 });
