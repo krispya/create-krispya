@@ -544,7 +544,7 @@ export async function promptForOptions(
         options: [
             { value: 'app', label: 'Application' },
             { value: 'library', label: 'Library' },
-            { value: 'monorepo', label: 'Monorepo' },
+            { value: 'monorepo', label: 'Monorepo', hint: 'experimental' },
         ],
         initialValue: presets?.type ?? 'app',
     });
@@ -674,8 +674,8 @@ export async function promptForPackageOptions(
     // Build template options including custom templates
     const builtInOptions = [
         { value: 'vanilla', label: 'Vanilla' },
-        { value: 'react', label: 'React' },
-        { value: 'r3f', label: 'React Three Fiber' },
+        { value: 'react', label: 'React', hint: 'experimental' },
+        { value: 'r3f', label: 'React Three Fiber', hint: 'experimental' },
     ];
 
     const customTemplates = getCustomTemplates();
