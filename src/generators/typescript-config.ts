@@ -49,6 +49,8 @@ export function generateTypescriptConfig(
     const files: Record<string, File> = {};
     const devDependencies: Record<string, string> = {};
 
+    assignResolvedPackageVersion(devDependencies, versions, 'typescript');
+
     // Add Node.js types when using the Node engine.
     if (getEngineName(engine) === 'node') {
         devDependencies['@types/node'] = formatNodeTypesVersion(versions, engine);

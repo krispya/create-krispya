@@ -54,6 +54,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
     'react-dom': { fallbackVersion: '19.0.0' },
     three: { fallbackVersion: '0.175.0', prefix: '~' },
     tsdown: { fallbackVersion: '0.12.0' },
+    typescript: { fallbackVersion: '5.9.3' },
     'typescript-eslint': { fallbackVersion: '8.18.0' },
     unbuild: { fallbackVersion: '3.5.0' },
     vite: { fallbackVersion: '6.3.4' },
@@ -307,6 +308,10 @@ function collectProjectPackageNames(options: GenerateOptions): string[] {
 
     if (getEngineName(engine) === 'node') {
         addPackageName(packageNames, explicitVersions, '@types/node');
+    }
+
+    if (isTypescript) {
+        addPackageName(packageNames, explicitVersions, 'typescript');
     }
 
     if (!isLibrary) {

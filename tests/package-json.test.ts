@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { generate } from "../src/index.js";
 import { generatePackageJson } from "../src/generators/package-json.js";
-import {
-  resolveEngine,
-  resolveProjectPackageVersions,
-} from "../src/package-versions.js";
 
 function readPackageJsonContent(
   file: { type: "text"; content: string } | { type: "remote"; url: string },
@@ -100,5 +97,26 @@ describe("generatePackageJson", () => {
     const packageJson = readPackageJsonContent(result.files["package.json"]);
     expect(packageJson.devDependencies["@types/node"]).toBe("^25.3.5");
     expect(packageJson.engines.node).toBe(">=25.0.0");
+  });
+
+  it("adds typescript to generated TypeScript projects", () => {
+    const files = generate({
+      name: "my-app",
+      template: "vanilla",
+      linter: "oxlint",
+      formatter: "prettier",
+      packageManager: { name: "pnpm", version: "10.0.0" },
+      engine: { name: "node", version: "25.1.0" },
+      versions: {
+        "@types/node": "25.3.5",
+        oxlint: "1.51.0",
+        prettier: "3.8.1",
+        typescript: "5.9.3",
+        vite: "6.3.4",
+      },
+    });
+
+    const packageJson = readPackageJsonContent(files["package.json"]);
+    expect(packageJson.devDependencies.typescript).toBe("^5.9.3");
   });
 });
