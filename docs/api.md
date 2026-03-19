@@ -259,7 +259,7 @@ Utility Options:
                               (use with --linter and --formatter for non-interactive)
   --update                    Update monorepo to latest template (add new files, update configs)
   --yes                       Accept defaults for prompts (non-interactive mode)
-  --clear-config              Clear saved preferences (editor, window reuse)
+  --clear-config              Clear saved preferences
   --config-path               Print path to config file
 ```
 
@@ -333,8 +333,6 @@ pnpm create krispya --clear-config
 
 The CLI saves preferences for:
 
-- **Editor** — Cursor, VS Code, WebStorm, or skip
-- **Window reuse** — Open in current window or new window
 - **AI platforms** — Which AI rule files to generate (AGENTS.md, CLAUDE.md)
 
 Clear saved preferences:
@@ -355,4 +353,4 @@ After scaffolding:
 
 1. Install dependencies: `pnpm install`
 2. Start development: `pnpm dev`
-3. Optionally open in your editor (Cursor, VS Code, or WebStorm)
+3. Open the project in your editor if you want

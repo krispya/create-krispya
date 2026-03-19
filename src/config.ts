@@ -8,8 +8,6 @@ import type {
     Testing,
 } from './types.js';
 
-export type EditorChoice = 'cursor' | 'code' | 'webstorm' | 'skip';
-
 export type { AiPlatform } from './types.js';
 
 export interface CustomTemplate {
@@ -22,8 +20,6 @@ export interface CustomTemplate {
 }
 
 interface Schema {
-    preferredEditor?: EditorChoice;
-    reuseWindow?: boolean;
     customTemplates?: Record<string, CustomTemplate>;
     /** Selected AI platforms to generate files for */
     aiPlatforms?: AiPlatform[];
@@ -33,22 +29,6 @@ interface Schema {
 const config = new Conf<Schema>({
     projectName: 'create-krispya',
 });
-
-export function getPreferredEditor(): EditorChoice | undefined {
-    return config.get('preferredEditor');
-}
-
-export function setPreferredEditor(editor: EditorChoice): void {
-    config.set('preferredEditor', editor);
-}
-
-export function getReuseWindow(): boolean {
-    return config.get('reuseWindow') ?? false;
-}
-
-export function setReuseWindow(reuse: boolean): void {
-    config.set('reuseWindow', reuse);
-}
 
 export function getAiPlatforms(): AiPlatform[] | undefined {
     return config.get('aiPlatforms');

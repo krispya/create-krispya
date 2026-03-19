@@ -34,9 +34,7 @@ import type {
 } from './types.js';
 
 import {
-    editorNames,
     getDefaultProjectName,
-    openInEditor,
     promptForInitialPackage,
     promptForOptions,
     promptForPackageOptions,
@@ -44,14 +42,9 @@ import {
 } from './cli/index.js';
 import {
     clearConfig,
-    EditorChoice,
     getAiPlatforms,
     getConfigPath,
-    getPreferredEditor,
-    getReuseWindow,
     setAiPlatforms,
-    setPreferredEditor,
-    setReuseWindow,
 } from './config.js';
 import {
     AI_PLATFORM_HINTS,
@@ -794,79 +787,6 @@ async function createPackageInWorkspace(
         spinner.stop('Failed to create package');
         p.log.error(String(error));
         return false;
-    }
-}
-
-/**
- * Shows editor prompt and opens project if selected.
- */
-async function promptAndOpenEditor(projectPath: string): Promise<void> {
-    const savedEditor = getPreferredEditor();
-    let selectedEditor: EditorChoice | undefined;
-
-    if (savedEditor && savedEditor !== 'skip') {
-        const useDefault = await p.confirm({
-            message: `Open in editor? ${color.dim(`(${editorNames[savedEditor]})`)}`,
-            initialValue: true,
-        });
-
-        if (p.isCancel(useDefault)) {
-            selectedEditor = undefined;
-        } else if (useDefault) {
-            selectedEditor = savedEditor;
-        } else {
-            selectedEditor = 'skip';
-        }
-    } else {
-        const openEditor = await p.select({
-            message: 'Open project in editor?',
-            options: [
-                { value: 'skip', label: 'Skip' },
-                { value: 'cursor', label: 'Cursor' },
-                { value: 'code', label: 'VS Code' },
-                { value: 'webstorm', label: 'WebStorm' },
-            ],
-            initialValue: 'skip',
-        });
-
-        if (!p.isCancel(openEditor)) {
-            selectedEditor = openEditor as EditorChoice;
-
-            const saveChoice = await p.confirm({
-                message: `Save ${editorNames[selectedEditor] ?? 'Skip'} as default editor?`,
-                initialValue: true,
-            });
-
-            if (!p.isCancel(saveChoice) && saveChoice) {
-                setPreferredEditor(selectedEditor);
-
-                if (selectedEditor === 'cursor' || selectedEditor === 'code') {
-                    const reuseChoice = await p.confirm({
-                        message: 'Reuse current window when opening projects?',
-                        initialValue: false,
-                    });
-
-                    if (!p.isCancel(reuseChoice)) {
-                        setReuseWindow(reuseChoice);
-                    }
-                }
-            }
-        }
-    }
-
-    if (selectedEditor && selectedEditor !== 'skip') {
-        try {
-            await openInEditor(
-                selectedEditor as 'cursor' | 'code' | 'webstorm',
-                projectPath,
-                getReuseWindow()
-            );
-            p.log.success(`Opening in ${editorNames[selectedEditor]}...`);
-        } catch {
-            p.log.warn(
-                `Could not open ${editorNames[selectedEditor]}. Make sure the CLI command is in your PATH.`
-            );
-        }
     }
 }
 
@@ -1734,8 +1654,6 @@ async function handleMonorepoCreation(
 
         p.note(nextSteps, 'Next steps');
 
-        await promptAndOpenEditor(projectPath);
-
         p.outro(color.green('Happy coding! ✨'));
         process.exit(0);
     } catch (error) {
@@ -1806,8 +1724,6 @@ async function handleStandaloneProjectCreation(
 
         p.note(nextSteps, 'Next steps');
 
-        await promptAndOpenEditor(projectPath);
-
         p.outro(color.green('Happy coding! ✨'));
     } catch (error) {
         spinner.stop('Failed to create project');
@@ -1862,8 +1778,6 @@ async function handleInteractiveMonorepoMode(monorepoRoot: string): Promise<void
 
         p.note([`cd ${monorepoRoot}`, 'pnpm install', 'pnpm run dev'].join('\n'), 'Next steps');
 
-        await promptAndOpenEditor(monorepoRoot);
-
         p.outro(color.green('Happy coding! ✨'));
         process.exit(0);
     }
@@ -1917,7 +1831,7 @@ async function main() {
         )
         .option('--workspace', 'Add package to current monorepo workspace (non-interactive)')
         .option('--dir <directory>', 'Target directory for --workspace (default: apps/ or packages/)')
-        .option('--clear-config', 'Clear saved preferences (e.g. editor choice)')
+        .option('--clear-config', 'Clear saved preferences')
         .option('--config-path', 'Print the path to the config file')
         .option('--check', 'Check if current directory is in a valid monorepo workspace')
         .option('--fix', 'Fix monorepo by generating missing .config packages')
