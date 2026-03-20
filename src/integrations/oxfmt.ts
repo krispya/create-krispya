@@ -18,7 +18,6 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
         const configPath = 'node_modules/@config/oxfmt/base.json';
 
         generator.addScript('format', `oxfmt -c ${configPath} --write .`);
-        generator.addVscodeSetting('oxc.fmt.configPath', configPath);
     } else {
         // Standalone: add oxfmt as devDependency
         generator.addDevDependency('oxfmt');
@@ -31,7 +30,6 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
                 content: JSON.stringify(defaultOxfmtConfig, null, 2),
             });
             generator.addScript('format', 'oxfmt -c .config/oxfmt.json --write .');
-            generator.addVscodeSetting('oxc.fmt.configPath', '.config/oxfmt.json');
         } else {
             generator.addFile('oxfmt.json', {
                 type: 'text',
@@ -46,17 +44,4 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
         '[Oxfmt](https://oxc.rs/docs/guide/usage/formatter) - Fast Prettier-compatible code formatter'
     );
     generator.inject('vscode-extension-suggestion', 'oxc.oxc-vscode');
-    generator.addVscodeSetting('editor.defaultFormatter', 'oxc.oxc-vscode');
-    generator.addVscodeSetting('[json]', {
-        'editor.defaultFormatter': 'vscode.json-language-features',
-    });
-    generator.addVscodeSetting('[jsonc]', {
-        'editor.defaultFormatter': 'vscode.json-language-features',
-    });
-    generator.addVscodeSetting('[markdown]', {
-        'editor.defaultFormatter': 'vscode.markdown-language-features',
-    });
-    generator.addVscodeSetting('[yaml]', {
-        'editor.defaultFormatter': 'redhat.vscode-yaml',
-    });
 }

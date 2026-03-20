@@ -256,19 +256,13 @@ export function generate(options: GenerateOptions) {
     // Generate linter integrations
     if (linter === 'eslint') {
         generateEslint(generator, true);
-        generator.addVscodeSetting('biome.enabled', false);
-        generator.addVscodeSetting('oxc.enable', false);
     } else if (linter === 'oxlint') {
         generateOxlint(generator, true);
-        generator.addVscodeSetting('eslint.enable', false);
-        generator.addVscodeSetting('biome.enabled', false);
     } else if (linter === 'biome') {
         generateBiome(generator, {
             linter: true,
             formatter: formatter === 'biome',
         });
-        generator.addVscodeSetting('eslint.enable', false);
-        generator.addVscodeSetting('oxc.enable', false);
     }
 
     // Generate formatter integrations (skip biome if already handled above)
@@ -279,8 +273,6 @@ export function generate(options: GenerateOptions) {
     } else if (formatter === 'biome' && linter !== 'biome') {
         // Only generate biome for formatting if it wasn't already generated for linting
         generateBiome(generator, { linter: false, formatter: true });
-        generator.addVscodeSetting('eslint.enable', false);
-        generator.addVscodeSetting('oxc.enable', false);
     }
 
     for (const { code, location } of clonedOptions.injections ?? []) {
@@ -348,7 +340,17 @@ export function generate(options: GenerateOptions) {
 
     // Generate VS Code files (skip for monorepo sub-packages - use workspace root config)
     if (!isMonorepoPackage) {
-        Object.assign(files, generateVscodeFiles({ codeSnippets, vscodeSettings }));
+        Object.assign(
+            files,
+            generateVscodeFiles({
+                codeSnippets,
+                vscodeSettings,
+                linter,
+                formatter,
+                configStrategy: clonedOptions.configStrategy,
+                isMonorepo: false,
+            })
+        );
     }
 
     // Git files (skip for monorepo sub-packages - use workspace root config)

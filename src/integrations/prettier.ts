@@ -18,7 +18,6 @@ export function generatePrettier(generator: Generator, options: GeneratePrettier
             content: JSON.stringify(defaultPrettierConfig, null, 2),
         });
         generator.addScript('format', 'prettier --config .config/prettier.json --write .');
-        generator.addVscodeSetting('prettier.configPath', '.config/prettier.json');
     } else {
         generator.addFile('.prettierrc', {
             type: 'text',
@@ -29,5 +28,4 @@ export function generatePrettier(generator: Generator, options: GeneratePrettier
 
     generator.inject('readme-tools', '[Prettier](https://prettier.io/) - Opinionated code formatter');
     generator.inject('vscode-extension-suggestion', 'esbenp.prettier-vscode');
-    generator.addVscodeSetting('editor.defaultFormatter', 'esbenp.prettier-vscode');
 }

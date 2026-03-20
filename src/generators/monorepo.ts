@@ -1,6 +1,5 @@
 import type {
     AiPlatform,
-    CodeInjectionLocation,
     EngineSpec,
     File,
     Formatter,
@@ -302,65 +301,12 @@ export function generateVscodeFiles(
     linter: Linter,
     formatter: Formatter
 ): void {
-    const recommendations: string[] = [];
-    const settings: Record<string, unknown> = {};
-
-    // Linter settings
-    if (linter === 'oxlint') {
-        recommendations.push('oxc.oxc-vscode');
-        settings['oxc.enable'] = true;
-        settings['eslint.enable'] = false;
-        settings['biome.enabled'] = false;
-    } else if (linter === 'eslint') {
-        recommendations.push('dbaeumer.vscode-eslint');
-        settings['eslint.enable'] = true;
-        settings['oxc.enable'] = false;
-        settings['biome.enabled'] = false;
-    } else if (linter === 'biome') {
-        recommendations.push('biomejs.biome');
-        settings['biome.enabled'] = true;
-        settings['eslint.enable'] = false;
-        settings['oxc.enable'] = false;
-    }
-
-    // Formatter settings
-    if (formatter === 'oxfmt') {
-        if (!recommendations.includes('oxc.oxc-vscode')) {
-            recommendations.push('oxc.oxc-vscode');
-        }
-        settings['editor.defaultFormatter'] = 'oxc.oxc-vscode';
-        settings['[json]'] = {
-            'editor.defaultFormatter': 'vscode.json-language-features',
-        };
-        settings['[jsonc]'] = {
-            'editor.defaultFormatter': 'vscode.json-language-features',
-        };
-    } else if (formatter === 'prettier') {
-        recommendations.push('esbenp.prettier-vscode');
-        settings['editor.defaultFormatter'] = 'esbenp.prettier-vscode';
-    } else if (formatter === 'biome') {
-        if (!recommendations.includes('biomejs.biome')) {
-            recommendations.push('biomejs.biome');
-        }
-        settings['editor.defaultFormatter'] = 'biomejs.biome';
-    }
-
-    // extensions.json
-    files['.vscode/extensions.json'] = {
-        type: 'text',
-        content: JSON.stringify({ recommendations }, null, 2),
-    };
-
-    // settings.json
-    const codeSnippets: Partial<Record<CodeInjectionLocation, string[]>> = {};
-    if (recommendations.length > 0) {
-        codeSnippets['vscode-extension-suggestion'] = recommendations;
-    }
     Object.assign(
         files,
         generateSharedVscodeFiles({
-            codeSnippets,
-            vscodeSettings: settings,
+            linter,
+            formatter,
+            isMonorepo: true,
         })
     );
 }

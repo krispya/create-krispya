@@ -88,7 +88,6 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
         if (options.formatter) {
             generator.addScript('format', 'biome format --config-path .config --write .');
         }
-        generator.addVscodeSetting('biome.linter.configPath', '.config/biome.json');
     } else {
         generator.addFile('biome.json', {
             type: 'text',
@@ -111,9 +110,4 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
         `[Biome](https://biomejs.dev/) - Fast ${roles.join(' and ')} for JavaScript and TypeScript`
     );
     generator.inject('vscode-extension-suggestion', 'biomejs.biome');
-    generator.addVscodeSetting('biome.enabled', true);
-
-    if (options.formatter) {
-        generator.addVscodeSetting('editor.defaultFormatter', 'biomejs.biome');
-    }
 }

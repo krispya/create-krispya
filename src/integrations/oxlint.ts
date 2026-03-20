@@ -30,7 +30,6 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
             : 'node_modules/@config/oxlint/base.json';
 
         generator.addScript('lint', `oxlint -c ${configPath}`);
-        generator.addVscodeSetting('oxc.configPath', configPath);
     } else {
         // Standalone: add oxlint as devDependency
         generator.addDevDependency('oxlint');
@@ -76,7 +75,6 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
                 content: JSON.stringify(oxlintConfig, null, 2),
             });
             generator.addScript('lint', 'oxlint -c .config/oxlint.json');
-            generator.addVscodeSetting('oxc.configPath', '.config/oxlint.json');
         } else {
             generator.addFile('oxlint.json', {
                 type: 'text',
@@ -91,5 +89,4 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
         '[Oxlint](https://oxc.rs/docs/guide/usage/linter) - A fast linter for JavaScript and TypeScript'
     );
     generator.inject('vscode-extension-suggestion', 'oxc.oxc-vscode');
-    generator.addVscodeSetting('oxc.enable', true);
 }
