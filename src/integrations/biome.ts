@@ -1,4 +1,5 @@
 import { defaultFormatterConfig, defaultLinterConfig } from '../constants.js';
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import type { Generator } from '../types.js';
 
 export type GenerateBiomeOptions = {
@@ -83,10 +84,10 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
             content: JSON.stringify(biomeConfig, null, 2),
         });
         if (options.linter) {
-            generator.addScript('lint', 'biome lint --config-path .config .');
+            generator.addScripts(packageJsonScripts.lint.biome('.config'));
         }
         if (options.formatter) {
-            generator.addScript('format', 'biome format --config-path .config --write .');
+            generator.addScripts(packageJsonScripts.format.biome('.config'));
         }
     } else {
         generator.addFile('biome.json', {
@@ -94,10 +95,10 @@ export function generateBiome(generator: Generator, options: GenerateBiomeOption
             content: JSON.stringify(biomeConfig, null, 2),
         });
         if (options.linter) {
-            generator.addScript('lint', 'biome lint .');
+            generator.addScripts(packageJsonScripts.lint.biome());
         }
         if (options.formatter) {
-            generator.addScript('format', 'biome format --write .');
+            generator.addScripts(packageJsonScripts.format.biome());
         }
     }
 

@@ -1,4 +1,5 @@
 import { getBaseTemplate, type Generator } from '../types.js';
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 
 export function generateVitest(generator: Generator) {
     generator.addDevDependency('vitest');
@@ -19,7 +20,7 @@ export function generateVitest(generator: Generator) {
         generator.configureVite({ test: { environment: 'jsdom' } });
     }
 
-    generator.addScript('test', 'vitest');
+    generator.addScripts(packageJsonScripts.test.vitest);
     generator.inject(
         'readme-tools',
         '[Vitest](https://vitest.dev/) - Fast unit test framework powered by Vite'

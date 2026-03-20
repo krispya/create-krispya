@@ -1,3 +1,4 @@
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../types.js';
 
 export function generateTsdown(generator: Generator) {
@@ -33,7 +34,7 @@ export function generateTsdown(generator: Generator) {
         content: configLines.join('\n'),
     });
 
-    generator.addScript('build', 'tsdown');
+    generator.addScripts(packageJsonScripts.build.tsdown);
     generator.inject(
         'readme-libraries',
         '[tsdown](https://github.com/nicepkg/tsdown) - Fast TypeScript bundler powered by esbuild'

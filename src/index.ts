@@ -122,12 +122,7 @@ export function generate(options: GenerateOptions) {
 
     const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
     const vscodeSettings: Record<string, unknown> = {};
-    const scripts: Record<string, string> = isLibrary
-        ? {} // Library build scripts are added by bundler integrations
-        : {
-              dev: 'vite',
-              build: 'vite build',
-          };
+    const scripts: Record<string, string> = {};
 
     // Setup vite config imports based on template (only for apps)
     if (!isLibrary && (isReact || isR3f)) {
@@ -188,8 +183,11 @@ export function generate(options: GenerateOptions) {
         addFile(path, content) {
             files[path] = content;
         },
+        addScripts(nextScripts) {
+            Object.assign(scripts, nextScripts);
+        },
         addScript(name, command) {
-            scripts[name] = command;
+            this.addScripts({ [name]: command });
         },
         inject(location, code) {
             let entries = codeSnippets[location];
@@ -238,9 +236,6 @@ export function generate(options: GenerateOptions) {
         } else if (libraryBundler === 'tsdown') {
             generateTsdown(generator);
         }
-        // Add release script for libraries
-        const packageManager = getPackageManagerName(clonedOptions.packageManager);
-        generator.addScript('release', `${packageManager} run build && ${packageManager} publish`);
     }
 
     // Testing - only if enabled (libraries default to vitest, apps default to none)

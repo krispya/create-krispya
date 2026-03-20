@@ -155,6 +155,7 @@ export type Generator = {
     addDevDependency(name: string, options?: DependencyVersionOptions): void;
     addPeerDependency(name: string, semver: string): void;
     addFile(path: string, file: File): void;
+    addScripts(scripts: Record<string, string>): void;
     addScript(name: string, command: string): void;
     inject(location: CodeInjectionLocation, code: string): void;
     replace(search: string, replace: string): void;

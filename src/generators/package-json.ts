@@ -6,6 +6,7 @@ import {
     getPackageManagerSpec,
 } from '../package-versions.js';
 import type { BaseTemplate, File, GenerateOptions } from '../types.js';
+import { mergePackageJsonScripts, resolveDefaultPackageJsonScripts } from './package-json-scripts.js';
 
 const DEFAULT_LIBRARY_VERSION = '0.1.0';
 
@@ -33,13 +34,11 @@ export type PackageJsonParams = {
 export function generatePackageJson(params: PackageJsonParams): PackageJsonResult {
     const {
         name,
-        baseTemplate,
         language,
         isLibrary,
         dependencies,
         devDependencies,
         peerDependencies,
-        scripts,
         options,
         workspaceDependencies,
     } = params;
@@ -47,6 +46,14 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
     const files: Record<string, File> = {};
     const packageManager = getPackageManagerSpec(options.packageManager);
     const isPnpm = packageManager.name === 'pnpm';
+    const resolvedScripts = mergePackageJsonScripts(
+        resolveDefaultPackageJsonScripts({
+            language,
+            isLibrary,
+            packageManagerName: packageManager.name,
+        }),
+        params.scripts
+    );
 
     const packageJson: Record<string, unknown> = {
         name,
@@ -93,7 +100,7 @@ export function generatePackageJson(params: PackageJsonParams): PackageJsonResul
         );
     }
 
-    packageJson.scripts = scripts;
+    packageJson.scripts = resolvedScripts;
     packageJson.dependencies = sortKeys(allDependencies);
 
     if (Object.keys(allDevDependencies).length > 0) {

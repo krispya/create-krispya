@@ -1,4 +1,5 @@
 import { defaultOxfmtConfig } from '../constants.js';
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import type { Generator } from '../types.js';
 
 export type GenerateOxfmtOptions = {} | boolean;
@@ -17,7 +18,7 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
 
         const configPath = 'node_modules/@config/oxfmt/base.json';
 
-        generator.addScript('format', `oxfmt -c ${configPath} --write .`);
+        generator.addScripts(packageJsonScripts.format.oxfmt(configPath));
     } else {
         // Standalone: add oxfmt as devDependency
         generator.addDevDependency('oxfmt');
@@ -29,13 +30,13 @@ export function generateOxfmt(generator: Generator, options: GenerateOxfmtOption
                 type: 'text',
                 content: JSON.stringify(defaultOxfmtConfig, null, 2),
             });
-            generator.addScript('format', 'oxfmt -c .config/oxfmt.json --write .');
+            generator.addScripts(packageJsonScripts.format.oxfmt('.config/oxfmt.json'));
         } else {
             generator.addFile('oxfmt.json', {
                 type: 'text',
                 content: JSON.stringify(defaultOxfmtConfig, null, 2),
             });
-            generator.addScript('format', 'oxfmt -c oxfmt.json --write .');
+            generator.addScripts(packageJsonScripts.format.oxfmt('oxfmt.json'));
         }
     }
 

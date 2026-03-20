@@ -1,4 +1,5 @@
 import { defaultLinterConfig } from '../constants.js';
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import { getBaseTemplate, type Generator } from '../types.js';
 
 export type GenerateOxlintOptions = {} | boolean;
@@ -29,7 +30,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
             ? 'node_modules/@config/oxlint/react.json'
             : 'node_modules/@config/oxlint/base.json';
 
-        generator.addScript('lint', `oxlint -c ${configPath}`);
+        generator.addScripts(packageJsonScripts.lint.oxlint(configPath));
     } else {
         // Standalone: add oxlint as devDependency
         generator.addDevDependency('oxlint');
@@ -74,13 +75,13 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
                 type: 'text',
                 content: JSON.stringify(oxlintConfig, null, 2),
             });
-            generator.addScript('lint', 'oxlint -c .config/oxlint.json');
+            generator.addScripts(packageJsonScripts.lint.oxlint('.config/oxlint.json'));
         } else {
             generator.addFile('oxlint.json', {
                 type: 'text',
                 content: JSON.stringify(oxlintConfig, null, 2),
             });
-            generator.addScript('lint', 'oxlint');
+            generator.addScripts(packageJsonScripts.lint.oxlint());
         }
     }
 

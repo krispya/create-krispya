@@ -1,4 +1,5 @@
 import { defaultLinterConfig } from '../constants.js';
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../types.js';
 
 export type GenerateEslintOptions = {} | boolean;
@@ -88,13 +89,13 @@ export function generateEslint(generator: Generator, options: GenerateEslintOpti
             type: 'text',
             content: configContent,
         });
-        generator.addScript('lint', 'eslint --config .config/eslint.config.js .');
+        generator.addScripts(packageJsonScripts.lint.eslint('.config/eslint.config.js'));
     } else {
         generator.addFile('eslint.config.js', {
             type: 'text',
             content: configContent,
         });
-        generator.addScript('lint', 'eslint .');
+        generator.addScripts(packageJsonScripts.lint.eslint());
     }
 
     generator.inject(

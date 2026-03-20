@@ -22,6 +22,7 @@ import {
     generateOxfmtConfigPackage,
 } from './config-packages.js';
 import { generateGitignore } from './gitignore.js';
+import { packageJsonScripts } from './package-json-scripts.js';
 import { generateVscodeFiles as generateSharedVscodeFiles } from './vscode.js';
 
 /**
@@ -101,19 +102,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
         version: '0.0.0',
         private: true,
         type: 'module',
-        scripts: {
-            dev: "pnpm --filter './apps/*' run dev",
-            build: "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
-            test: 'pnpm -r run test',
-            lint:
-                linter === 'oxlint' ? 'oxlint .' : linter === 'biome' ? 'biome check .' : 'eslint .',
-            format:
-                formatter === 'oxfmt'
-                    ? 'oxfmt -c .config/oxfmt/base.json .'
-                    : formatter === 'biome'
-                      ? 'biome format . --write'
-                      : 'prettier --config .config/prettier/base.json --write .',
-        },
+        scripts: packageJsonScripts.monorepoRoot(linter, formatter),
         devDependencies,
     };
 

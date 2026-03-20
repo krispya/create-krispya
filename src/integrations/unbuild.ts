@@ -1,3 +1,4 @@
+import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../types.js';
 
 export function generateUnbuild(generator: Generator) {
@@ -42,14 +43,14 @@ export function generateUnbuild(generator: Generator) {
             type: 'text',
             content: buildConfigLines.join('\n'),
         });
-        generator.addScript('build', `unbuild --config .config/build.config.${ext}`);
+        generator.addScripts(packageJsonScripts.build.unbuild(`.config/build.config.${ext}`));
     } else {
         // Monorepo or root strategy: place config at package root
         generator.addFile(`build.config.${ext}`, {
             type: 'text',
             content: buildConfigLines.join('\n'),
         });
-        generator.addScript('build', 'unbuild');
+        generator.addScripts(packageJsonScripts.build.unbuild());
     }
 
     generator.inject(
