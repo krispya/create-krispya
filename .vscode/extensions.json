@@ -1,3 +1,6 @@
 {
-  "recommendations": ["oxc.oxc-vscode", "esbenp.prettier-vscode"]
+  "recommendations": [
+    "oxc.oxc-vscode",
+    "esbenp.prettier-vscode"
+  ]
 }

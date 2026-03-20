@@ -2,5 +2,7 @@
   "biome.enabled": false,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "eslint.enable": false,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
   "oxc.enable": true
 }

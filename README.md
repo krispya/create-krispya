@@ -28,3 +28,10 @@ Consider this experimental but safe. It was vibe coded and then I decided this p
 ## Single-project workspaces
 
 The basic dish.
+
+## CLI
+
+```bash
+npm create krispya name
+npm create krispya --update
+```
