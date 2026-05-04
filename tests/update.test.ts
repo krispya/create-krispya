@@ -5,6 +5,14 @@ import { tmpdir } from 'node:os';
 import { detectCurrentConfig, generateExpectedFiles } from '../src/update.js';
 
 describe('update helpers', () => {
+    function readTextJson(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
+        if (file.type !== 'text') {
+            throw new Error('Expected generated file to be text');
+        }
+
+        return JSON.parse(file.content);
+    }
+
     it('uses standalone root config for standalone updates', async () => {
         const expected = await generateExpectedFiles({
             name: 'my-app',
@@ -46,6 +54,22 @@ describe('update helpers', () => {
         expect(expected['workspace-config']).toEqual({});
     });
 
+    it('uses standalone VS Code config paths for standalone updates', async () => {
+        const expected = await generateExpectedFiles({
+            name: 'my-app',
+            linter: 'oxlint',
+            formatter: 'prettier',
+            packageManager: 'pnpm',
+            isMonorepo: false,
+            configStrategy: 'stealth',
+        });
+
+        const settings = readTextJson(expected.vscode['.vscode/settings.json']);
+
+        expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
+        expect(settings['prettier.configPath']).toBe('.config/prettier.json');
+    });
+
     it('uses workspace root config for monorepo updates', async () => {
         const expected = await generateExpectedFiles({
             name: 'workspace',
@@ -69,6 +93,10 @@ describe('update helpers', () => {
             ].join('\n'),
         });
         expect(expected['config-packages']['.config/typescript/package.json']).toBeDefined();
+
+        const settings = readTextJson(expected.vscode['.vscode/settings.json']);
+        expect(settings['oxc.configPath']).toBeUndefined();
+        expect(settings['prettier.configPath']).toBeUndefined();
     });
 });
 

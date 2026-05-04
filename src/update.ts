@@ -9,11 +9,11 @@ import {
     generateEslintConfigPackage,
     generatePrettierConfigPackage,
     generateOxfmtConfigPackage,
-    generateVscodeFiles,
 } from './generators/monorepo.js';
 import { generateAiFiles, ALL_AI_PLATFORMS } from './generators/ai-files.js';
 import { generateEditorConfig } from './generators/editorconfig.js';
 import { generateGitignore } from './generators/gitignore.js';
+import { generateVscodeFiles } from './generators/vscode.js';
 import {
     formatResolvedPackageVersion,
     getResolvedPackageVersion,
@@ -158,8 +158,12 @@ export async function generateExpectedFiles(
     });
 
     // VS Code
-    const vscodeFiles: Record<string, File> = {};
-    generateVscodeFiles(vscodeFiles, linter, formatter);
+    const vscodeFiles = generateVscodeFiles({
+        linter,
+        formatter,
+        configStrategy,
+        isMonorepo,
+    });
 
     // Config Packages
     const configPackages: Record<string, File> = {};
