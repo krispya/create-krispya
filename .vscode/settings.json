@@ -1,9 +1,16 @@
 {
   "biome.enabled": false,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.detectIndentation": false,
+  "editor.insertSpaces": true,
+  "editor.rulers": [102],
+  "editor.tabSize": 2,
   "eslint.enable": false,
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "oxc.configPath": ".config/oxlint.json",
   "oxc.enable": true,
-  "mdx-preview.preview.enableScripts": true
+  "prettier.configPath": ".config/prettier.json"
 }
