@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { detectCurrentConfig, generateExpectedFiles } from '../src/update.js';
+import {
+    detectCurrentConfig,
+    generateExpectedFiles,
+    getPackageJsonScriptUpdates,
+} from '../src/update.js';
 
 describe('update helpers', () => {
     function readTextJson(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
@@ -68,6 +72,62 @@ describe('update helpers', () => {
 
         expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
         expect(settings['prettier.configPath']).toBe('.config/prettier.json');
+    });
+
+    it('regenerates standalone package scripts with typecheck watch', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-scripts-'));
+        try {
+            await mkdir(join(tempDir, '.config'), { recursive: true });
+            await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
+            await writeFile(
+                join(tempDir, 'package.json'),
+                JSON.stringify(
+                    {
+                        name: 'my-app',
+                        type: 'module',
+                        scripts: {
+                            custom: 'echo custom',
+                            typecheck: 'tsc --noEmit',
+                        },
+                        devDependencies: {
+                            eslint: '^9.0.0',
+                            prettier: '^3.0.0',
+                            typescript: '^5.0.0',
+                            vite: '^6.0.0',
+                            vitest: '^4.0.0',
+                        },
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const changes = await getPackageJsonScriptUpdates(tempDir, {
+                name: 'my-app',
+                linter: 'eslint',
+                formatter: 'prettier',
+                packageManager: 'pnpm',
+                isMonorepo: false,
+                configStrategy: 'stealth',
+            });
+
+            expect(changes).toHaveLength(1);
+            expect(changes[0]?.status).toBe('modified');
+
+            const packageJson = JSON.parse(changes[0]!.newContent);
+            expect(packageJson.scripts).toMatchObject({
+                build: 'vite build',
+                custom: 'echo custom',
+                dev: 'vite',
+                format: 'prettier --config .config/prettier.json --write .',
+                lint: 'eslint --config .config/eslint.config.js .',
+                test: 'vitest',
+                typecheck: 'tsc --build --noEmit',
+                'typecheck:watch': 'tsc --build --watch',
+            });
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('uses workspace root config for monorepo updates', async () => {

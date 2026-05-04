@@ -2,7 +2,7 @@ import { readFile, access, writeFile, mkdir, rm, readdir } from 'fs/promises';
 import { constants } from 'fs';
 import { join, dirname } from 'path';
 
-import type { ConfigStrategy, Linter, Formatter, File } from './types.js';
+import type { ConfigStrategy, Linter, Formatter, File, PackageManagerName } from './types.js';
 import {
     generateTypescriptConfigPackage,
     generateOxlintConfigPackage,
@@ -19,6 +19,11 @@ import {
     getResolvedPackageVersion,
     resolveMonorepoRootPackageVersions,
 } from './package-versions.js';
+import {
+    mergePackageJsonScripts,
+    packageJsonScripts,
+    resolveDefaultPackageJsonScripts,
+} from './generators/package-json-scripts.js';
 import { parseWorkspaceYamlContent, detectTooling } from './utils.js';
 
 // =============================================================================
@@ -28,6 +33,7 @@ import { parseWorkspaceYamlContent, detectTooling } from './utils.js';
 export type UpdateCategory =
     | 'ai-files'
     | 'vscode'
+    | 'package-json'
     | 'config-packages'
     | 'workspace-config'
     | 'root-config';
@@ -55,6 +61,18 @@ export type WorkspaceConfig = {
     packageManager: string;
     isMonorepo: boolean;
     configStrategy?: ConfigStrategy;
+};
+
+type PackageJsonForScripts = {
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    packageManager?: string;
+    exports?: unknown;
+    main?: string;
+    module?: string;
+    files?: unknown;
 };
 
 export type MigrationTarget = {
@@ -226,6 +244,7 @@ export async function generateExpectedFiles(
     return {
         'ai-files': aiFilesMap,
         vscode: vscodeFiles,
+        'package-json': {},
         'config-packages': configPackages,
         'workspace-config': workspaceConfig,
         'root-config': rootConfig,
@@ -258,6 +277,7 @@ export async function compareWithDisk(
     const categoryLabels: Record<UpdateCategory, string> = {
         'ai-files': 'AI Files',
         vscode: 'VS Code',
+        'package-json': 'Package Scripts',
         'config-packages': 'Config Packages',
         'workspace-config': 'Workspace Config',
         'root-config': 'Root Config',
@@ -319,6 +339,163 @@ export async function compareWithDisk(
     }
 
     return categories;
+}
+
+// =============================================================================
+// Package Script Merge
+// =============================================================================
+
+function isPackageManagerName(value: string): value is PackageManagerName {
+    return value === 'pnpm' || value === 'npm' || value === 'yarn';
+}
+
+function hasPackage(pkg: PackageJsonForScripts, name: string): boolean {
+    return (
+        pkg.dependencies?.[name] != null ||
+        pkg.devDependencies?.[name] != null ||
+        pkg.peerDependencies?.[name] != null
+    );
+}
+
+async function detectTypeScriptPackage(root: string, pkg: PackageJsonForScripts): Promise<boolean> {
+    if (hasPackage(pkg, 'typescript')) return true;
+
+    return (
+        (await fileExists(join(root, 'tsconfig.json'))) ||
+        (await fileExists(join(root, 'tsconfig.app.json'))) ||
+        (await fileExists(join(root, '.config/tsconfig.app.json')))
+    );
+}
+
+function detectLibraryPackage(pkg: PackageJsonForScripts): boolean {
+    return (
+        pkg.exports != null ||
+        pkg.main?.includes('dist') === true ||
+        pkg.module?.includes('dist') === true ||
+        (Array.isArray(pkg.files) && pkg.files.includes('dist'))
+    );
+}
+
+function getPackageManagerForScripts(config: WorkspaceConfig, pkg: PackageJsonForScripts) {
+    const packageManager = pkg.packageManager?.split('@')[0] ?? config.packageManager;
+    return isPackageManagerName(packageManager) ? packageManager : 'pnpm';
+}
+
+function getStandaloneToolScripts(config: WorkspaceConfig) {
+    const isStealth = (config.configStrategy ?? 'stealth') === 'stealth';
+    const linterScripts =
+        config.linter === 'oxlint'
+            ? packageJsonScripts.lint.oxlint(isStealth ? '.config/oxlint.json' : undefined)
+            : config.linter === 'eslint'
+              ? packageJsonScripts.lint.eslint(isStealth ? '.config/eslint.config.js' : undefined)
+              : packageJsonScripts.lint.biome(isStealth ? '.config' : undefined);
+
+    const formatterScripts =
+        config.formatter === 'prettier'
+            ? packageJsonScripts.format.prettier(isStealth ? '.config/prettier.json' : undefined)
+            : config.formatter === 'oxfmt'
+              ? packageJsonScripts.format.oxfmt(isStealth ? '.config/oxfmt.json' : 'oxfmt.json')
+              : packageJsonScripts.format.biome(isStealth ? '.config' : undefined);
+
+    return mergePackageJsonScripts(linterScripts, formatterScripts);
+}
+
+function getLibraryBuildScripts(pkg: PackageJsonForScripts) {
+    if (!detectLibraryPackage(pkg)) return undefined;
+
+    if (hasPackage(pkg, 'tsdown') || pkg.scripts?.build === 'tsdown') {
+        return packageJsonScripts.build.tsdown;
+    }
+
+    return packageJsonScripts.build.unbuild();
+}
+
+function getTestingScripts(pkg: PackageJsonForScripts) {
+    if (hasPackage(pkg, 'vitest') || pkg.scripts?.test === 'vitest') {
+        return packageJsonScripts.test.vitest;
+    }
+
+    return undefined;
+}
+
+function scriptsEqual(left: Record<string, string>, right: Record<string, string>): boolean {
+    const leftEntries = Object.entries(left);
+    if (leftEntries.length !== Object.keys(right).length) return false;
+
+    return leftEntries.every(([key, value]) => right[key] === value);
+}
+
+async function getExpectedPackageScripts(
+    root: string,
+    config: WorkspaceConfig,
+    pkg: PackageJsonForScripts
+) {
+    if (config.isMonorepo) {
+        return packageJsonScripts.monorepoRoot(config.linter, config.formatter);
+    }
+
+    const language = (await detectTypeScriptPackage(root, pkg)) ? 'typescript' : 'javascript';
+    const isLibrary = detectLibraryPackage(pkg);
+    const packageManagerName = getPackageManagerForScripts(config, pkg);
+
+    return mergePackageJsonScripts(
+        resolveDefaultPackageJsonScripts({
+            language,
+            isLibrary,
+            packageManagerName,
+        }),
+        getLibraryBuildScripts(pkg),
+        getTestingScripts(pkg),
+        getStandaloneToolScripts(config)
+    );
+}
+
+/**
+ * Generates a package.json scripts update while preserving unknown scripts and package fields.
+ */
+export async function getPackageJsonScriptUpdates(
+    root: string,
+    config: WorkspaceConfig
+): Promise<FileChange[]> {
+    const packageJsonPath = join(root, 'package.json');
+
+    let currentContent: string;
+    try {
+        currentContent = await readFile(packageJsonPath, 'utf-8');
+    } catch {
+        return [];
+    }
+
+    const pkg = JSON.parse(currentContent) as PackageJsonForScripts;
+    const currentScripts = pkg.scripts ?? {};
+    const expectedScripts = await getExpectedPackageScripts(root, config, pkg);
+    const nextScripts = mergePackageJsonScripts(currentScripts, expectedScripts);
+
+    if (scriptsEqual(currentScripts, nextScripts)) {
+        return [
+            {
+                path: 'package.json',
+                status: 'unchanged',
+                currentContent,
+                newContent: currentContent,
+            },
+        ];
+    }
+
+    const nextPackageJson = {
+        ...pkg,
+        scripts: nextScripts,
+    };
+    const newContent = `${JSON.stringify(nextPackageJson, null, 2)}\n`;
+
+    return [
+        {
+            path: 'package.json',
+            status: 'modified',
+            currentContent,
+            newContent,
+        },
+    ];
 }
 
 // =============================================================================

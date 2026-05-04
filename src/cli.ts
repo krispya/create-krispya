@@ -88,6 +88,7 @@ import {
     formatMigrationChange,
     generateExpectedFiles,
     getMigrationPlan,
+    getPackageJsonScriptUpdates,
     getWorkspaceConfigUpdates,
     needsMigration,
     type CategoryUpdate,
@@ -1257,6 +1258,16 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
     const categories = await compareWithDisk(expected, projectRoot);
 
     const allCategories = categories.filter((c) => c.category !== 'workspace-config');
+    const packageJsonScriptChanges = await getPackageJsonScriptUpdates(projectRoot, config);
+    if (packageJsonScriptChanges.length > 0) {
+        allCategories.push({
+            category: 'package-json',
+            label: 'Package Scripts',
+            changes: packageJsonScriptChanges,
+            hasUserModifications: packageJsonScriptChanges.some((c) => c.status === 'modified'),
+        });
+    }
+
     if (isMonorepo) {
         // Step 4: Add workspace config updates (merge strategy)
         const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot);
@@ -1358,8 +1369,8 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
             console.log();
 
             // Non-interactive: add new only (safe default)
-            // Exception: workspace-config uses merge strategy, so "modified" is safe
-            if (category.category === 'workspace-config') {
+            // Exceptions: these use merge strategies, so "modified" is safe
+            if (category.category === 'workspace-config' || category.category === 'package-json') {
                 changesToApply = [...newChanges, ...modifiedChanges];
                 if (changesToApply.length > 0) {
                     console.log(color.dim('  (--yes mode: applying merge updates)'));

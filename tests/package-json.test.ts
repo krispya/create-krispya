@@ -121,6 +121,7 @@ describe('generatePackageJson', () => {
             build: 'vite build',
             dev: 'vite',
             typecheck: 'tsc --build --noEmit',
+            'typecheck:watch': 'tsc --build --watch',
         });
     });
 
@@ -147,6 +148,7 @@ describe('generatePackageJson', () => {
             build: 'unbuild',
             release: 'pnpm run build && pnpm publish',
             typecheck: 'tsc --build --noEmit',
+            'typecheck:watch': 'tsc --build --watch',
         });
     });
 
@@ -177,6 +179,7 @@ describe('generatePackageJson', () => {
             lint: 'eslint --config .config/eslint.config.js .',
             test: 'vitest',
             typecheck: 'tsc --build --noEmit',
+            'typecheck:watch': 'tsc --build --watch',
         });
     });
 

@@ -10,6 +10,7 @@ export const packageJsonScripts = {
 
     typescript: {
         typecheck: 'tsc --build --noEmit',
+        'typecheck:watch': 'tsc --build --watch',
     } satisfies PackageJsonScripts,
 
     test: {

@@ -28,8 +28,8 @@ We are also in a time of rampant changes to the JS toolchain ecosytem. In an eff
 
 The basic dish. The default templates include:
 
-- Application
-- Library
+- **Application.** An application with a dev server.
+- **Library.** A library meant to be published.
 
 ## CLI
 
@@ -38,10 +38,14 @@ npm create krispya@latest my-project
 npm create krispya@latest --update
 ```
 
-## Options
+## Why?
 
 ### Editor config
 
-Editors, or IDEs, allow the user to generically configure formatting using the [EditorConfig](https://spec.editorconfig.org/) file. You might think, isn't this what the formatter is for? The formatter only runs after code is written while the editor config will enforce the rules inside the editor itself making generated code more consistent.
+Editors, or IDEs, allow the user to generically configure formatting using the [EditorConfig](https://spec.editorconfig.org/) file. You might think, isn't this what the formatter is for? The formatter only runs after code is written while the editor config will enforce the rules inside the editor itself making generated code more consistent and working between editors a nicer experience.
 
 Editor specific config files can optionally be installed for more control. Currently only `vscode` is supported.
+
+### `typecheck` script uses build mode
+
+It turns out that for `tsc` to actually follow tsconfig references, it needs to be in [build mode](https://www.typescriptlang.org/docs/handbook/project-references.html#build-mode-for-typescript). This makes it so you can have a (single config entry point)[https://www.typescriptlang.org/docs/handbook/project-references.html#overall-structure], reducing files and making me happy.
