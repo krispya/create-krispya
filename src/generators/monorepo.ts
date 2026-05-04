@@ -88,6 +88,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
 
     if (linter === 'oxlint') {
         assignResolvedPackageVersion(devDependencies, versions, 'oxlint');
+        assignResolvedPackageVersion(devDependencies, versions, 'oxlint-tsgolint');
     } else if (linter === 'eslint') {
         assignResolvedPackageVersion(devDependencies, versions, 'eslint');
     } else if (linter === 'biome') {

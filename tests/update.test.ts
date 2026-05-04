@@ -6,6 +6,7 @@ import {
     compareWithDisk,
     detectCurrentConfig,
     generateExpectedFiles,
+    getOxlintConfigReplacementUpdates,
     getPackageJsonScriptUpdates,
 } from '../src/update.js';
 
@@ -174,6 +175,88 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
                 typecheck: 'tsc --build --noEmit',
                 'typecheck:watch': 'tsc --build --watch',
             });
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('adds oxlint type-aware backend during standalone updates', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-oxlint-type-aware-'));
+        try {
+            await mkdir(join(tempDir, '.config'), { recursive: true });
+            await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
+            await writeFile(
+                join(tempDir, 'package.json'),
+                JSON.stringify(
+                    {
+                        name: 'my-app',
+                        type: 'module',
+                        scripts: {
+                            lint: 'oxlint -c .config/oxlint.json',
+                        },
+                        devDependencies: {
+                            oxlint: '^1.51.0',
+                            typescript: '^5.9.3',
+                        },
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const changes = await getPackageJsonScriptUpdates(tempDir, {
+                name: 'my-app',
+                linter: 'oxlint',
+                formatter: 'prettier',
+                packageManager: 'pnpm',
+                isMonorepo: false,
+                configStrategy: 'stealth',
+            });
+
+            expect(changes).toHaveLength(1);
+            expect(changes[0]?.status).toBe('modified');
+
+            const packageJson = JSON.parse(changes[0]!.newContent);
+            expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('offers oxlint config replacement during standalone updates', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-oxlint-config-'));
+        try {
+            await mkdir(join(tempDir, '.config'), { recursive: true });
+            await writeFile(
+                join(tempDir, '.config/oxlint.json'),
+                JSON.stringify(
+                    {
+                        $schema: '../node_modules/oxlint/configuration_schema.json',
+                        plugins: ['unicorn', 'typescript', 'oxc'],
+                        rules: {
+                            'no-useless-escape': 'off',
+                        },
+                    },
+                    null,
+                    2
+                )
+            );
+
+            const changes = await getOxlintConfigReplacementUpdates(tempDir, {
+                name: 'my-app',
+                linter: 'oxlint',
+                formatter: 'prettier',
+                packageManager: 'pnpm',
+                isMonorepo: false,
+                configStrategy: 'stealth',
+            });
+
+            expect(changes).toHaveLength(1);
+            expect(changes[0]?.status).toBe('modified');
+
+            const oxlintConfig = JSON.parse(changes[0]!.newContent);
+            expect(oxlintConfig.options).toEqual({ typeAware: true });
+            expect(oxlintConfig.ignorePatterns).toEqual(['dist']);
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }

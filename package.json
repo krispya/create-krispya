@@ -48,6 +48,7 @@
   "devDependencies": {
     "@types/node": "^25.3.5",
     "oxlint": "^1.51.0",
+    "oxlint-tsgolint": "^0.22.1",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

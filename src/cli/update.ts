@@ -14,6 +14,7 @@ import {
     formatMigrationChange,
     generateExpectedFiles,
     getMigrationPlan,
+    getOxlintConfigReplacementUpdates,
     getPackageJsonScriptUpdates,
     getWorkspaceConfigUpdates,
     needsMigration,
@@ -37,6 +38,7 @@ type FixCommand = (options: CliOptions) => Promise<void>;
 const UPDATE_CATEGORY_ORDER = [
     'root-config',
     'config-packages',
+    'tooling-config',
     'workspace-config',
     'vscode',
     'package-json',
@@ -49,7 +51,7 @@ function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
 
 function getUpdateHint(category: CategoryUpdate['category'], status: 'added' | 'modified'): string {
     if (status === 'added') return 'new file';
-    if (category === 'package-json') return 'scripts-only merge';
+    if (category === 'package-json') return 'merge update';
     if (category === 'workspace-config') return 'merge update';
     return 'changed; overwrites if selected';
 }
@@ -115,11 +117,21 @@ async function collectUpdateCategories(
     if (packageJsonScriptChanges.length > 0) {
         allCategories.push({
             category: 'package-json',
-            label: 'package.json Scripts',
+            label: 'package.json',
             changes: packageJsonScriptChanges,
             hasUserModifications: packageJsonScriptChanges.some(
                 (change) => change.status === 'modified'
             ),
+        });
+    }
+
+    const oxlintConfigChanges = await getOxlintConfigReplacementUpdates(projectRoot, config);
+    if (oxlintConfigChanges.length > 0) {
+        allCategories.push({
+            category: 'tooling-config',
+            label: 'Tooling Config',
+            changes: oxlintConfigChanges,
+            hasUserModifications: oxlintConfigChanges.some((change) => change.status === 'modified'),
         });
     }
 

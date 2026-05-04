@@ -49,6 +49,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
     leva: { fallbackVersion: '0.10.0' },
     oxfmt: { fallbackVersion: '0.21.0' },
     oxlint: { fallbackVersion: '1.36.0' },
+    'oxlint-tsgolint': { fallbackVersion: '0.22.1' },
     prettier: { fallbackVersion: '3.4.2' },
     react: { fallbackVersion: '19.0.0' },
     'react-dom': { fallbackVersion: '19.0.0' },
@@ -272,6 +273,9 @@ export async function resolveMonorepoRootPackageVersions(params: {
     const packageNames = new Set<string>();
     const explicitVersions = new Set(Object.keys(params.versions ?? {}));
     addPackageName(packageNames, explicitVersions, getLinterPackage(params.linter));
+    if (params.linter === 'oxlint') {
+        addPackageName(packageNames, explicitVersions, 'oxlint-tsgolint');
+    }
     if (params.formatter !== 'biome' || params.linter !== 'biome') {
         addPackageName(packageNames, explicitVersions, getFormatterPackage(params.formatter));
     }
@@ -394,6 +398,9 @@ function collectProjectPackageNames(options: GenerateOptions): string[] {
     } else if (linter === 'oxlint') {
         if (!inWorkspace) {
             addPackageName(packageNames, explicitVersions, 'oxlint');
+            if (isTypescript) {
+                addPackageName(packageNames, explicitVersions, 'oxlint-tsgolint');
+            }
         }
     } else if (linter === 'biome') {
         addPackageName(packageNames, explicitVersions, '@biomejs/biome');

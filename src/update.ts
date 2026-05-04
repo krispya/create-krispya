@@ -24,7 +24,7 @@ import {
     packageJsonScripts,
     resolveDefaultPackageJsonScripts,
 } from './generators/package-json-scripts.js';
-import { prettierIgnoreContent } from './constants.js';
+import { defaultLinterConfig, prettierIgnoreContent } from './constants.js';
 import { parseWorkspaceYamlContent, detectTooling } from './utils.js';
 
 // =============================================================================
@@ -36,6 +36,7 @@ export type UpdateCategory =
     | 'vscode'
     | 'package-json'
     | 'config-packages'
+    | 'tooling-config'
     | 'workspace-config'
     | 'root-config';
 
@@ -434,6 +435,7 @@ export async function compareWithDisk(
         vscode: 'VS Code',
         'package-json': 'package.json Scripts',
         'config-packages': 'Config Packages',
+        'tooling-config': 'Tooling Config',
         'workspace-config': 'Workspace Config',
         'root-config': 'Root Config',
     };
@@ -510,6 +512,10 @@ function hasPackage(pkg: PackageJsonForScripts, name: string): boolean {
         pkg.devDependencies?.[name] != null ||
         pkg.peerDependencies?.[name] != null
     );
+}
+
+function sortPackageMap(packageMap: Record<string, string>): Record<string, string> {
+    return Object.fromEntries(Object.entries(packageMap).sort(([a], [b]) => a.localeCompare(b)));
 }
 
 async function detectTypeScriptPackage(root: string, pkg: PackageJsonForScripts): Promise<boolean> {
@@ -608,8 +614,26 @@ async function getExpectedPackageScripts(
     );
 }
 
+async function getExpectedPackageDevDependencies(
+    root: string,
+    config: WorkspaceConfig,
+    pkg: PackageJsonForScripts
+) {
+    const nextDevDependencies = { ...(pkg.devDependencies ?? {}) };
+    const shouldAddOxlintTypeAwareBackend =
+        config.linter === 'oxlint' &&
+        (config.isMonorepo || (await detectTypeScriptPackage(root, pkg))) &&
+        !hasPackage(pkg, 'oxlint-tsgolint');
+
+    if (shouldAddOxlintTypeAwareBackend) {
+        nextDevDependencies['oxlint-tsgolint'] = formatResolvedPackageVersion({}, 'oxlint-tsgolint');
+    }
+
+    return sortPackageMap(nextDevDependencies);
+}
+
 /**
- * Generates a package.json scripts-only update while preserving unknown scripts and package fields.
+ * Generates a package.json additive update while preserving unknown package fields.
  */
 export async function getPackageJsonScriptUpdates(
     root: string,
@@ -628,8 +652,13 @@ export async function getPackageJsonScriptUpdates(
     const currentScripts = pkg.scripts ?? {};
     const expectedScripts = await getExpectedPackageScripts(root, config, pkg);
     const nextScripts = mergePackageJsonScripts(currentScripts, expectedScripts);
+    const currentDevDependencies = pkg.devDependencies ?? {};
+    const nextDevDependencies = await getExpectedPackageDevDependencies(root, config, pkg);
 
-    if (scriptsEqual(currentScripts, nextScripts)) {
+    if (
+        scriptsEqual(currentScripts, nextScripts) &&
+        scriptsEqual(currentDevDependencies, nextDevDependencies)
+    ) {
         return [
             {
                 path: 'package.json',
@@ -640,10 +669,13 @@ export async function getPackageJsonScriptUpdates(
         ];
     }
 
-    const nextPackageJson = {
+    const nextPackageJson: PackageJsonForScripts = {
         ...pkg,
         scripts: nextScripts,
     };
+    if (Object.keys(nextDevDependencies).length > 0 || pkg.devDependencies != null) {
+        nextPackageJson.devDependencies = nextDevDependencies;
+    }
     const newContent = `${JSON.stringify(nextPackageJson, null, 2)}\n`;
 
     return [
@@ -652,6 +684,82 @@ export async function getPackageJsonScriptUpdates(
             status: 'modified',
             currentContent,
             newContent,
+        },
+    ];
+}
+
+// =============================================================================
+// Tooling Config Replacement
+// =============================================================================
+
+function generateStandaloneOxlintConfig(config: WorkspaceConfig): FileChange | undefined {
+    if (config.linter !== 'oxlint' || config.isMonorepo) return undefined;
+
+    const isStealth = (config.configStrategy ?? 'stealth') === 'stealth';
+    const path = isStealth ? '.config/oxlint.json' : 'oxlint.json';
+    const { rules } = defaultLinterConfig;
+    const oxlintConfig = {
+        $schema: isStealth
+            ? '../node_modules/oxlint/configuration_schema.json'
+            : './node_modules/oxlint/configuration_schema.json',
+        plugins: ['unicorn', 'typescript', 'oxc'],
+        options: { typeAware: true },
+        rules: {
+            'no-unused-vars': [
+                rules.noUnusedVars.level,
+                {
+                    argsIgnorePattern: rules.noUnusedVars.argsIgnorePattern,
+                    varsIgnorePattern: rules.noUnusedVars.varsIgnorePattern,
+                    caughtErrorsIgnorePattern: rules.noUnusedVars.caughtErrorsIgnorePattern,
+                },
+            ],
+            'no-useless-escape': 'off',
+            'no-unused-expressions': [
+                rules.noUnusedExpressions.level,
+                { allowShortCircuit: rules.noUnusedExpressions.allowShortCircuit },
+            ],
+        },
+        ignorePatterns: defaultLinterConfig.ignorePatterns,
+    };
+
+    return {
+        path,
+        status: 'added',
+        newContent: `${JSON.stringify(oxlintConfig, null, 2)}\n`,
+    };
+}
+
+export async function getOxlintConfigReplacementUpdates(
+    root: string,
+    config: WorkspaceConfig
+): Promise<FileChange[]> {
+    const expected = generateStandaloneOxlintConfig(config);
+    if (expected == null) return [];
+
+    const fullPath = join(root, expected.path);
+    let currentContent: string;
+    try {
+        currentContent = await readFile(fullPath, 'utf-8');
+    } catch {
+        return [expected];
+    }
+
+    if (fileContentsEqual(expected.path, currentContent, expected.newContent)) {
+        return [
+            {
+                ...expected,
+                status: 'unchanged',
+                currentContent,
+                newContent: currentContent,
+            },
+        ];
+    }
+
+    return [
+        {
+            ...expected,
+            status: 'modified',
+            currentContent,
         },
     ];
 }
@@ -1175,6 +1283,9 @@ async function updateRootPackageJson(root: string, plan: MigrationPlan): Promise
     // Remove old linter dep
     const oldLinterDep = LINTER_DEPS[plan.fromLinter];
     delete devDeps[oldLinterDep];
+    if (plan.fromLinter === 'oxlint') {
+        delete devDeps['oxlint-tsgolint'];
+    }
 
     // Remove old formatter dep (if different from linter)
     if (plan.fromFormatter !== plan.fromLinter) {
@@ -1190,6 +1301,12 @@ async function updateRootPackageJson(root: string, plan: MigrationPlan): Promise
     // Add new linter dep
     const newLinterDep = LINTER_DEPS[plan.toLinter];
     devDeps[newLinterDep] = formatResolvedPackageVersion(resolvedVersions, newLinterDep);
+    if (plan.toLinter === 'oxlint') {
+        devDeps['oxlint-tsgolint'] = formatResolvedPackageVersion(
+            resolvedVersions,
+            'oxlint-tsgolint'
+        );
+    }
 
     // Add new formatter dep (if different from linter)
     if (plan.toFormatter !== plan.toLinter) {

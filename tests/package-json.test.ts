@@ -268,6 +268,35 @@ describe('generatePackageJson', () => {
         );
     });
 
+    it('adds formatter ignore patterns to oxfmt configs', () => {
+        const standaloneFiles = generate({
+            name: 'my-app',
+            template: 'vanilla',
+            formatter: 'oxfmt',
+        });
+        const { files: monorepoFiles } = generateMonorepo({
+            name: 'workspace',
+            linter: 'oxlint',
+            formatter: 'oxfmt',
+            packageManager: { name: 'pnpm', version: '10.0.0' },
+        });
+
+        const expectedIgnorePatterns = [
+            'package-lock.json',
+            'npm-shrinkwrap.json',
+            'pnpm-lock.yaml',
+            'pnpm-lock.json',
+            'yarn.lock',
+            'bun.lock',
+            'bun.lockb',
+        ];
+        const standaloneConfig = JSON.parse(standaloneFiles['.config/oxfmt.json'].content);
+        const monorepoConfig = JSON.parse(monorepoFiles['.config/oxfmt/base.json'].content);
+
+        expect(standaloneConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
+        expect(monorepoConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
+    });
+
     it('adds editorconfig to monorepo roots', () => {
         const { files } = generateMonorepo({
             name: 'workspace',
@@ -312,5 +341,27 @@ describe('generatePackageJson', () => {
 
         const packageJson = readPackageJsonContent(files['package.json']);
         expect(packageJson.devDependencies.typescript).toBe('^5.9.3');
+        expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
+    });
+
+    it('adds oxlint type-aware support to monorepo roots', () => {
+        const { files } = generateMonorepo({
+            name: 'workspace',
+            linter: 'oxlint',
+            formatter: 'prettier',
+            packageManager: { name: 'pnpm', version: '10.0.0' },
+            versions: {
+                '@types/node': '25.3.5',
+                oxlint: '1.51.0',
+                'oxlint-tsgolint': '0.22.1',
+                prettier: '3.8.1',
+            },
+        });
+
+        const packageJson = readPackageJsonContent(files['package.json']);
+        expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
+
+        const oxlintConfig = readPackageJsonContent(files['.config/oxlint/base.json']);
+        expect(oxlintConfig.options).toEqual({ typeAware: true });
     });
 });

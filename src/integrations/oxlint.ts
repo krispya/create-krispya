@@ -1,6 +1,6 @@
 import { defaultLinterConfig } from '../constants.js';
 import { packageJsonScripts } from '../generators/package-json-scripts.js';
-import { getBaseTemplate, type Generator } from '../types.js';
+import { getBaseTemplate, getLanguageFromTemplate, type Generator } from '../types.js';
 
 export type GenerateOxlintOptions = {} | boolean;
 
@@ -17,6 +17,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     // Check if it's a React project
     const template = generator.options.template ?? 'vanilla';
     const baseTemplate = getBaseTemplate(template);
+    const isTypescript = getLanguageFromTemplate(template) === 'typescript';
     const isReact = baseTemplate === 'react' || baseTemplate === 'r3f';
 
     // Check if we're in a monorepo context (workspaceRoot is set)
@@ -34,6 +35,9 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
     } else {
         // Standalone: add oxlint as devDependency
         generator.addDevDependency('oxlint');
+        if (isTypescript) {
+            generator.addDevDependency('oxlint-tsgolint');
+        }
 
         const isStealth = generator.isStealthConfig();
 
@@ -52,6 +56,7 @@ export function generateOxlint(generator: Generator, options: GenerateOxlintOpti
                 ? '../node_modules/oxlint/configuration_schema.json'
                 : './node_modules/oxlint/configuration_schema.json',
             plugins,
+            ...(isTypescript ? { options: { typeAware: true } } : {}),
             rules: {
                 'no-unused-vars': [
                     toOxlintLevel(rules.noUnusedVars.level),

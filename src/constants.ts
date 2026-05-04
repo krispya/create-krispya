@@ -101,6 +101,16 @@ export type FormatterConfig = {
     arrowParens: 'always' | 'avoid';
 };
 
+export const formatterIgnorePatterns = [
+    'package-lock.json',
+    'npm-shrinkwrap.json',
+    'pnpm-lock.yaml',
+    'pnpm-lock.json',
+    'yarn.lock',
+    'bun.lock',
+    'bun.lockb',
+];
+
 export const defaultFormatterConfig: FormatterConfig = {
     printWidth: 102,
     tabWidth: 2,
@@ -128,15 +138,7 @@ export const defaultPrettierConfig = {
     ],
 };
 
-export const prettierIgnoreContent = [
-    'package-lock.json',
-    'npm-shrinkwrap.json',
-    'pnpm-lock.yaml',
-    'pnpm-lock.json',
-    'yarn.lock',
-    'bun.lock',
-    'bun.lockb',
-].join('\n');
+export const prettierIgnoreContent = formatterIgnorePatterns.join('\n');
 
 // Full oxfmt config (Prettier-compatible subset)
 export const defaultOxfmtConfig = {
@@ -148,6 +150,7 @@ export const defaultOxfmtConfig = {
     trailingComma: defaultFormatterConfig.trailingComma,
     bracketSpacing: defaultFormatterConfig.bracketSpacing,
     arrowParens: defaultFormatterConfig.arrowParens,
+    ignorePatterns: formatterIgnorePatterns,
 };
 
 // Common linter configuration

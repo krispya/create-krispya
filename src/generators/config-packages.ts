@@ -178,6 +178,7 @@ oxlint -c node_modules/@config/oxlint/base.json
             {
                 $schema: './node_modules/oxlint/configuration_schema.json',
                 plugins: ['unicorn', 'typescript', 'oxc'],
+                options: { typeAware: true },
                 rules: {
                     'no-unused-vars': [
                         rules.noUnusedVars.level,
@@ -207,6 +208,7 @@ oxlint -c node_modules/@config/oxlint/base.json
             {
                 $schema: './node_modules/oxlint/configuration_schema.json',
                 plugins: ['unicorn', 'typescript', 'oxc', 'react'],
+                options: { typeAware: true },
                 rules: {
                     'no-unused-vars': [
                         rules.noUnusedVars.level,
