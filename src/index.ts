@@ -346,6 +346,7 @@ export function generate(options: GenerateOptions) {
                 formatter,
                 configStrategy: clonedOptions.configStrategy,
                 isMonorepo: false,
+                packageManager,
             })
         );
     }

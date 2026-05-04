@@ -182,6 +182,7 @@ export async function generateExpectedFiles(
         formatter,
         configStrategy,
         isMonorepo,
+        packageManager: isPackageManagerName(packageManager) ? packageManager : undefined,
     });
 
     // Config Packages

@@ -7,6 +7,10 @@
   "eslint.enable": false,
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    ".gitignore": ".gitattributes",
+    "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml"
+  },
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "oxc.configPath": ".config/oxlint.json",

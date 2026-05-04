@@ -1,4 +1,11 @@
-import type { CodeInjectionLocation, ConfigStrategy, File, Formatter, Linter } from '../types.js';
+import type {
+    CodeInjectionLocation,
+    ConfigStrategy,
+    File,
+    Formatter,
+    Linter,
+    PackageManagerName,
+} from '../types.js';
 import { generateVscodeEditorSettings } from './editorconfig.js';
 
 export type VscodeParams = {
@@ -8,12 +15,17 @@ export type VscodeParams = {
     formatter?: Formatter;
     configStrategy?: ConfigStrategy;
     isMonorepo?: boolean;
+    packageManager?: PackageManagerName;
 };
 
 const DEFAULT_VSCODE_SETTINGS: Record<string, unknown> = {
     ...generateVscodeEditorSettings(),
     'explorer.fileNesting.enabled': true,
     'explorer.fileNesting.expand': false,
+    'explorer.fileNesting.patterns': {
+        '.gitignore': '.gitattributes',
+        'AGENTS.md': 'CLAUDE.md',
+    },
 };
 
 const OXFMT_LANGUAGE_SETTINGS: Record<string, unknown> = {
@@ -30,6 +42,22 @@ const OXFMT_LANGUAGE_SETTINGS: Record<string, unknown> = {
         'editor.defaultFormatter': 'redhat.vscode-yaml',
     },
 };
+
+function resolvePackageJsonNestedFiles(packageManager?: PackageManagerName): string[] {
+    if (packageManager === 'pnpm') {
+        return ['pnpm-lock.yaml', 'pnpm-workspace.yaml'];
+    }
+
+    if (packageManager === 'npm') {
+        return ['package-lock.json', 'npm-shrinkwrap.json'];
+    }
+
+    if (packageManager === 'yarn') {
+        return ['yarn.lock'];
+    }
+
+    return [];
+}
 
 function resolveVscodeRecommendations(linter?: Linter, formatter?: Formatter): string[] {
     const recommendations: string[] = [];
@@ -54,9 +82,17 @@ function resolveVscodeRecommendations(linter?: Linter, formatter?: Formatter): s
 }
 
 function resolveVscodeSettings(params: VscodeParams): Record<string, unknown> {
-    const { linter, formatter, configStrategy, isMonorepo } = params;
+    const { linter, formatter, configStrategy, isMonorepo, packageManager } = params;
     const settings: Record<string, unknown> = { ...DEFAULT_VSCODE_SETTINGS };
     const isStealth = !isMonorepo && (configStrategy ?? 'stealth') === 'stealth';
+    const packageJsonNestedFiles = resolvePackageJsonNestedFiles(packageManager);
+
+    if (packageJsonNestedFiles.length > 0) {
+        settings['explorer.fileNesting.patterns'] = {
+            ...(settings['explorer.fileNesting.patterns'] as Record<string, string>),
+            'package.json': packageJsonNestedFiles.join(', '),
+        };
+    }
 
     if (linter === 'eslint') {
         settings['eslint.enable'] = true;

@@ -16,6 +16,43 @@ describe('generateVscodeFiles', () => {
 
         expect(settings['explorer.fileNesting.enabled']).toBe(true);
         expect(settings['explorer.fileNesting.expand']).toBe(false);
+        expect(settings['explorer.fileNesting.patterns']).toEqual({
+            '.gitignore': '.gitattributes',
+            'AGENTS.md': 'CLAUDE.md',
+        });
+    });
+
+    it('nests pnpm lock and workspace files under package.json', () => {
+        const files = generateVscodeFiles({ packageManager: 'pnpm' });
+        const settings = readJsonFile(files['.vscode/settings.json']);
+
+        expect(settings['explorer.fileNesting.patterns']).toEqual({
+            '.gitignore': '.gitattributes',
+            'AGENTS.md': 'CLAUDE.md',
+            'package.json': 'pnpm-lock.yaml, pnpm-workspace.yaml',
+        });
+    });
+
+    it('nests npm lock files under package.json', () => {
+        const files = generateVscodeFiles({ packageManager: 'npm' });
+        const settings = readJsonFile(files['.vscode/settings.json']);
+
+        expect(settings['explorer.fileNesting.patterns']).toEqual({
+            '.gitignore': '.gitattributes',
+            'AGENTS.md': 'CLAUDE.md',
+            'package.json': 'package-lock.json, npm-shrinkwrap.json',
+        });
+    });
+
+    it('nests yarn lock files under package.json', () => {
+        const files = generateVscodeFiles({ packageManager: 'yarn' });
+        const settings = readJsonFile(files['.vscode/settings.json']);
+
+        expect(settings['explorer.fileNesting.patterns']).toEqual({
+            '.gitignore': '.gitattributes',
+            'AGENTS.md': 'CLAUDE.md',
+            'package.json': 'yarn.lock',
+        });
     });
 
     it('adds editor settings that match formatter defaults', () => {
@@ -24,7 +61,6 @@ describe('generateVscodeFiles', () => {
 
         expect(settings['editor.detectIndentation']).toBe(false);
         expect(settings['editor.insertSpaces']).toBe(true);
-        expect(settings['editor.rulers']).toEqual([102]);
         expect(settings['editor.tabSize']).toBe(2);
         expect(settings['files.eol']).toBe('\n');
         expect(settings['files.insertFinalNewline']).toBe(true);

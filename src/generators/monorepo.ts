@@ -243,7 +243,7 @@ export default [...base];
 
     // IDE settings
     if (ide === 'vscode') {
-        generateVscodeFiles(files, linter, formatter);
+        generateVscodeFiles(files, linter, formatter, packageManager.name);
     }
 
     // README
@@ -295,7 +295,8 @@ To add a new package to this workspace, run create-krispya from this directory a
 export function generateVscodeFiles(
     files: Record<string, File>,
     linter: Linter,
-    formatter: Formatter
+    formatter: Formatter,
+    packageManager: PackageManagerSpec['name'] = 'pnpm'
 ): void {
     Object.assign(
         files,
@@ -303,6 +304,7 @@ export function generateVscodeFiles(
             linter,
             formatter,
             isMonorepo: true,
+            packageManager,
         })
     );
 }
