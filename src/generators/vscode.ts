@@ -91,6 +91,7 @@ function resolveVscodeSettings(params: VscodeParams): Record<string, unknown> {
 
         if (isStealth) {
             settings['prettier.configPath'] = '.config/prettier.json';
+            settings['prettier.ignorePath'] = '.config/prettierignore';
         }
     } else if (formatter === 'oxfmt') {
         settings['editor.defaultFormatter'] = 'oxc.oxc-vscode';

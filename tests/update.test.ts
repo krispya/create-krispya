@@ -55,6 +55,18 @@ describe('update helpers', () => {
                 '.pnpm-store',
             ].join('\n'),
         });
+        expect(expected['root-config']['.config/prettierignore']).toEqual({
+            type: 'text',
+            content: [
+                'package-lock.json',
+                'npm-shrinkwrap.json',
+                'pnpm-lock.yaml',
+                'pnpm-lock.json',
+                'yarn.lock',
+                'bun.lock',
+                'bun.lockb',
+            ].join('\n'),
+        });
         expect(expected['config-packages']).toEqual({});
         expect(expected['workspace-config']).toEqual({});
     });
@@ -73,6 +85,7 @@ describe('update helpers', () => {
 
         expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
         expect(settings['prettier.configPath']).toBe('.config/prettier.json');
+        expect(settings['prettier.ignorePath']).toBe('.config/prettierignore');
     });
 
     it('compares generated JSON files by value instead of formatting', async () => {
@@ -155,7 +168,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
                 build: 'vite build',
                 custom: 'echo custom',
                 dev: 'vite',
-                format: 'prettier --config .config/prettier.json --write .',
+                format: 'prettier --config .config/prettier.json --ignore-path .config/prettierignore --write .',
                 lint: 'eslint --config .config/eslint.config.js .',
                 test: 'vitest',
                 typecheck: 'tsc --build --noEmit',

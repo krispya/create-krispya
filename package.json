@@ -33,7 +33,7 @@
     "release": "pnpm run build && pnpm publish",
     "test": "vitest",
     "lint": "oxlint -c .config/oxlint.json",
-    "format": "prettier --config .config/prettier.json --write .",
+    "format": "prettier --config .config/prettier.json --ignore-path .config/prettierignore --write .",
     "typecheck": "tsc --build --noEmit",
     "typecheck:watch": "tsc --build --watch"
   },

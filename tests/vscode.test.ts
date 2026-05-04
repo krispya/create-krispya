@@ -45,6 +45,7 @@ describe('generateVscodeFiles', () => {
         expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
         expect(settings['editor.defaultFormatter']).toBe('esbenp.prettier-vscode');
         expect(settings['prettier.configPath']).toBe('.config/prettier.json');
+        expect(settings['prettier.ignorePath']).toBe('.config/prettierignore');
         expect(extensions.recommendations).toEqual(['oxc.oxc-vscode', 'esbenp.prettier-vscode']);
     });
 

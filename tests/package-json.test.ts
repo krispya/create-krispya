@@ -175,7 +175,7 @@ describe('generatePackageJson', () => {
         expect(packageJson.scripts).toEqual({
             build: 'vite build',
             dev: 'vite',
-            format: 'prettier --config .config/prettier.json --write .',
+            format: 'prettier --config .config/prettier.json --ignore-path .config/prettierignore --write .',
             lint: 'eslint --config .config/eslint.config.js .',
             test: 'vitest',
             typecheck: 'tsc --build --noEmit',
@@ -232,10 +232,40 @@ describe('generatePackageJson', () => {
         expect(packageJson.scripts).toEqual({
             build: "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
             dev: "pnpm --filter './apps/*' run dev",
-            format: 'prettier --config .config/prettier/base.json --write .',
+            format: 'prettier --config .config/prettier/base.json --ignore-path .config/prettier/prettierignore --write .',
             lint: 'oxlint .',
             test: 'pnpm -r run test',
         });
+    });
+
+    it('generates prettier ignore files for lock files', () => {
+        const standaloneFiles = generate({
+            name: 'my-app',
+            template: 'vanilla',
+            formatter: 'prettier',
+        });
+        const { files: monorepoFiles } = generateMonorepo({
+            name: 'workspace',
+            linter: 'oxlint',
+            formatter: 'prettier',
+            packageManager: { name: 'pnpm', version: '10.0.0' },
+        });
+
+        expect(standaloneFiles['.config/prettierignore']).toEqual({
+            type: 'text',
+            content: [
+                'package-lock.json',
+                'npm-shrinkwrap.json',
+                'pnpm-lock.yaml',
+                'pnpm-lock.json',
+                'yarn.lock',
+                'bun.lock',
+                'bun.lockb',
+            ].join('\n'),
+        });
+        expect(monorepoFiles['.config/prettier/prettierignore']).toEqual(
+            standaloneFiles['.config/prettierignore']
+        );
     });
 
     it('adds editorconfig to monorepo roots', () => {

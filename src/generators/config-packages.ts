@@ -1,4 +1,9 @@
-import { defaultLinterConfig, defaultOxfmtConfig, defaultPrettierConfig } from '../constants.js';
+import {
+    defaultLinterConfig,
+    defaultOxfmtConfig,
+    defaultPrettierConfig,
+    prettierIgnoreContent,
+} from '../constants.js';
 import type { File } from '../types.js';
 
 /**
@@ -362,7 +367,7 @@ export function generatePrettierConfigPackage(files: Record<string, File>): void
                 exports: {
                     '.': './base.json',
                 },
-                files: ['base.json'],
+                files: ['base.json', 'prettierignore'],
             },
             null,
             2
@@ -402,6 +407,11 @@ Or in \`.prettierrc.json\`:
     files[`${basePath}/base.json`] = {
         type: 'text',
         content: JSON.stringify(defaultPrettierConfig, null, 2),
+    };
+
+    files[`${basePath}/prettierignore`] = {
+        type: 'text',
+        content: prettierIgnoreContent,
     };
 }
 

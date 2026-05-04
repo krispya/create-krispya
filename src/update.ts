@@ -24,6 +24,7 @@ import {
     packageJsonScripts,
     resolveDefaultPackageJsonScripts,
 } from './generators/package-json-scripts.js';
+import { prettierIgnoreContent } from './constants.js';
 import { parseWorkspaceYamlContent, detectTooling } from './utils.js';
 
 // =============================================================================
@@ -214,6 +215,13 @@ export async function generateExpectedFiles(
 *.{bat,[bB][aA][tT]} text eol=crlf
 `,
     };
+
+    if (!isMonorepo && formatter === 'prettier') {
+        rootConfig[configStrategy === 'root' ? '.prettierignore' : '.config/prettierignore'] = {
+            type: 'text',
+            content: prettierIgnoreContent,
+        };
+    }
 
     // Biome config if using biome
     if (linter === 'biome' || formatter === 'biome') {
@@ -538,7 +546,10 @@ function getStandaloneToolScripts(config: WorkspaceConfig) {
 
     const formatterScripts =
         config.formatter === 'prettier'
-            ? packageJsonScripts.format.prettier(isStealth ? '.config/prettier.json' : undefined)
+            ? packageJsonScripts.format.prettier(
+                  isStealth ? '.config/prettier.json' : undefined,
+                  isStealth ? '.config/prettierignore' : undefined
+              )
             : config.formatter === 'oxfmt'
               ? packageJsonScripts.format.oxfmt(isStealth ? '.config/oxfmt.json' : 'oxfmt.json')
               : packageJsonScripts.format.biome(isStealth ? '.config' : undefined);
@@ -1191,21 +1202,9 @@ async function updateRootPackageJson(root: string, plan: MigrationPlan): Promise
 
     // Update scripts
     const scripts = pkg.scripts ?? {};
-    if (plan.toLinter === 'oxlint') {
-        scripts.lint = 'oxlint .';
-    } else if (plan.toLinter === 'eslint') {
-        scripts.lint = 'eslint .';
-    } else if (plan.toLinter === 'biome') {
-        scripts.lint = 'biome check .';
-    }
-
-    if (plan.toFormatter === 'oxfmt') {
-        scripts.format = 'oxfmt .';
-    } else if (plan.toFormatter === 'prettier') {
-        scripts.format = 'prettier --write .';
-    } else if (plan.toFormatter === 'biome') {
-        scripts.format = 'biome format . --write';
-    }
+    const rootScripts = packageJsonScripts.monorepoRoot(plan.toLinter, plan.toFormatter);
+    scripts.lint = rootScripts.lint!;
+    scripts.format = rootScripts.format!;
 
     pkg.scripts = scripts;
 

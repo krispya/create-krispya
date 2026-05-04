@@ -28,7 +28,6 @@ export function generateVscodeEditorSettings(
     return {
         'editor.detectIndentation': false,
         'editor.insertSpaces': !config.useTabs,
-        'editor.rulers': [config.printWidth],
         'editor.tabSize': config.tabWidth,
         'files.eol': '\n',
         'files.insertFinalNewline': true,

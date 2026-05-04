@@ -53,12 +53,12 @@ export const packageJsonScripts = {
     },
 
     format: {
-        prettier(configPath?: string): PackageJsonScripts {
+        prettier(configPath?: string, ignorePath?: string): PackageJsonScripts {
+            const configFlag = configPath == null ? '' : ` --config ${configPath}`;
+            const ignoreFlag = ignorePath == null ? '' : ` --ignore-path ${ignorePath}`;
+
             return {
-                format:
-                    configPath == null
-                        ? 'prettier --write .'
-                        : `prettier --config ${configPath} --write .`,
+                format: `prettier${configFlag}${ignoreFlag} --write .`,
             };
         },
 
@@ -111,7 +111,7 @@ export const packageJsonScripts = {
                         format: 'biome format . --write',
                     }
                   : {
-                        format: 'prettier --config .config/prettier/base.json --write .',
+                        format: 'prettier --config .config/prettier/base.json --ignore-path .config/prettier/prettierignore --write .',
                     }
         );
     },

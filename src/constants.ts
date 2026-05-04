@@ -128,6 +128,16 @@ export const defaultPrettierConfig = {
     ],
 };
 
+export const prettierIgnoreContent = [
+    'package-lock.json',
+    'npm-shrinkwrap.json',
+    'pnpm-lock.yaml',
+    'pnpm-lock.json',
+    'yarn.lock',
+    'bun.lock',
+    'bun.lockb',
+].join('\n');
+
 // Full oxfmt config (Prettier-compatible subset)
 export const defaultOxfmtConfig = {
     printWidth: defaultFormatterConfig.printWidth,

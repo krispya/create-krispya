@@ -1,4 +1,4 @@
-import { defaultPrettierConfig } from '../constants.js';
+import { defaultPrettierConfig, prettierIgnoreContent } from '../constants.js';
 import { packageJsonScripts } from '../generators/package-json-scripts.js';
 import type { Generator } from '../types.js';
 
@@ -18,11 +18,21 @@ export function generatePrettier(generator: Generator, options: GeneratePrettier
             type: 'text',
             content: JSON.stringify(defaultPrettierConfig, null, 2),
         });
-        generator.addScripts(packageJsonScripts.format.prettier('.config/prettier.json'));
+        generator.addFile('.config/prettierignore', {
+            type: 'text',
+            content: prettierIgnoreContent,
+        });
+        generator.addScripts(
+            packageJsonScripts.format.prettier('.config/prettier.json', '.config/prettierignore')
+        );
     } else {
         generator.addFile('.prettierrc', {
             type: 'text',
             content: JSON.stringify(defaultPrettierConfig, null, 2),
+        });
+        generator.addFile('.prettierignore', {
+            type: 'text',
+            content: prettierIgnoreContent,
         });
         generator.addScripts(packageJsonScripts.format.prettier());
     }
