@@ -18,7 +18,6 @@ export function generateReadme(params: ReadmeParams): File {
     const isVanilla = baseTemplate === 'vanilla';
     const isReact = baseTemplate === 'react';
     const isR3f = baseTemplate === 'r3f';
-    const language = 'typescript'; // README always references TS files
     const ext = 'ts';
     const jsxExt = 'tsx';
 

@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+    compareWithDisk,
     detectCurrentConfig,
     generateExpectedFiles,
     getPackageJsonScriptUpdates,
@@ -72,6 +73,41 @@ describe('update helpers', () => {
 
         expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
         expect(settings['prettier.configPath']).toBe('.config/prettier.json');
+    });
+
+    it('compares generated JSON files by value instead of formatting', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-json-'));
+        try {
+            const expected = await generateExpectedFiles({
+                name: 'my-app',
+                linter: 'oxlint',
+                formatter: 'prettier',
+                packageManager: 'pnpm',
+                isMonorepo: false,
+                configStrategy: 'stealth',
+            });
+            const settings = readTextJson(expected.vscode['.vscode/settings.json']!);
+            const reversedSettings = Object.fromEntries(Object.entries(settings).reverse());
+
+            await mkdir(join(tempDir, '.vscode'), { recursive: true });
+            await writeFile(
+                join(tempDir, '.vscode/settings.json'),
+                `{
+  // Existing user formatting should not matter.
+${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
+}
+`
+            );
+            const categories = await compareWithDisk(expected, tempDir);
+            const vscode = categories.find((category) => category.category === 'vscode');
+            const settingsChange = vscode?.changes.find(
+                (change) => change.path === '.vscode/settings.json'
+            );
+
+            expect(settingsChange?.status).toBe('unchanged');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 
     it('regenerates standalone package scripts with typecheck watch', async () => {

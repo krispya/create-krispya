@@ -67,7 +67,7 @@ type WorkspaceContext = {
 };
 
 function generateWorkspace(ctx: WorkspaceContext): string {
-    const { name, packageManager, linter, formatter, isMonorepo, configStrategy } = ctx;
+    const { name, packageManager, linter, formatter, isMonorepo } = ctx;
 
     const sections: string[] = [
         `# ${name}`,

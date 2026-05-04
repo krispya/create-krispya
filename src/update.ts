@@ -267,6 +267,152 @@ async function fileExists(path: string): Promise<boolean> {
     }
 }
 
+function stripJsonComments(content: string): string {
+    let output = '';
+    let inString = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+    let escaped = false;
+
+    for (let index = 0; index < content.length; index++) {
+        const char = content[index]!;
+        const next = content[index + 1];
+
+        if (inLineComment) {
+            if (char === '\n' || char === '\r') {
+                inLineComment = false;
+                output += char;
+            }
+            continue;
+        }
+
+        if (inBlockComment) {
+            if (char === '*' && next === '/') {
+                inBlockComment = false;
+                index++;
+            }
+            continue;
+        }
+
+        if (inString) {
+            output += char;
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            output += char;
+            continue;
+        }
+
+        if (char === '/' && next === '/') {
+            inLineComment = true;
+            index++;
+            continue;
+        }
+
+        if (char === '/' && next === '*') {
+            inBlockComment = true;
+            index++;
+            continue;
+        }
+
+        output += char;
+    }
+
+    return output;
+}
+
+function stripTrailingJsonCommas(content: string): string {
+    let output = '';
+    let inString = false;
+    let escaped = false;
+
+    for (let index = 0; index < content.length; index++) {
+        const char = content[index]!;
+
+        if (inString) {
+            output += char;
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            output += char;
+            continue;
+        }
+
+        if (char === ',') {
+            let lookahead = index + 1;
+            while (/\s/.test(content[lookahead] ?? '')) lookahead++;
+            if (content[lookahead] === '}' || content[lookahead] === ']') {
+                continue;
+            }
+        }
+
+        output += char;
+    }
+
+    return output;
+}
+
+function parseJsonValue(content: string): unknown {
+    return JSON.parse(stripTrailingJsonCommas(stripJsonComments(content)));
+}
+
+function stableJsonValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(stableJsonValue);
+    }
+
+    if (value != null && typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, entryValue]) => [key, stableJsonValue(entryValue)])
+        );
+    }
+
+    return value;
+}
+
+function jsonValuesEqual(currentContent: string, newContent: string): boolean {
+    try {
+        return (
+            JSON.stringify(stableJsonValue(parseJsonValue(currentContent))) ===
+            JSON.stringify(stableJsonValue(parseJsonValue(newContent)))
+        );
+    } catch {
+        return false;
+    }
+}
+
+function shouldCompareJsonValues(filePath: string): boolean {
+    return filePath.endsWith('.json') || filePath.endsWith('.jsonc');
+}
+
+function fileContentsEqual(filePath: string, currentContent: string, newContent: string): boolean {
+    if (shouldCompareJsonValues(filePath) && jsonValuesEqual(currentContent, newContent)) {
+        return true;
+    }
+
+    return currentContent === newContent;
+}
+
 /**
  * Compares expected files with disk and categorizes changes.
  */
@@ -277,7 +423,7 @@ export async function compareWithDisk(
     const categoryLabels: Record<UpdateCategory, string> = {
         'ai-files': 'AI Files',
         vscode: 'VS Code',
-        'package-json': 'Package Scripts',
+        'package-json': 'package.json Scripts',
         'config-packages': 'Config Packages',
         'workspace-config': 'Workspace Config',
         'root-config': 'Root Config',
@@ -299,7 +445,7 @@ export async function compareWithDisk(
 
             if (await fileExists(fullPath)) {
                 const currentContent = await readFile(fullPath, 'utf-8');
-                if (currentContent === newContent) {
+                if (fileContentsEqual(filePath, currentContent, newContent)) {
                     changes.push({
                         path: filePath,
                         status: 'unchanged',
@@ -451,7 +597,7 @@ async function getExpectedPackageScripts(
 }
 
 /**
- * Generates a package.json scripts update while preserving unknown scripts and package fields.
+ * Generates a package.json scripts-only update while preserving unknown scripts and package fields.
  */
 export async function getPackageJsonScriptUpdates(
     root: string,
@@ -525,9 +671,9 @@ export async function getWorkspaceConfigUpdates(root: string): Promise<FileChang
         const newContent = `manage-package-manager-versions: true
 
 packages:
-  - ".config/*"
-  - "apps/*"
-  - "packages/*"
+  - '.config/*'
+  - 'apps/*'
+  - 'packages/*'
 
 onlyBuiltDependencies:
   - esbuild
@@ -557,12 +703,12 @@ onlyBuiltDependencies:
     }
 
     // Check for .config/* in packages
-    if (!currentContent.includes('.config/*') && !currentContent.includes('".config/*"')) {
+    if (!currentContent.includes('.config/*')) {
         // Insert .config/* after packages:
         const lines = updatedContent.split('\n');
         const packagesIndex = lines.findIndex((line) => line.trim().startsWith('packages:'));
         if (packagesIndex !== -1) {
-            lines.splice(packagesIndex + 1, 0, '  - ".config/*"');
+            lines.splice(packagesIndex + 1, 0, "  - '.config/*'");
             updatedContent = lines.join('\n');
             needsUpdate = true;
         }

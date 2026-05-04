@@ -92,6 +92,7 @@ import {
     getWorkspaceConfigUpdates,
     needsMigration,
     type CategoryUpdate,
+    type FileChange,
     type MigrationTarget,
     type WorkspaceConfig,
 } from './update.js';
@@ -457,14 +458,14 @@ async function ensureConfigInWorkspace(monorepoRoot: string): Promise<void> {
         content = await readFile(workspacePath, 'utf-8');
     } catch {
         content = `packages:
-  - ".config/*"
-  - "packages/*"
+  - '.config/*'
+  - 'packages/*'
 `;
         await writeFile(workspacePath, content);
         return;
     }
 
-    if (content.includes('.config/*') || content.includes('".config/*"')) {
+    if (content.includes('.config/*')) {
         return;
     }
 
@@ -473,10 +474,10 @@ async function ensureConfigInWorkspace(monorepoRoot: string): Promise<void> {
 
     if (packagesIndex === -1) {
         content = `packages:
-  - ".config/*"
+  - '.config/*'
 ${content}`;
     } else {
-        lines.splice(packagesIndex + 1, 0, '  - ".config/*"');
+        lines.splice(packagesIndex + 1, 0, "  - '.config/*'");
         content = lines.join('\n');
     }
 
@@ -1181,6 +1182,54 @@ async function handleMigration(
     process.exit(0);
 }
 
+function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
+    return category === 'workspace-config' || category === 'package-json';
+}
+
+function getUpdateHint(category: CategoryUpdate['category'], status: 'added' | 'modified'): string {
+    if (status === 'added') return 'new file';
+    if (category === 'package-json') return 'scripts-only merge';
+    if (category === 'workspace-config') return 'merge update';
+    return 'changed; overwrites if selected';
+}
+
+type SelectableFileChange = FileChange & { status: 'added' | 'modified' };
+
+function isSelectableFileChange(change: FileChange): change is SelectableFileChange {
+    return change.status === 'added' || change.status === 'modified';
+}
+
+function getInitialUpdateSelections(category: CategoryUpdate): string[] {
+    return category.changes
+        .filter(
+            (change) =>
+                change.status === 'added' ||
+                (change.status === 'modified' && isMergeUpdateCategory(category.category))
+        )
+        .map((change) => change.path);
+}
+
+async function promptForUpdateSelections(category: CategoryUpdate) {
+    const selectableChanges = category.changes.filter(isSelectableFileChange);
+    const selectedFiles = await p.multiselect({
+        message: category.label,
+        options: selectableChanges.map((change) => ({
+            value: change.path,
+            label: change.path,
+            hint: getUpdateHint(category.category, change.status),
+        })),
+        initialValues: getInitialUpdateSelections(category),
+        required: false,
+    });
+
+    if (p.isCancel(selectedFiles)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+    }
+
+    return selectableChanges.filter((change) => selectedFiles.includes(change.path));
+}
+
 /**
  * Handles the --update command to update a workspace or standalone project.
  */
@@ -1262,7 +1311,7 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
     if (packageJsonScriptChanges.length > 0) {
         allCategories.push({
             category: 'package-json',
-            label: 'Package Scripts',
+            label: 'package.json Scripts',
             changes: packageJsonScriptChanges,
             hasUserModifications: packageJsonScriptChanges.some((c) => c.status === 'modified'),
         });
@@ -1305,72 +1354,22 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
             continue;
         }
 
-        // Special handling for AI Files: prompt for yes/no
-        if (category.category === 'ai-files') {
-            if (hasNew) {
-                console.log(color.cyan(category.label + ':'));
-                console.log(color.dim(`  ${newChanges.length} AI file(s) can be added`));
-                console.log();
-
-                // In update mode, just ask yes/no to apply the determined changes
-                const applyAi = options.yes
-                    ? true
-                    : await p.confirm({
-                          message: 'Add AI rules?',
-                          initialValue: true,
-                      });
-
-                if (!p.isCancel(applyAi) && applyAi) {
-                    await applyUpdates(newChanges, projectRoot);
-                    console.log(color.green('✓') + ` Added ${newChanges.length} AI file(s)`);
-                    updatedCount++;
-                } else {
-                    console.log(color.dim(`  Skipped ${category.label}`));
-                    skippedCount++;
-                }
-            }
-
-            // Handle modified AI files separately (if any exist and changed)
-            if (hasModified) {
-                console.log(color.cyan('AI Files (existing):'));
-                for (const change of modifiedChanges) {
-                    console.log(formatFileChange(change));
-                }
-                console.log();
-
-                // In --yes mode, skip updating existing AI files (safe default)
-                if (options.yes) {
-                    console.log(color.dim('  (--yes mode: keeping existing AI files)'));
-                } else {
-                    const updateExisting = await p.confirm({
-                        message: 'Update existing AI files to latest template?',
-                        initialValue: false,
-                    });
-
-                    if (!p.isCancel(updateExisting) && updateExisting) {
-                        await applyUpdates(modifiedChanges, projectRoot);
-                        console.log(color.green('✓') + ' Updated existing AI files');
-                    }
-                }
-            }
-            console.log();
-            continue;
-        }
-
         // Determine action based on what changes exist
         let changesToApply: typeof category.changes = [];
 
         if (options.yes) {
             // Show changes for --yes mode
             console.log(color.cyan(category.label + ':'));
+
             for (const change of [...newChanges, ...modifiedChanges]) {
                 console.log(formatFileChange(change));
             }
             console.log();
 
             // Non-interactive: add new only (safe default)
-            // Exceptions: these use merge strategies, so "modified" is safe
-            if (category.category === 'workspace-config' || category.category === 'package-json') {
+            // Exceptions: these use merge strategies, so "modified" is safe.
+            // package-json only updates the scripts object and preserves other manifest fields.
+            if (isMergeUpdateCategory(category.category)) {
                 changesToApply = [...newChanges, ...modifiedChanges];
                 if (changesToApply.length > 0) {
                     console.log(color.dim('  (--yes mode: applying merge updates)'));
@@ -1381,70 +1380,8 @@ async function handleUpdateCommand(options: CliOptions): Promise<void> {
                     console.log(color.dim('  (--yes mode: adding new files only)'));
                 }
             }
-        } else if (hasNew && hasModified) {
-            // Both new and modified: multiselect with individual files
-            // New files pre-selected, modified files not selected by default
-            const allChanges = [...newChanges, ...modifiedChanges];
-            const selectedFiles = await p.multiselect({
-                message: `${category.label} (+ new, ~ changed)`,
-                options: allChanges.map((change) => ({
-                    value: change.path,
-                    label: change.status === 'added' ? `+ ${change.path}` : `~ ${change.path}`,
-                })),
-                initialValues: newChanges.map((c) => c.path), // Pre-select new files
-                required: false,
-            });
-
-            if (p.isCancel(selectedFiles)) {
-                p.cancel('Operation cancelled.');
-                process.exit(0);
-            }
-
-            if (selectedFiles.length > 0) {
-                changesToApply = allChanges.filter((c) => selectedFiles.includes(c.path));
-            }
-        } else if (hasNew) {
-            // Only new files: show list then confirm
-            console.log(color.cyan(category.label + ':'));
-            for (const change of newChanges) {
-                console.log(formatFileChange(change));
-            }
-            console.log();
-            // Only new files: simple confirm
-            const shouldAdd = await p.confirm({
-                message: `Add ${newChanges.length} new file(s)?`,
-                initialValue: true,
-            });
-
-            if (p.isCancel(shouldAdd)) {
-                p.cancel('Operation cancelled.');
-                process.exit(0);
-            }
-
-            if (shouldAdd) {
-                changesToApply = newChanges;
-            }
-        } else if (hasModified) {
-            // Only modified files: show list then confirm with warning
-            console.log(color.cyan(category.label + ':'));
-            for (const change of modifiedChanges) {
-                console.log(formatFileChange(change));
-            }
-            console.log();
-
-            const shouldUpdate = await p.confirm({
-                message: `Update ${modifiedChanges.length} file(s)? (will overwrite)`,
-                initialValue: false,
-            });
-
-            if (p.isCancel(shouldUpdate)) {
-                p.cancel('Operation cancelled.');
-                process.exit(0);
-            }
-
-            if (shouldUpdate) {
-                changesToApply = modifiedChanges;
-            }
+        } else {
+            changesToApply = await promptForUpdateSelections(category);
         }
 
         if (changesToApply.length > 0) {
@@ -1615,16 +1552,7 @@ async function handleMonorepoCreation(
             ide: generateOptions.ide ?? 'vscode',
         });
 
-        const filePaths = Object.keys(files).sort();
-        for (const filePath of filePaths) {
-            const fullFilePath = join(projectPath, filePath);
-            await mkdir(dirname(fullFilePath), { recursive: true });
-            const file = files[filePath]!;
-
-            if (file.type === 'text') {
-                await writeFile(fullFilePath, file.content);
-            }
-        }
+        await writeGeneratedFiles(projectPath, files);
 
         spinner.stop(color.green.inverse(' ✓ Monorepo workspace created! '));
 

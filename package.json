@@ -29,12 +29,13 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "unbuild --config .config/build.config.ts",
+    "build": "unbuild",
     "release": "pnpm run build && pnpm publish",
     "test": "vitest",
     "lint": "oxlint -c .config/oxlint.json",
     "format": "prettier --config .config/prettier.json --write .",
-    "typecheck": "tsc --build --noEmit"
+    "typecheck": "tsc --build --noEmit",
+    "typecheck:watch": "tsc --build --watch"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
