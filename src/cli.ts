@@ -28,6 +28,7 @@ import { fetch } from 'undici';
 import type {
     EngineSpec,
     Formatter,
+    Ide,
     Linter,
     PackageManagerName,
     PackageManagerSpec,
@@ -40,12 +41,7 @@ import {
     promptForPackageOptions,
     type CliPresets,
 } from './cli/index.js';
-import {
-    clearConfig,
-    getAiPlatforms,
-    getConfigPath,
-    setAiPlatforms,
-} from './config.js';
+import { clearConfig, getAiPlatforms, getConfigPath } from './config.js';
 import {
     AI_PLATFORM_HINTS,
     AI_PLATFORM_LABELS,
@@ -127,6 +123,7 @@ interface CliOptions {
     triplex?: boolean;
     viverse?: boolean;
     packageManager?: PackageManagerName;
+    ide?: Ide;
     nodeVersion?: string;
     clearConfig?: boolean;
     dir?: string;
@@ -1604,6 +1601,7 @@ async function handleMonorepoCreation(
             engine: generateOptions.engine,
             versions: generateOptions.versions,
             aiPlatforms: aiPlatforms.length > 0 ? aiPlatforms : undefined,
+            ide: generateOptions.ide ?? 'vscode',
         });
 
         const filePaths = Object.keys(files).sort();
@@ -1817,6 +1815,7 @@ async function main() {
         .option('--triplex', 'set up triplex development environment (r3f only)')
         .option('--viverse', 'set up viverse deployment (r3f only)')
         .option('--package-manager <manager>', 'specify package manager (e.g. npm, yarn, pnpm)')
+        .option('--ide <ide>', 'IDE files: vscode or none (default: vscode)')
         .option(
             '--pnpm-manage-versions',
             'enable manage-package-manager-versions in pnpm-workspace.yaml (default: true)'
@@ -1857,6 +1856,11 @@ async function main() {
             if (options.configPath) {
                 console.log(getConfigPath());
                 process.exit(0);
+            }
+
+            if (options.ide && !['vscode', 'none'].includes(options.ide)) {
+                console.error(color.red('Error:') + ' --ide must be "vscode" or "none"');
+                process.exit(1);
             }
 
             // Handle flags that may have been parsed as the name argument
@@ -1952,6 +1956,7 @@ async function main() {
                     template,
                     linter: options.linter ?? 'oxlint',
                     formatter: options.formatter ?? 'prettier',
+                    ide: options.ide ?? 'vscode',
                     ...(baseTemplate === 'r3f' && {
                         drei: options.drei ? {} : undefined,
                         handle: options.handle ? {} : undefined,
@@ -1982,6 +1987,7 @@ async function main() {
                           linter: options.linter,
                           formatter: options.formatter,
                           packageManager: options.packageManager,
+                          ide: options.ide,
                           engine: options.nodeVersion
                               ? { name: 'node', version: options.nodeVersion }
                               : undefined,

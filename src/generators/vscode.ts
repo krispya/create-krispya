@@ -1,10 +1,5 @@
-import type {
-    CodeInjectionLocation,
-    ConfigStrategy,
-    File,
-    Formatter,
-    Linter,
-} from '../types.js';
+import type { CodeInjectionLocation, ConfigStrategy, File, Formatter, Linter } from '../types.js';
+import { generateVscodeEditorSettings } from './editorconfig.js';
 
 export type VscodeParams = {
     codeSnippets?: Partial<Record<CodeInjectionLocation, string[]>>;
@@ -16,6 +11,7 @@ export type VscodeParams = {
 };
 
 const DEFAULT_VSCODE_SETTINGS: Record<string, unknown> = {
+    ...generateVscodeEditorSettings(),
     'explorer.fileNesting.enabled': true,
     'explorer.fileNesting.expand': false,
 };

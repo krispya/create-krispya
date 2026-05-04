@@ -18,6 +18,18 @@ describe('generateVscodeFiles', () => {
         expect(settings['explorer.fileNesting.expand']).toBe(false);
     });
 
+    it('adds editor settings that match formatter defaults', () => {
+        const files = generateVscodeFiles({});
+        const settings = readJsonFile(files['.vscode/settings.json']);
+
+        expect(settings['editor.detectIndentation']).toBe(false);
+        expect(settings['editor.insertSpaces']).toBe(true);
+        expect(settings['editor.rulers']).toEqual([102]);
+        expect(settings['editor.tabSize']).toBe(2);
+        expect(settings['files.eol']).toBe('\n');
+        expect(settings['files.insertFinalNewline']).toBe(true);
+    });
+
     it('resolves standalone linter and formatter settings centrally', () => {
         const files = generateVscodeFiles({
             linter: 'oxlint',

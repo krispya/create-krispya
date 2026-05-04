@@ -40,6 +40,7 @@ export type Linter = 'eslint' | 'oxlint' | 'biome';
 export type Formatter = 'prettier' | 'oxfmt' | 'biome';
 export type Testing = 'vitest' | 'none';
 export type ConfigStrategy = 'stealth' | 'root';
+export type Ide = 'vscode' | 'none';
 
 // Code injection locations for template assembly
 export type CodeInjectionLocation =
@@ -116,6 +117,7 @@ export type GenerateOptions = {
     formatter?: Formatter;
     testing?: Testing;
     configStrategy?: ConfigStrategy;
+    ide?: Ide;
     /** AI platforms to generate pointer files for */
     aiPlatforms?: AiPlatform[];
     versions?: PackageVersions;

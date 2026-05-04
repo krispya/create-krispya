@@ -2,6 +2,7 @@ import { GitAttributes } from './constants.js';
 import { generateAiFiles } from './generators/ai-files.js';
 import {
     generateGitignore,
+    generateEditorConfig,
     generatePackageJson,
     generateReadme,
     generateSourceFiles,
@@ -70,6 +71,7 @@ export function generate(options: GenerateOptions) {
     const isR3f = baseTemplate === 'r3f';
     const isLibrary = clonedOptions.projectType === 'library';
     const libraryBundler = clonedOptions.libraryBundler ?? 'unbuild';
+    const ide = clonedOptions.ide ?? 'vscode';
 
     const files: Record<string, File> = {
         ...clonedOptions.files,
@@ -334,7 +336,7 @@ export function generate(options: GenerateOptions) {
     );
 
     // Generate VS Code files (skip for monorepo sub-packages - use workspace root config)
-    if (!isMonorepoPackage) {
+    if (!isMonorepoPackage && ide === 'vscode') {
         Object.assign(
             files,
             generateVscodeFiles({
@@ -350,6 +352,7 @@ export function generate(options: GenerateOptions) {
 
     // Git files (skip for monorepo sub-packages - use workspace root config)
     if (!isMonorepoPackage) {
+        files['.editorconfig'] = generateEditorConfig();
         files['.gitignore'] = generateGitignore('standalone');
         files['.gitattributes'] = { type: 'text', content: GitAttributes };
     }

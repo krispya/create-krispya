@@ -4,6 +4,7 @@ import type {
     BaseTemplate,
     ConfigStrategy,
     Formatter,
+    Ide,
     Linter,
     Testing,
 } from './types.js';
@@ -16,6 +17,7 @@ export interface CustomTemplate {
     formatter: Formatter;
     testing: Testing;
     configStrategy?: ConfigStrategy;
+    ide?: Ide;
     integrations?: string[];
 }
 

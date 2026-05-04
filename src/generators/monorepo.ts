@@ -6,6 +6,7 @@ import type {
     Linter,
     PackageManagerSpec,
     PackageVersions,
+    Ide,
 } from '../types.js';
 import { generateAiFiles } from './ai-files.js';
 import {
@@ -21,6 +22,7 @@ import {
     generatePrettierConfigPackage,
     generateOxfmtConfigPackage,
 } from './config-packages.js';
+import { generateEditorConfig } from './editorconfig.js';
 import { generateGitignore } from './gitignore.js';
 import { packageJsonScripts } from './package-json-scripts.js';
 import { generateVscodeFiles as generateSharedVscodeFiles } from './vscode.js';
@@ -42,6 +44,7 @@ export type MonorepoParams = {
     pnpmManageVersions?: boolean;
     engine?: EngineSpec;
     versions?: PackageVersions;
+    ide?: Ide;
     /** AI platforms to generate files for */
     aiPlatforms?: AiPlatform[];
 };
@@ -65,6 +68,7 @@ export function generateMonorepo(params: MonorepoParams): MonorepoResult {
         pnpmManageVersions,
         engine,
         versions = {},
+        ide = 'vscode',
         aiPlatforms,
     } = params;
 
@@ -224,7 +228,8 @@ export default [...base];
     }
     // biome formatter is handled above with linter
 
-    // .gitignore
+    // Root editor and git files
+    files['.editorconfig'] = generateEditorConfig();
     files['.gitignore'] = generateGitignore('workspace-root');
 
     // .gitattributes
@@ -236,8 +241,10 @@ export default [...base];
 `,
     };
 
-    // VS Code settings
-    generateVscodeFiles(files, linter, formatter);
+    // IDE settings
+    if (ide === 'vscode') {
+        generateVscodeFiles(files, linter, formatter);
+    }
 
     // README
     files['README.md'] = {

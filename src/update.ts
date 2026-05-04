@@ -12,6 +12,7 @@ import {
     generateVscodeFiles,
 } from './generators/monorepo.js';
 import { generateAiFiles, ALL_AI_PLATFORMS } from './generators/ai-files.js';
+import { generateEditorConfig } from './generators/editorconfig.js';
 import { generateGitignore } from './generators/gitignore.js';
 import {
     formatResolvedPackageVersion,
@@ -182,6 +183,7 @@ export async function generateExpectedFiles(
 
     // Root Config
     const rootConfig: Record<string, File> = {};
+    rootConfig['.editorconfig'] = generateEditorConfig();
     rootConfig['.gitignore'] = generateGitignore(isMonorepo ? 'workspace-root' : 'standalone');
     rootConfig['.gitattributes'] = {
         type: 'text',

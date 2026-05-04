@@ -3,6 +3,7 @@ import { getConfigStrategy, getCustomTemplates, type CustomTemplate } from '../c
 import type {
     EngineSpec,
     GenerateOptions,
+    Ide,
     LibraryBundler,
     PackageManagerName,
     PackageManagerSpec,
@@ -41,6 +42,7 @@ export function getDefaultOptions(
         // Libraries get vitest by default, apps don't
         testing: projectType === 'library' ? 'vitest' : 'none',
         configStrategy: getConfigStrategy(),
+        ide: 'vscode',
     };
 
     if (baseTemplate === 'r3f' && integrations) {
@@ -306,6 +308,20 @@ export async function promptForCustomization(
         process.exit(0);
     }
 
+    const ideChoice = await p.select({
+        message: 'IDE config',
+        options: [
+            { value: 'vscode', label: 'vscode' },
+            { value: 'none', label: 'None' },
+        ],
+        initialValue: presets?.ide ?? 'vscode',
+    });
+
+    if (p.isCancel(ideChoice)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+    }
+
     // Derive final template based on language selection
     const baseTemplate = getBaseTemplate(template);
     const finalTemplate: Template =
@@ -323,6 +339,7 @@ export async function promptForCustomization(
         formatter,
         testing: testing as 'vitest' | 'none',
         configStrategy: configStrategyChoice as 'stealth' | 'root',
+        ide: ideChoice as Ide,
     };
 
     // For R3F, use the integrations passed in (already selected upfront)
@@ -381,6 +398,7 @@ export function getDefaultMonorepoOptions(name: string): GenerateOptions {
         engine: { name: 'node', version: 'latest' },
         linter: 'oxlint',
         formatter: 'prettier',
+        ide: 'vscode',
     };
 }
 
@@ -449,6 +467,20 @@ async function promptForMonorepoCustomization(
         process.exit(0);
     }
 
+    const ide = await p.select({
+        message: 'IDE config',
+        options: [
+            { value: 'vscode', label: 'vscode' },
+            { value: 'none', label: 'None' },
+        ],
+        initialValue: presets?.ide ?? 'vscode',
+    });
+
+    if (p.isCancel(ide)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+    }
+
     return {
         name,
         projectType: 'monorepo',
@@ -457,6 +489,7 @@ async function promptForMonorepoCustomization(
         pnpmManageVersions: managePnpm,
         linter: linter as 'eslint' | 'oxlint' | 'biome',
         formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
+        ide: ide as Ide,
     };
 }
 
@@ -473,6 +506,7 @@ async function promptForMonorepo(
     if (presets) {
         if (presets.linter) defaultOptions.linter = presets.linter;
         if (presets.formatter) defaultOptions.formatter = presets.formatter;
+        if (presets.ide) defaultOptions.ide = presets.ide;
         if (presets.engine) defaultOptions.engine = presets.engine;
         if (presets.pnpmManageVersions !== undefined)
             defaultOptions.pnpmManageVersions = presets.pnpmManageVersions;
@@ -487,6 +521,7 @@ async function promptForMonorepo(
             pnpmManageVersions: defaultOptions.pnpmManageVersions,
             linter: defaultOptions.linter ?? 'oxlint',
             formatter: defaultOptions.formatter ?? 'prettier',
+            ide: defaultOptions.ide ?? 'vscode',
         }),
         'Workspace Configuration'
     );
@@ -585,6 +620,7 @@ function customTemplateToOptions(
         formatter: inheritedSettings?.formatter ?? customTemplate.formatter,
         testing: customTemplate.testing,
         configStrategy: customTemplate.configStrategy ?? getConfigStrategy(),
+        ide: customTemplate.ide ?? 'vscode',
     };
 
     if (baseTemplate === 'r3f' && customTemplate.integrations) {
@@ -630,6 +666,7 @@ export type CliPresets = {
     packageManager?: PackageManagerName;
     engine?: EngineSpec;
     pnpmManageVersions?: boolean;
+    ide?: Ide;
     // R3F integrations
     drei?: boolean;
     handle?: boolean;
@@ -742,7 +779,11 @@ export async function promptForPackageOptions(
             projectName,
             projectType,
             customTemplate.integrations,
-            inheritedSettings
+            inheritedSettings,
+            {
+                ...presets,
+                ide: customTemplate.ide,
+            }
         );
     }
 
@@ -764,6 +805,9 @@ export async function promptForPackageOptions(
         integrations,
         inheritedSettings ?? presetsToInheritedSettings(presets)
     );
+    if (presets?.ide && !inheritedSettings) {
+        defaultOptions.ide = presets.ide;
+    }
 
     // Show summary and ask confirm/customize
     const configTitle = inheritedSettings

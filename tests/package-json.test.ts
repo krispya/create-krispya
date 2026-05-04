@@ -180,6 +180,43 @@ describe('generatePackageJson', () => {
         });
     });
 
+    it('adds editorconfig to standalone projects', () => {
+        const files = generate({
+            name: 'my-app',
+            template: 'vanilla',
+            formatter: 'prettier',
+        });
+
+        expect(files['.editorconfig']).toEqual({
+            type: 'text',
+            content: [
+                'root = true',
+                '',
+                '[*]',
+                'charset = utf-8',
+                'end_of_line = lf',
+                'insert_final_newline = true',
+                'indent_style = space',
+                'indent_size = 2',
+                'tab_width = 2',
+                'max_line_length = 102',
+            ].join('\n'),
+        });
+    });
+
+    it('omits vscode files when standalone IDE is none', () => {
+        const files = generate({
+            name: 'my-app',
+            template: 'vanilla',
+            formatter: 'prettier',
+            ide: 'none',
+        });
+
+        expect(files['.editorconfig']).toBeDefined();
+        expect(files['.vscode/settings.json']).toBeUndefined();
+        expect(files['.vscode/extensions.json']).toBeUndefined();
+    });
+
     it('uses the shared script registry for monorepo root scripts', () => {
         const { files } = generateMonorepo({
             name: 'workspace',
@@ -196,6 +233,31 @@ describe('generatePackageJson', () => {
             lint: 'oxlint .',
             test: 'pnpm -r run test',
         });
+    });
+
+    it('adds editorconfig to monorepo roots', () => {
+        const { files } = generateMonorepo({
+            name: 'workspace',
+            linter: 'oxlint',
+            formatter: 'prettier',
+            packageManager: { name: 'pnpm', version: '10.0.0' },
+        });
+
+        expect(files['.editorconfig']).toBeDefined();
+    });
+
+    it('omits vscode files when monorepo IDE is none', () => {
+        const { files } = generateMonorepo({
+            name: 'workspace',
+            linter: 'oxlint',
+            formatter: 'prettier',
+            packageManager: { name: 'pnpm', version: '10.0.0' },
+            ide: 'none',
+        });
+
+        expect(files['.editorconfig']).toBeDefined();
+        expect(files['.vscode/settings.json']).toBeUndefined();
+        expect(files['.vscode/extensions.json']).toBeUndefined();
     });
 
     it('adds typescript to generated TypeScript projects', () => {

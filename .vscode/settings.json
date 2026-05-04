@@ -4,5 +4,6 @@
   "eslint.enable": false,
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
-  "oxc.enable": true
+  "oxc.enable": true,
+  "mdx-preview.preview.enableScripts": true
 }

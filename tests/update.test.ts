@@ -15,6 +15,21 @@ describe('update helpers', () => {
             configStrategy: 'stealth',
         });
 
+        expect(expected['root-config']['.editorconfig']).toEqual({
+            type: 'text',
+            content: [
+                'root = true',
+                '',
+                '[*]',
+                'charset = utf-8',
+                'end_of_line = lf',
+                'insert_final_newline = true',
+                'indent_style = space',
+                'indent_size = 2',
+                'tab_width = 2',
+                'max_line_length = 102',
+            ].join('\n'),
+        });
         expect(expected['root-config']['.gitignore']).toEqual({
             type: 'text',
             content: [
@@ -24,6 +39,7 @@ describe('update helpers', () => {
                 '.env',
                 '.env.*',
                 '!.env.example',
+                '.pnpm-store',
             ].join('\n'),
         });
         expect(expected['config-packages']).toEqual({});
@@ -48,6 +64,7 @@ describe('update helpers', () => {
                 '.env',
                 '.env.*',
                 '!.env.example',
+                '.pnpm-store',
                 '.DS_Store',
             ].join('\n'),
         });

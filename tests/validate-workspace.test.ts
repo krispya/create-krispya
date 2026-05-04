@@ -83,7 +83,7 @@ describe('generateMonorepo with eslint/prettier', () => {
             name: 'test-workspace',
             linter: 'eslint',
             formatter: 'prettier',
-            packageManager: 'pnpm',
+            packageManager: { name: 'pnpm' },
         });
 
         expect(files['.config/eslint/package.json']).toBeDefined();
