@@ -124,6 +124,7 @@ export function generateTypescriptConfig(
                 composite: true,
                 rewriteRelativeImportExtensions: true,
                 erasableSyntaxOnly: true,
+                noEmit: true,
                 ...(isReact || isR3f ? { jsx: 'react-jsx' } : {}),
             },
             include: ['../src', '../tests'],
@@ -149,6 +150,7 @@ export function generateTypescriptConfig(
                 composite: true,
                 rewriteRelativeImportExtensions: true,
                 erasableSyntaxOnly: true,
+                noEmit: true,
             },
             include: ['../*.config.ts', './*.ts'],
         };
@@ -185,6 +187,7 @@ export function generateTypescriptConfig(
                 composite: true,
                 rewriteRelativeImportExtensions: true,
                 erasableSyntaxOnly: true,
+                noEmit: true,
                 ...(isReact || isR3f ? { jsx: 'react-jsx' } : {}),
             },
             include: ['src', 'tests'],
@@ -210,6 +213,7 @@ export function generateTypescriptConfig(
                 composite: true,
                 rewriteRelativeImportExtensions: true,
                 erasableSyntaxOnly: true,
+                noEmit: true,
             },
             include: ['*.config.ts'],
         };

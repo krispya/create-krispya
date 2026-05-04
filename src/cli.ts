@@ -25,14 +25,7 @@ import { dirname, join, resolve } from 'node:path';
 import { cwd } from 'node:process';
 import { fetch } from 'undici';
 
-import type {
-    EngineSpec,
-    Formatter,
-    Ide,
-    Linter,
-    PackageManagerName,
-    PackageManagerSpec,
-} from './types.js';
+import type { EngineSpec, Ide, PackageManagerName, PackageManagerSpec } from './types.js';
 
 import {
     getDefaultProjectName,
@@ -41,6 +34,7 @@ import {
     promptForPackageOptions,
     type CliPresets,
 } from './cli/index.js';
+import { handleUpdateCommand } from './cli/update.js';
 import { clearConfig, getAiPlatforms, getConfigPath } from './config.js';
 import {
     AI_PLATFORM_HINTS,
@@ -79,23 +73,6 @@ import {
     resolveProjectPackageVersions,
 } from './package-versions.js';
 import type { AiPlatform } from './types.js';
-import {
-    applyMigration,
-    applyUpdates,
-    compareWithDisk,
-    detectCurrentConfig,
-    formatFileChange,
-    formatMigrationChange,
-    generateExpectedFiles,
-    getMigrationPlan,
-    getPackageJsonScriptUpdates,
-    getWorkspaceConfigUpdates,
-    needsMigration,
-    type CategoryUpdate,
-    type FileChange,
-    type MigrationTarget,
-    type WorkspaceConfig,
-} from './update.js';
 import { validateWorkspace } from './validate.js';
 
 const require = createRequire(import.meta.url);
@@ -105,7 +82,7 @@ const pkg = require('../package.json') as { version: string };
 // Types
 // =============================================================================
 
-interface CliOptions {
+export interface CliOptions {
     type?: ProjectType;
     bundler?: LibraryBundler;
     template?: Template;
@@ -301,20 +278,6 @@ async function detectMonorepoRoot(): Promise<string | null> {
     }
 
     return null;
-}
-
-async function detectPackageRoot(): Promise<string | null> {
-    let currentDir = cwd();
-    const root = resolve('/');
-
-    while (currentDir !== root) {
-        if (await fileExists(join(currentDir, 'package.json'))) {
-            return currentDir;
-        }
-        currentDir = dirname(currentDir);
-    }
-
-    return (await fileExists(join(root, 'package.json'))) ? root : null;
 }
 
 /**
@@ -1084,339 +1047,6 @@ async function handleFixCommand(options: CliOptions): Promise<void> {
 }
 
 /**
- * Handles migration from one linter/formatter to another.
- */
-async function handleMigration(
-    config: WorkspaceConfig,
-    target: MigrationTarget,
-    root: string,
-    options: CliOptions
-): Promise<void> {
-    const plan = await getMigrationPlan(config, target, root);
-
-    // Display migration summary
-    console.log(color.cyan('Migration:'));
-    if (plan.fromLinter !== plan.toLinter) {
-        console.log(`  Linter: ${color.dim(plan.fromLinter)} → ${color.green(plan.toLinter)}`);
-    }
-    if (plan.fromFormatter !== plan.toFormatter) {
-        console.log(
-            `  Formatter: ${color.dim(plan.fromFormatter)} → ${color.green(plan.toFormatter)}`
-        );
-    }
-    console.log();
-
-    // Display changes
-    console.log(color.cyan('Changes:'));
-    for (const change of plan.changes) {
-        console.log(formatMigrationChange(change));
-    }
-
-    if (plan.subPackageUpdates.length > 0) {
-        console.log();
-        console.log(color.cyan(`Sub-packages (${plan.subPackageUpdates.length}):`));
-        for (const update of plan.subPackageUpdates) {
-            const changes = [
-                ...update.remove.map((d) => `-${d}`),
-                ...update.add.map((d) => `+${d}`),
-            ].join(', ');
-            console.log(`  ~ ${update.path} (${changes})`);
-        }
-    }
-    console.log();
-
-    // Confirm
-    if (!options.yes) {
-        const confirm = await p.confirm({
-            message: 'Apply migration?',
-            initialValue: true,
-        });
-
-        if (p.isCancel(confirm) || !confirm) {
-            console.log(color.dim('  Migration cancelled'));
-            process.exit(0);
-        }
-    }
-
-    // Apply migration
-    await applyMigration(plan, root);
-
-    // Update AI rules if they exist (they reference linter/formatter)
-    const aiWorkspacePath = join(root, '.ai/workspace.md');
-    const aiRulesExist = await fileExists(aiWorkspacePath);
-    if (aiRulesExist) {
-        console.log();
-        console.log(color.cyan('Updating AI rules...'));
-
-        const scope = await getMonorepoScope(root);
-        // Detect which platforms already exist
-        const existingPlatforms: AiPlatform[] = [];
-        if (await fileExists(join(root, 'AGENTS.md'))) {
-            existingPlatforms.push('agents');
-        }
-        if (await fileExists(join(root, 'CLAUDE.md'))) {
-            existingPlatforms.push('claude');
-        }
-
-        const aiFilesOutput: Record<string, { type: 'text'; content: string }> = {};
-        generateAiFiles(aiFilesOutput, {
-            name: scope,
-            packageManager: 'pnpm',
-            linter: plan.toLinter,
-            formatter: plan.toFormatter,
-            isMonorepo: true,
-            platforms: existingPlatforms.length > 0 ? existingPlatforms : ['agents'],
-        });
-
-        for (const [filePath, file] of Object.entries(aiFilesOutput)) {
-            const fullPath = join(root, filePath);
-            await mkdir(dirname(fullPath), { recursive: true });
-            await writeFile(fullPath, file.content);
-            console.log(color.dim(`  ${filePath}`));
-        }
-    }
-
-    console.log();
-    console.log(color.green('✓') + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`);
-    console.log(color.dim('  Run `pnpm install` to update dependencies'));
-    process.exit(0);
-}
-
-function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
-    return category === 'workspace-config' || category === 'package-json';
-}
-
-function getUpdateHint(category: CategoryUpdate['category'], status: 'added' | 'modified'): string {
-    if (status === 'added') return 'new file';
-    if (category === 'package-json') return 'scripts-only merge';
-    if (category === 'workspace-config') return 'merge update';
-    return 'changed; overwrites if selected';
-}
-
-type SelectableFileChange = FileChange & { status: 'added' | 'modified' };
-
-function isSelectableFileChange(change: FileChange): change is SelectableFileChange {
-    return change.status === 'added' || change.status === 'modified';
-}
-
-function getInitialUpdateSelections(category: CategoryUpdate): string[] {
-    return category.changes
-        .filter(
-            (change) =>
-                change.status === 'added' ||
-                (change.status === 'modified' && isMergeUpdateCategory(category.category))
-        )
-        .map((change) => change.path);
-}
-
-async function promptForUpdateSelections(category: CategoryUpdate) {
-    const selectableChanges = category.changes.filter(isSelectableFileChange);
-    const selectedFiles = await p.multiselect({
-        message: category.label,
-        options: selectableChanges.map((change) => ({
-            value: change.path,
-            label: change.path,
-            hint: getUpdateHint(category.category, change.status),
-        })),
-        initialValues: getInitialUpdateSelections(category),
-        required: false,
-    });
-
-    if (p.isCancel(selectedFiles)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
-
-    return selectableChanges.filter((change) => selectedFiles.includes(change.path));
-}
-
-/**
- * Handles the --update command to update a workspace or standalone project.
- */
-async function handleUpdateCommand(options: CliOptions): Promise<void> {
-    const monorepoRoot = await detectMonorepoRoot();
-    const projectRoot = monorepoRoot ?? (await detectPackageRoot());
-    if (!projectRoot) {
-        console.log(color.red('✗') + ' Could not find a project root');
-        console.log(color.dim('  Run this command from inside a generated project'));
-        process.exit(1);
-    }
-    const isMonorepo = monorepoRoot != null;
-
-    if (isMonorepo) {
-        // Step 1: Validate workspace
-        const { valid, errors } = await validateWorkspace(projectRoot);
-        if (!valid) {
-            console.log(color.yellow('!') + ' Workspace has issues:');
-            for (const error of errors) {
-                console.log(color.dim(`  • ${error}`));
-            }
-            console.log();
-
-            const shouldFix =
-                options.yes ||
-                (await p.confirm({
-                    message: 'Run fix first to resolve these issues?',
-                    initialValue: true,
-                }));
-
-            if (p.isCancel(shouldFix) || !shouldFix) {
-                console.log(color.dim('  Run `pnpm create krispya --fix` to fix manually'));
-                process.exit(1);
-            }
-
-            // Detect config before fix so we can pass linter/formatter for non-interactive mode
-            const preFixConfig = await detectCurrentConfig(projectRoot);
-
-            // Run fix command with detected linter/formatter for non-interactive mode
-            const fixOptions: CliOptions = {
-                ...options,
-                linter: options.linter ?? preFixConfig.linter,
-                formatter: options.formatter ?? preFixConfig.formatter,
-            };
-            await handleFixCommand(fixOptions);
-        }
-    } else if (options.linter || options.formatter) {
-        console.log(
-            color.yellow('!') + ' Linter/formatter migrations in --update are currently monorepo-only'
-        );
-        console.log(color.dim('  Continuing with standalone shared config updates'));
-        console.log();
-    }
-
-    // Step 2: Detect current configuration
-    const config = await detectCurrentConfig(projectRoot, isMonorepo);
-
-    // Step 3: Check for migration (if --linter or --formatter flags provided)
-    const targetLinter = options.linter as Linter | undefined;
-    const targetFormatter = options.formatter as Formatter | undefined;
-    const migrationTarget = { linter: targetLinter, formatter: targetFormatter };
-
-    if (isMonorepo && needsMigration(config, migrationTarget)) {
-        await handleMigration(config, migrationTarget, projectRoot, options);
-        return;
-    }
-
-    console.log(
-        color.cyan('Checking for updates...') + color.dim(` (${config.linter}/${config.formatter})`)
-    );
-    console.log();
-
-    // Step 4: Generate expected files and compare
-    const expected = await generateExpectedFiles(config);
-    const categories = await compareWithDisk(expected, projectRoot);
-
-    const allCategories = categories.filter((c) => c.category !== 'workspace-config');
-    const packageJsonScriptChanges = await getPackageJsonScriptUpdates(projectRoot, config);
-    if (packageJsonScriptChanges.length > 0) {
-        allCategories.push({
-            category: 'package-json',
-            label: 'package.json Scripts',
-            changes: packageJsonScriptChanges,
-            hasUserModifications: packageJsonScriptChanges.some((c) => c.status === 'modified'),
-        });
-    }
-
-    if (isMonorepo) {
-        // Step 4: Add workspace config updates (merge strategy)
-        const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot);
-        const workspaceCategory: CategoryUpdate = {
-            category: 'workspace-config',
-            label: 'Workspace Config',
-            changes: workspaceConfigChanges,
-            hasUserModifications: workspaceConfigChanges.some((c) => c.status === 'modified'),
-        };
-
-        // Insert after config-packages
-        if (workspaceConfigChanges.length > 0) {
-            const configPkgIndex = allCategories.findIndex((c) => c.category === 'config-packages');
-            if (configPkgIndex !== -1) {
-                allCategories.splice(configPkgIndex + 1, 0, workspaceCategory);
-            } else {
-                allCategories.push(workspaceCategory);
-            }
-        }
-    }
-
-    // Step 5: Process each category
-    let updatedCount = 0;
-    let skippedCount = 0;
-
-    for (const category of allCategories) {
-        const newChanges = category.changes.filter((c) => c.status === 'added');
-        const modifiedChanges = category.changes.filter((c) => c.status === 'modified');
-        const hasNew = newChanges.length > 0;
-        const hasModified = modifiedChanges.length > 0;
-        const hasChanges = hasNew || hasModified;
-
-        if (!hasChanges) {
-            console.log(color.green('✓') + ` ${category.label}: Up to date`);
-            continue;
-        }
-
-        // Determine action based on what changes exist
-        let changesToApply: typeof category.changes = [];
-
-        if (options.yes) {
-            // Show changes for --yes mode
-            console.log(color.cyan(category.label + ':'));
-
-            for (const change of [...newChanges, ...modifiedChanges]) {
-                console.log(formatFileChange(change));
-            }
-            console.log();
-
-            // Non-interactive: add new only (safe default)
-            // Exceptions: these use merge strategies, so "modified" is safe.
-            // package-json only updates the scripts object and preserves other manifest fields.
-            if (isMergeUpdateCategory(category.category)) {
-                changesToApply = [...newChanges, ...modifiedChanges];
-                if (changesToApply.length > 0) {
-                    console.log(color.dim('  (--yes mode: applying merge updates)'));
-                }
-            } else {
-                changesToApply = newChanges;
-                if (newChanges.length > 0) {
-                    console.log(color.dim('  (--yes mode: adding new files only)'));
-                }
-            }
-        } else {
-            changesToApply = await promptForUpdateSelections(category);
-        }
-
-        if (changesToApply.length > 0) {
-            await applyUpdates(changesToApply, projectRoot);
-            const addedCount = changesToApply.filter((c) => c.status === 'added').length;
-            const updatedFilesCount = changesToApply.filter((c) => c.status === 'modified').length;
-            const parts = [];
-            if (addedCount > 0) parts.push(`added ${addedCount}`);
-            if (updatedFilesCount > 0) parts.push(`updated ${updatedFilesCount}`);
-            console.log(color.green('✓') + ` ${category.label}: ${parts.join(', ')}`);
-            updatedCount++;
-        } else {
-            console.log(color.dim(`  Skipped ${category.label}`));
-            skippedCount++;
-        }
-        console.log();
-    }
-
-    // Summary
-    if (updatedCount === 0 && skippedCount === 0) {
-        console.log(color.green('✓') + ' Everything is up to date!');
-    } else if (updatedCount > 0) {
-        console.log(
-            color.green('✓') +
-                ` Updated ${updatedCount} ${updatedCount === 1 ? 'category' : 'categories'}`
-        );
-        if (skippedCount > 0) {
-            console.log(color.dim(`  Skipped ${skippedCount}`));
-        }
-    }
-
-    process.exit(0);
-}
-
-/**
  * Handles the --workspace command for non-interactive package creation in a monorepo.
  */
 async function handleWorkspaceCommand(name: string, options: CliOptions): Promise<void> {
@@ -1850,7 +1480,7 @@ async function main() {
 
             // Handle --update flag
             if (options.update) {
-                await handleUpdateCommand(options);
+                await handleUpdateCommand(options, handleFixCommand);
             }
 
             // Validate --dir requires --workspace
