@@ -35,6 +35,7 @@ The basic dish. The default templates include:
 
 ```bash
 npm create krispya@latest my-project
+# Updates the install with the latest config
 npm create krispya@latest --update
 ```
 

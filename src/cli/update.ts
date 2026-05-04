@@ -1,9 +1,7 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
-import { constants } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { cwd } from 'node:process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { generateAiFiles } from '../generators/ai-files.js';
 import type { AiPlatform, Linter, Formatter } from '../types.js';
@@ -27,6 +25,12 @@ import {
 } from '../update.js';
 import { validateWorkspace } from '../validate.js';
 import type { CliOptions } from '../cli.js';
+import {
+    detectMonorepoRoot,
+    detectPackageRoot,
+    fileExists,
+    getMonorepoScope,
+} from './workspace-utils.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 
@@ -38,64 +42,6 @@ const UPDATE_CATEGORY_ORDER = [
     'package-json',
     'ai-files',
 ] satisfies UpdateCategory[];
-
-async function fileExists(path: string): Promise<boolean> {
-    try {
-        await access(path, constants.F_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-async function detectMonorepoRoot(): Promise<string | null> {
-    let currentDir = cwd();
-    const root = resolve('/');
-
-    while (currentDir !== root) {
-        const workspaceFile = join(currentDir, 'pnpm-workspace.yaml');
-        try {
-            await access(workspaceFile, constants.F_OK);
-            const content = await readFile(workspaceFile, 'utf-8');
-            if (content.includes('packages:')) {
-                return currentDir;
-            }
-        } catch {
-            // File doesn't exist, continue.
-        }
-        currentDir = dirname(currentDir);
-    }
-
-    return null;
-}
-
-async function detectPackageRoot(): Promise<string | null> {
-    let currentDir = cwd();
-    const root = resolve('/');
-
-    while (currentDir !== root) {
-        if (await fileExists(join(currentDir, 'package.json'))) {
-            return currentDir;
-        }
-        currentDir = dirname(currentDir);
-    }
-
-    return (await fileExists(join(root, 'package.json'))) ? root : null;
-}
-
-async function getMonorepoScope(monorepoRoot: string): Promise<string> {
-    try {
-        const pkgPath = join(monorepoRoot, 'package.json');
-        const content = await readFile(pkgPath, 'utf-8');
-        const pkgJson = JSON.parse(content) as { name?: string };
-        if (pkgJson.name) {
-            return pkgJson.name.replace(/^@/, '').replace(/\/.*$/, '');
-        }
-    } catch {
-        // Fall through to directory name.
-    }
-    return monorepoRoot.split(/[/\\]/).pop() ?? 'workspace';
-}
 
 function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
     return category === 'workspace-config' || category === 'package-json';
