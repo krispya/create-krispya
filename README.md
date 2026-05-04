@@ -26,13 +26,16 @@ We are also in a time of rampant changes to the JS toolchain ecosytem. In an eff
 
 ## Single-project workspaces
 
-The basic dish.
+The basic dish. The default templates include:
+
+- Application
+- Library
 
 ## CLI
 
 ```bash
-npm create krispya name
-npm create krispya --update
+npm create krispya@latest my-project
+npm create krispya@latest --update
 ```
 
 ## Options
