@@ -192,10 +192,7 @@ export async function resolveEngine(options: GenerateOptions) {
     return engine;
 }
 
-export function formatNodeTypesVersion(
-    versions: PackageVersions = {},
-    engine?: EngineSpec
-): string {
+export function formatNodeTypesVersion(versions: PackageVersions = {}, engine?: EngineSpec): string {
     const resolvedVersion = versions['@types/node'];
     if (resolvedVersion != null) {
         return `^${resolvedVersion}`;

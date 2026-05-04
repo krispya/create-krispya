@@ -41,9 +41,7 @@ describe('getLatestNpmMajorVersion', () => {
             }),
         } as Response);
 
-        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe(
-            '25.3.5'
-        );
+        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe('25.3.5');
     });
 
     it('falls back when no version matches the requested major', async () => {
@@ -55,8 +53,6 @@ describe('getLatestNpmMajorVersion', () => {
             }),
         } as Response);
 
-        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe(
-            '25.0.0'
-        );
+        await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe('25.0.0');
     });
 });
