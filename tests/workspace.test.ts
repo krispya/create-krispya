@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseWorkspaceYamlContent } from '../src/utils.js';
+import { parseWorkspaceYamlContent } from '../src/utils/index.js';
 
 describe('parseWorkspaceYamlContent', () => {
     it('parses basic workspace directories', () => {

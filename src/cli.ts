@@ -12,7 +12,7 @@ import { fetch } from 'undici';
 import type { Ide, PackageManagerName } from './types.js';
 
 import { getDefaultProjectName, promptForOptions, type CliPresets } from './cli/index.js';
-import { promptForAiPlatforms } from './cli/ai.js';
+import { promptForAiAgentPlatforms } from './cli/ai.js';
 import { handleCheckCommand } from './cli/check.js';
 import { handleFixCommand } from './cli/fix.js';
 import { handleUpdateCommand } from './cli/update.js';
@@ -24,21 +24,18 @@ import {
 import { detectMonorepoRoot, type InheritedWorkspaceSettings } from './cli/workspace-utils.js';
 import { clearConfig, getConfigPath } from './config.js';
 import {
-    generate,
     getBaseTemplate,
-    type File,
-    type GenerateOptions,
+    planProject,
+    resolveProjectPlanInput,
+    planWorkspace,
+    resolveWorkspacePlanInput,
+    type VirtualFile,
+    type ProjectOptions,
     type LibraryBundler,
     type ProjectType,
     type Template,
 } from './index.js';
-import {
-    getPackageManagerName,
-    resolveEngine,
-    resolveMonorepoRootPackageVersions,
-    resolvePackageManager,
-    resolveProjectPackageVersions,
-} from './package-versions.js';
+import { getPackageManagerName } from './package-versions.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -109,7 +106,10 @@ function hasConfigOptions(options: CliOptions): boolean {
 /**
  * Writes generated files to disk.
  */
-async function writeGeneratedFiles(basePath: string, files: Record<string, File>): Promise<void> {
+async function writeGeneratedFiles(
+    basePath: string,
+    files: Record<string, VirtualFile>
+): Promise<void> {
     const filePaths = Object.keys(files).sort();
 
     for (const filePath of filePaths) {
@@ -130,42 +130,30 @@ async function writeGeneratedFiles(basePath: string, files: Record<string, File>
  * Handles monorepo creation.
  */
 async function handleMonorepoCreation(
-    generateOptions: GenerateOptions,
+    projectOptions: ProjectOptions,
     isNonInteractive: boolean
 ): Promise<void> {
-    const { generateMonorepo } = await import('./generators/monorepo.js');
-
-    const packageManager = getPackageManagerName(generateOptions.packageManager);
-    generateOptions.packageManager = await resolvePackageManager(generateOptions);
-    generateOptions.engine = await resolveEngine(generateOptions);
-    generateOptions.versions = await resolveMonorepoRootPackageVersions({
-        linter: generateOptions.linter ?? 'oxlint',
-        formatter: generateOptions.formatter ?? 'prettier',
-        engine: generateOptions.engine,
-        versions: generateOptions.versions,
-    });
-
-    // Prompt for AI platforms
-    const aiPlatforms = await promptForAiPlatforms(isNonInteractive);
-
-    const projectPath = join(cwd(), generateOptions.name);
+    const packageManager = getPackageManagerName(projectOptions.packageManager);
+    const projectPath = join(cwd(), projectOptions.name);
     const spinner = p.spinner();
     spinner.start('Creating monorepo workspace...');
 
     try {
-        const { files } = generateMonorepo({
-            name: generateOptions.name,
-            linter: generateOptions.linter ?? 'oxlint',
-            formatter: generateOptions.formatter ?? 'prettier',
-            packageManager: generateOptions.packageManager ?? {
+        const planInput = resolveWorkspacePlanInput({
+            name: projectOptions.name,
+            linter: projectOptions.linter ?? 'oxlint',
+            formatter: projectOptions.formatter ?? 'prettier',
+            packageManager: projectOptions.packageManager ?? {
                 name: packageManager,
             },
-            pnpmManageVersions: generateOptions.pnpmManageVersions,
-            engine: generateOptions.engine,
-            versions: generateOptions.versions,
-            aiPlatforms: aiPlatforms.length > 0 ? aiPlatforms : undefined,
-            ide: generateOptions.ide ?? 'vscode',
+            pnpmManageVersions: projectOptions.pnpmManageVersions,
+            engine: projectOptions.engine,
+            versions: projectOptions.versions,
+            aiPlatforms: projectOptions.aiPlatforms,
+            ide: projectOptions.ide ?? 'vscode',
         });
+
+        const { files } = await planWorkspace(planInput);
 
         await writeGeneratedFiles(projectPath, files);
 
@@ -177,16 +165,16 @@ async function handleMonorepoCreation(
         }
 
         const newWorkspaceSettings: InheritedWorkspaceSettings = {
-            linter: generateOptions.linter,
-            formatter: generateOptions.formatter,
-            packageManager: generateOptions.packageManager ?? {
+            linter: projectOptions.linter,
+            formatter: projectOptions.formatter,
+            packageManager: projectOptions.packageManager ?? {
                 name: packageManager,
             },
-            engine: generateOptions.engine,
-            pnpmManageVersions: generateOptions.pnpmManageVersions,
+            engine: projectOptions.engine,
+            pnpmManageVersions: projectOptions.pnpmManageVersions,
         };
 
-        const scope = generateOptions.name;
+        const scope = projectOptions.name;
 
         let addMore = true;
         while (addMore) {
@@ -200,7 +188,7 @@ async function handleMonorepoCreation(
         }
 
         const nextSteps = [
-            `cd ${generateOptions.name}`,
+            `cd ${projectOptions.name}`,
             `${packageManager} install`,
             `${packageManager} run dev`,
         ].join('\n');
@@ -217,45 +205,29 @@ async function handleMonorepoCreation(
 }
 
 /**
- * Handles standalone project creation (app or library).
+ * Handles single-package workspace creation.
  */
-async function handleStandaloneProjectCreation(
-    generateOptions: GenerateOptions,
+async function handleSingleWorkspaceCreation(
+    projectOptions: ProjectOptions,
     isNonInteractive: boolean
 ): Promise<void> {
-    const base = generateOptions.template ? getBaseTemplate(generateOptions.template) : 'vanilla';
-
+    const base = projectOptions.template ? getBaseTemplate(projectOptions.template) : 'vanilla';
     const defaultFallbackName =
         base === 'vanilla' ? 'vanilla-app' : base === 'react' ? 'react-app' : 'react-three-app';
-
-    generateOptions.name ??= defaultFallbackName;
-
-    // Prompt for AI platforms
-    const aiPlatforms = await promptForAiPlatforms(isNonInteractive);
-    if (aiPlatforms.length > 0) {
-        generateOptions.aiPlatforms = aiPlatforms;
-    }
-
-    /**
-     * Resolve: All of the user's settings are resolved into one options object
-     * with the latest package versions from NPM.
-     */
-    const packageManager = getPackageManagerName(generateOptions.packageManager);
-    const isLibrary = generateOptions.projectType === 'library';
-
-    generateOptions.packageManager = await resolvePackageManager(generateOptions);
-    generateOptions.engine = await resolveEngine(generateOptions);
-    generateOptions.versions = await resolveProjectPackageVersions(generateOptions);
+    projectOptions.name ??= defaultFallbackName;
+    const packageManager = getPackageManagerName(projectOptions.packageManager);
 
     /**
      * Render: Create files from the resolved options
      */
-    const projectPath = join(cwd(), generateOptions.name);
+    const projectPath = join(cwd(), projectOptions.name);
     const spinner = p.spinner();
+
     spinner.start('Creating project...');
 
     try {
-        const files = generate(generateOptions);
+        const planInput = resolveProjectPlanInput(projectOptions);
+        const { files } = await planProject(planInput);
         await writeGeneratedFiles(projectPath, files);
 
         spinner.stop(color.green.inverse(' ✓ Project created! '));
@@ -263,17 +235,18 @@ async function handleStandaloneProjectCreation(
         // In non-interactive mode, just exit
         if (isNonInteractive) process.exit(0);
 
-        const nextSteps = isLibrary
-            ? [
-                  `cd ${generateOptions.name}`,
-                  `${packageManager} install`,
-                  `${packageManager} run build`,
-              ].join('\n')
-            : [
-                  `cd ${generateOptions.name}`,
-                  `${packageManager} install`,
-                  `${packageManager} run dev`,
-              ].join('\n');
+        const nextSteps =
+            projectOptions.projectType === 'library'
+                ? [
+                      `cd ${projectOptions.name}`,
+                      `${packageManager} install`,
+                      `${packageManager} run build`,
+                  ].join('\n')
+                : [
+                      `cd ${projectOptions.name}`,
+                      `${packageManager} install`,
+                      `${packageManager} run dev`,
+                  ].join('\n');
 
         p.note(nextSteps, 'Next steps');
 
@@ -442,7 +415,7 @@ async function main() {
             }
 
             // Get generate options
-            let generateOptions: GenerateOptions;
+            let projectOptions: ProjectOptions;
 
             // Non-interactive mode: --yes flag skips all prompts
             if (options.yes) {
@@ -451,7 +424,7 @@ async function main() {
                 const defaultName = getDefaultProjectName(template);
                 const projectType: ProjectType = options.type ?? 'app';
 
-                generateOptions = {
+                projectOptions = {
                     name: name || defaultName,
                     projectType,
                     libraryBundler:
@@ -510,15 +483,20 @@ async function main() {
                       }
                     : undefined;
 
-                generateOptions = await promptForOptions(name, presets);
+                projectOptions = await promptForOptions(name, presets);
             }
 
             // Route to appropriate handler
             const isNonInteractive = options.yes ?? false;
-            if (generateOptions.projectType === 'monorepo') {
-                await handleMonorepoCreation(generateOptions, isNonInteractive);
+            const aiAgentPlatforms = await promptForAiAgentPlatforms(isNonInteractive);
+            if (aiAgentPlatforms.length > 0) {
+                projectOptions.aiPlatforms = aiAgentPlatforms;
+            }
+
+            if (projectOptions.projectType === 'monorepo') {
+                await handleMonorepoCreation(projectOptions, isNonInteractive);
             } else {
-                await handleStandaloneProjectCreation(generateOptions, isNonInteractive);
+                await handleSingleWorkspaceCreation(projectOptions, isNonInteractive);
             }
         });
 

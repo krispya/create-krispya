@@ -191,7 +191,7 @@ Select which files to generate during project creation. Your selection can be sa
 
 ## Config Strategy
 
-Control where configuration files are placed in single-package projects:
+Control where configuration files are placed in single-package workspaces:
 
 | Strategy  | Description                                    |
 | --------- | ---------------------------------------------- |

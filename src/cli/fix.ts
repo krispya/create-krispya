@@ -3,22 +3,22 @@ import color from 'chalk';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { generateAiFiles } from '../generators/ai-files.js';
+import { renderAiFiles } from '../renderers/ai-files.js';
 import {
-    generateEslintConfigPackage,
-    generateOxfmtConfigPackage,
-    generateOxlintConfigPackage,
-    generatePrettierConfigPackage,
-    generateTypescriptConfigPackage,
-    generateVscodeFiles,
-} from '../generators/monorepo.js';
+    renderEslintConfigPackage,
+    renderOxfmtConfigPackage,
+    renderOxlintConfigPackage,
+    renderPrettierConfigPackage,
+    renderTypescriptConfigPackage,
+    renderVscodeFiles,
+} from '../renderers/monorepo.js';
 import {
     getResolvedPackageVersion,
     resolveMonorepoRootPackageVersions,
 } from '../package-versions.js';
 import { validateWorkspace } from '../validate.js';
 import type { CliOptions } from '../cli.js';
-import { promptForAiPlatforms } from './ai.js';
+import { promptForAiAgentPlatforms } from './ai.js';
 import {
     detectExistingConfigs,
     detectMonorepoRoot,
@@ -39,7 +39,7 @@ async function migrateEslintConfig(
     try {
         existingContent = await readFile(existingConfigPath, 'utf-8');
     } catch {
-        generateEslintConfigPackage(files);
+        renderEslintConfigPackage(files);
         return;
     }
 
@@ -127,7 +127,7 @@ async function migratePrettierConfig(
     try {
         existingContent = await readFile(existingConfigPath, 'utf-8');
     } catch {
-        generatePrettierConfigPackage(files);
+        renderPrettierConfigPackage(files);
         return;
     }
 
@@ -287,12 +287,12 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
             join(monorepoRoot, '.config/typescript/package.json')
         );
         if (!tsConfigExists) {
-            generateTypescriptConfigPackage(files);
+            renderTypescriptConfigPackage(files);
         }
 
         if (linter === 'oxlint') {
             const oxlintExists = await fileExists(join(monorepoRoot, '.config/oxlint/package.json'));
-            if (!oxlintExists) generateOxlintConfigPackage(files);
+            if (!oxlintExists) renderOxlintConfigPackage(files);
         } else if (linter === 'eslint') {
             const eslintPkgExists = await fileExists(
                 join(monorepoRoot, '.config/eslint/package.json')
@@ -301,14 +301,14 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
                 if (existingConfigs.eslintConfigPath) {
                     await migrateEslintConfig(monorepoRoot, files);
                 } else {
-                    generateEslintConfigPackage(files);
+                    renderEslintConfigPackage(files);
                 }
             }
         }
 
         if (formatter === 'oxfmt') {
             const oxfmtExists = await fileExists(join(monorepoRoot, '.config/oxfmt/package.json'));
-            if (!oxfmtExists) generateOxfmtConfigPackage(files);
+            if (!oxfmtExists) renderOxfmtConfigPackage(files);
         } else if (formatter === 'prettier') {
             const prettierPkgExists = await fileExists(
                 join(monorepoRoot, '.config/prettier/package.json')
@@ -317,7 +317,7 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
                 if (existingConfigs.prettierConfigPath) {
                     await migratePrettierConfig(monorepoRoot, files);
                 } else {
-                    generatePrettierConfigPackage(files);
+                    renderPrettierConfigPackage(files);
                 }
             }
         }
@@ -398,7 +398,7 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
 
             if (addVscode) {
                 const vscodeFiles: Record<string, { type: 'text'; content: string }> = {};
-                generateVscodeFiles(vscodeFiles, linter, formatter);
+                renderVscodeFiles(vscodeFiles, linter, formatter);
                 for (const [filePath, file] of Object.entries(vscodeFiles)) {
                     const fullPath = join(monorepoRoot, filePath);
                     await mkdir(dirname(fullPath), { recursive: true });
@@ -412,12 +412,12 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
         const aiRulesExist = await fileExists(join(monorepoRoot, '.ai/workspace.md'));
 
         if (!aiRulesExist) {
-            const platforms = await promptForAiPlatforms(isNonInteractive);
+            const platforms = await promptForAiAgentPlatforms(isNonInteractive);
 
             if (platforms.length > 0) {
                 const scope = await getMonorepoScope(monorepoRoot);
                 const aiFilesOutput: Record<string, { type: 'text'; content: string }> = {};
-                generateAiFiles(aiFilesOutput, {
+                renderAiFiles(aiFilesOutput, {
                     name: scope,
                     packageManager: 'pnpm',
                     linter,

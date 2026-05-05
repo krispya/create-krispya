@@ -2,10 +2,10 @@ import * as p from '@clack/prompts';
 import color from 'chalk';
 
 import { getAiPlatforms } from '../config.js';
-import { AI_PLATFORM_HINTS, AI_PLATFORM_LABELS, ALL_AI_PLATFORMS } from '../generators/ai-files.js';
+import { AI_PLATFORM_HINTS, AI_PLATFORM_LABELS, ALL_AI_PLATFORMS } from '../renderers/ai-files.js';
 import type { AiPlatform } from '../types.js';
 
-export async function promptForAiPlatforms(isNonInteractive: boolean): Promise<AiPlatform[]> {
+export async function promptForAiAgentPlatforms(isNonInteractive: boolean): Promise<AiPlatform[]> {
     const savedPlatforms = getAiPlatforms();
 
     if (isNonInteractive) {

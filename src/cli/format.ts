@@ -1,11 +1,6 @@
 import color from 'chalk';
 import { getEngineName, getPackageManagerName } from '../package-versions.js';
-import type {
-    EngineSpec,
-    GenerateOptions,
-    PackageManagerName,
-    PackageManagerSpec,
-} from '../types.js';
+import type { EngineSpec, ProjectOptions, PackageManagerName, PackageManagerSpec } from '../types.js';
 import { getBaseTemplate, getLanguageFromTemplate } from '../types.js';
 
 export type MonorepoConfigOptions = {
@@ -33,7 +28,7 @@ export type InheritedFields = {
  * Formats the configuration summary for display in the CLI.
  * When inherited is provided, those fields are displayed with dim styling.
  */
-export function formatConfigSummary(options: GenerateOptions, inherited?: InheritedFields): string {
+export function formatConfigSummary(options: ProjectOptions, inherited?: InheritedFields): string {
     const lines: string[] = [];
     const VALUE_COL = 27; // Start position for values
 
@@ -108,7 +103,7 @@ export function formatConfigSummary(options: GenerateOptions, inherited?: Inheri
     const testing = options.testing ?? (projectType === 'library' ? 'vitest' : 'none');
     lines.push(formatRow('Testing', testing));
 
-    // Config strategy (only relevant for standalone projects, not monorepo packages)
+    // Config strategy (only relevant for single-package workspaces, not monorepo packages)
     if (!inherited) {
         lines.push(
             formatRow('Editor config', options.ide === 'none' ? 'generic' : 'generic + vscode')
@@ -118,7 +113,7 @@ export function formatConfigSummary(options: GenerateOptions, inherited?: Inheri
         lines.push(formatRow('Config strategy', configStrategy));
     }
 
-    // R3F integrations
+    // R3F features
     if (options.template && getBaseTemplate(options.template) === 'r3f') {
         const integrationNames = [
             options.drei && 'drei',
@@ -136,7 +131,7 @@ export function formatConfigSummary(options: GenerateOptions, inherited?: Inheri
         ].filter(Boolean) as string[];
 
         lines.push('');
-        lines.push(color.dim('Integrations'));
+        lines.push(color.dim('Features'));
 
         // Two-column layout
         for (let i = 0; i < integrationNames.length; i += 2) {

@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { validateWorkspace } from '../src/validate.js';
+import { planWorkspace } from '../src/index.js';
 
 describe('validateWorkspace', () => {
     let tempDir: string;
@@ -76,10 +77,9 @@ describe('validateWorkspace', () => {
     });
 });
 
-describe('generateMonorepo with eslint/prettier', () => {
+describe('renderMonorepo with eslint/prettier', () => {
     it('generates .config/eslint package when eslint is selected', async () => {
-        const { generateMonorepo } = await import('../src/generators/monorepo.js');
-        const { files } = generateMonorepo({
+        const { files } = await planWorkspace({
             name: 'test-workspace',
             linter: 'eslint',
             formatter: 'prettier',

@@ -1,6 +1,6 @@
 # create-krispya
 
-- **Type:** standalone project
+- **Type:** single-package workspace
 - **Package Manager:** pnpm
 - **Linter:** oxlint
 - **Formatter:** prettier

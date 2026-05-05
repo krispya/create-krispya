@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import {
     compareWithDisk,
     detectCurrentConfig,
-    generateExpectedFiles,
+    planExpectedFiles,
     getOxlintConfigReplacementUpdates,
     getPackageJsonScriptUpdates,
-} from '../src/update.js';
+} from '../src/cli/update-core.js';
 
 describe('update helpers', () => {
     function readTextJson(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
@@ -19,8 +19,8 @@ describe('update helpers', () => {
         return JSON.parse(file.content);
     }
 
-    it('uses standalone root config for standalone updates', async () => {
-        const expected = await generateExpectedFiles({
+    it('uses single-package root config for single-package updates', async () => {
+        const expected = await planExpectedFiles({
             name: 'my-app',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -72,8 +72,8 @@ describe('update helpers', () => {
         expect(expected['workspace-config']).toEqual({});
     });
 
-    it('uses standalone VS Code config paths for standalone updates', async () => {
-        const expected = await generateExpectedFiles({
+    it('uses single-package VS Code config paths for single-package updates', async () => {
+        const expected = await planExpectedFiles({
             name: 'my-app',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -92,7 +92,7 @@ describe('update helpers', () => {
     it('compares generated JSON files by value instead of formatting', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-json-'));
         try {
-            const expected = await generateExpectedFiles({
+            const expected = await planExpectedFiles({
                 name: 'my-app',
                 linter: 'oxlint',
                 formatter: 'prettier',
@@ -124,7 +124,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         }
     });
 
-    it('regenerates standalone package scripts with typecheck watch', async () => {
+    it('regenerates single-package scripts with typecheck watch', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-scripts-'));
         try {
             await mkdir(join(tempDir, '.config'), { recursive: true });
@@ -180,7 +180,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         }
     });
 
-    it('adds oxlint type-aware backend during standalone updates', async () => {
+    it('adds oxlint type-aware backend during single-package updates', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-oxlint-type-aware-'));
         try {
             await mkdir(join(tempDir, '.config'), { recursive: true });
@@ -223,7 +223,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         }
     });
 
-    it('offers oxlint config replacement during standalone updates', async () => {
+    it('offers oxlint config replacement during single-package updates', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-oxlint-config-'));
         try {
             await mkdir(join(tempDir, '.config'), { recursive: true });
@@ -263,7 +263,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     });
 
     it('uses workspace root config for monorepo updates', async () => {
-        const expected = await generateExpectedFiles({
+        const expected = await planExpectedFiles({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -302,7 +302,7 @@ describe('detectCurrentConfig', () => {
         }
     });
 
-    it('detects standalone package manager and config strategy', async () => {
+    it('detects single-package package manager and config strategy', async () => {
         tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-update-'));
         await mkdir(join(tempDir, '.config'), { recursive: true });
         await writeFile(

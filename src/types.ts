@@ -24,8 +24,8 @@ export type DependencyVersionOptions = {
     version?: string;
 };
 
-// File output types
-export type File =
+// In-memory file output types. These are planned files, not files on disk yet.
+export type VirtualFile =
     | {
           type: 'text';
           content: string;
@@ -35,12 +35,61 @@ export type File =
           url: string;
       };
 
+export type FileRenderer<Input> = (input: Input) => VirtualFile;
+export type VirtualFileMap = Record<string, VirtualFile>;
+
 // Linter and formatter choices
 export type Linter = 'eslint' | 'oxlint' | 'biome';
 export type Formatter = 'prettier' | 'oxfmt' | 'biome';
 export type Testing = 'vitest' | 'none';
 export type ConfigStrategy = 'stealth' | 'root';
 export type Ide = 'vscode' | 'none';
+
+export type FormatterMetaConfig = {
+    printWidth: number;
+    tabWidth: number;
+    useTabs: boolean;
+    semi: boolean;
+    singleQuote: boolean;
+    trailingComma: 'none' | 'es5' | 'all';
+    bracketSpacing: boolean;
+    arrowParens: 'always' | 'avoid';
+    ignorePatterns: string[];
+};
+
+export type LinterMetaConfig = {
+    ignorePatterns: string[];
+    rules: {
+        noUnusedVars: {
+            level: 'off' | 'warn' | 'error';
+            argsIgnorePattern: string;
+            varsIgnorePattern: string;
+            caughtErrorsIgnorePattern: string;
+        };
+        noUnusedExpressions: {
+            level: 'off' | 'warn' | 'error';
+            allowShortCircuit: boolean;
+        };
+    };
+};
+
+export type TypeScriptMetaConfig = {
+    configStrategy?: ConfigStrategy;
+};
+
+export type EditorMetaConfig = Record<string, never>;
+export type TestingMetaConfig = Record<string, never>;
+export type LibraryBundlerMetaConfig = Record<string, never>;
+
+export type PackageManagerMetaConfig = {
+    version?: string;
+    pnpmManageVersions?: boolean;
+};
+
+export type ToolConfig<Tool extends string, Config> = {
+    tool: Tool;
+    config: Config;
+};
 
 // Code injection locations for template assembly
 export type CodeInjectionLocation =
@@ -62,51 +111,121 @@ export type CodeInjectionLocation =
     | 'vscode-extension-suggestion'
     | 'vscode-setting';
 
-// Integration option types
-export type GenerateFiberOptions =
+// Adapter option types
+export type PlanFiberOptions =
     | {
           /** @default true */
           addExample?: boolean;
       }
     | boolean;
 
-export type GenerateDreiOptions = {} | boolean;
-export type GenerateHandleOptions = {} | boolean;
+export type PlanDreiOptions = {} | boolean;
+export type PlanHandleOptions = {} | boolean;
 
-export type GenerateKootaOptions =
+export type PlanKootaOptions =
     | {
           /** @default true */
           addExample?: boolean;
       }
     | boolean;
 
-export type GenerateLevaOptions = {} | boolean;
-export type GenerateOffscreenOptions = {} | boolean;
-export type GeneratePostprocessingOptions = {} | boolean;
-export type GenerateRapierOptions = {} | boolean;
-export type GenerateTriplexOptions = {} | boolean;
-export type GenerateUikitOptions = {} | boolean;
-export type GenerateViverseOptions = {} | boolean;
+export type PlanLevaOptions = {} | boolean;
+export type PlanOffscreenOptions = {} | boolean;
+export type PlanPostprocessingOptions = {} | boolean;
+export type PlanRapierOptions = {} | boolean;
+export type PlanTriplexOptions = {} | boolean;
+export type PlanUikitOptions = {} | boolean;
+export type PlanViverseOptions = {} | boolean;
 
-export type GenerateXrOptions =
+export type PlanXrOptions =
     | {
           storeOptions?: unknown;
       }
     | boolean;
 
-export type GenerateZustandOptions =
+export type PlanZustandOptions =
     | {
           /** @default true */
           addExample?: boolean;
       }
     | boolean;
 
-export type GenerateGithubPagesOptions = {} | boolean;
+export type PlanGithubPagesOptions = {} | boolean;
 
 // AI rules platform options
 export type AiPlatform = 'agents' | 'claude';
 
-export type GenerateOptions = {
+export type AiAgentsMetaConfig = {
+    platforms: AiPlatform[];
+};
+
+export type ProjectMetaConfig = {
+    githubUserName?: string;
+    githubRepoName?: string;
+    name: string;
+    projectType?: ProjectType;
+    template?: Template;
+};
+
+export type FeatureSelections = {
+    fiber?: PlanFiberOptions;
+    handle?: PlanHandleOptions;
+    drei?: PlanDreiOptions;
+    koota?: PlanKootaOptions;
+    leva?: PlanLevaOptions;
+    offscreen?: PlanOffscreenOptions;
+    postprocessing?: PlanPostprocessingOptions;
+    rapier?: PlanRapierOptions;
+    triplex?: PlanTriplexOptions;
+    viverse?: PlanViverseOptions;
+    uikit?: PlanUikitOptions;
+    xr?: PlanXrOptions;
+    zustand?: PlanZustandOptions;
+    githubPages?: PlanGithubPagesOptions;
+};
+
+export type ProjectPlanContext = {
+    dependencies?: Record<string, string>;
+    engine?: EngineSpec;
+    files?: VirtualFileMap;
+    injections?: Array<{ location: CodeInjectionLocation; code: string }>;
+    replacements?: Array<{ search: string; replace: string }>;
+    versions?: PackageVersions;
+    workspaceRoot?: string;
+    workspaceDependencies?: string[];
+};
+
+export type ProjectPlanInput = {
+    project: ProjectMetaConfig;
+    aiAgents: ToolConfig<'ai-agents', AiAgentsMetaConfig>;
+    formatter: ToolConfig<Formatter, FormatterMetaConfig>;
+    linter: ToolConfig<Linter, LinterMetaConfig>;
+    testing: ToolConfig<Testing, TestingMetaConfig>;
+    typescript: ToolConfig<'typescript', TypeScriptMetaConfig>;
+    ide: ToolConfig<Ide, EditorMetaConfig>;
+    packageManager: ToolConfig<PackageManagerName, PackageManagerMetaConfig>;
+    libraryBundler: ToolConfig<LibraryBundler, LibraryBundlerMetaConfig>;
+    features: FeatureSelections;
+    context: ProjectPlanContext;
+};
+
+export type WorkspacePlanContext = {
+    engine?: EngineSpec;
+    pnpmManageVersions?: boolean;
+    versions?: PackageVersions;
+};
+
+export type WorkspacePlanInput = {
+    project: Pick<ProjectMetaConfig, 'name'>;
+    aiAgents: ToolConfig<'ai-agents', AiAgentsMetaConfig>;
+    formatter: ToolConfig<Formatter, FormatterMetaConfig>;
+    linter: ToolConfig<Linter, LinterMetaConfig>;
+    ide: ToolConfig<Ide, EditorMetaConfig>;
+    packageManager: ToolConfig<PackageManagerName, PackageManagerMetaConfig>;
+    context: WorkspacePlanContext;
+};
+
+export type ProjectOptions = {
     githubUserName?: string;
     githubRepoName?: string;
     name: string;
@@ -121,22 +240,22 @@ export type GenerateOptions = {
     /** AI platforms to generate pointer files for */
     aiPlatforms?: AiPlatform[];
     versions?: PackageVersions;
-    fiber?: GenerateFiberOptions;
-    handle?: GenerateHandleOptions;
-    drei?: GenerateDreiOptions;
-    koota?: GenerateKootaOptions;
-    leva?: GenerateLevaOptions;
-    offscreen?: GenerateOffscreenOptions;
-    postprocessing?: GeneratePostprocessingOptions;
-    rapier?: GenerateRapierOptions;
-    triplex?: GenerateTriplexOptions;
-    viverse?: GenerateViverseOptions;
-    uikit?: GenerateUikitOptions;
-    xr?: GenerateXrOptions;
-    zustand?: GenerateZustandOptions;
-    githubPages?: GenerateGithubPagesOptions;
+    fiber?: PlanFiberOptions;
+    handle?: PlanHandleOptions;
+    drei?: PlanDreiOptions;
+    koota?: PlanKootaOptions;
+    leva?: PlanLevaOptions;
+    offscreen?: PlanOffscreenOptions;
+    postprocessing?: PlanPostprocessingOptions;
+    rapier?: PlanRapierOptions;
+    triplex?: PlanTriplexOptions;
+    viverse?: PlanViverseOptions;
+    uikit?: PlanUikitOptions;
+    xr?: PlanXrOptions;
+    zustand?: PlanZustandOptions;
+    githubPages?: PlanGithubPagesOptions;
     dependencies?: Record<string, string>;
-    files?: Record<string, File>;
+    files?: VirtualFileMap;
     injections?: Array<{ location: CodeInjectionLocation; code: string }>;
     replacements?: Array<{ search: string; replace: string }>;
     packageManager?: PackageManagerSpec;
@@ -146,9 +265,9 @@ export type GenerateOptions = {
     workspaceDependencies?: string[]; // workspace package names to add as dependencies
 };
 
-// Generator interface for integrations
-export type Generator = {
-    get options(): GenerateOptions;
+// Mutable plan builder used internally while adapters are being composed.
+export type PlanBuilder = {
+    get options(): ProjectOptions;
     get versions(): PackageVersions;
     getVersion(name: string): string;
     /** Returns true if using stealth config strategy (configs in .config/) */
@@ -156,7 +275,7 @@ export type Generator = {
     addDependency(name: string, options?: DependencyVersionOptions): void;
     addDevDependency(name: string, options?: DependencyVersionOptions): void;
     addPeerDependency(name: string, semver: string): void;
-    addFile(path: string, file: File): void;
+    addFile(path: string, file: VirtualFile): void;
     addScripts(scripts: Record<string, string>): void;
     addScript(name: string, command: string): void;
     inject(location: CodeInjectionLocation, code: string): void;

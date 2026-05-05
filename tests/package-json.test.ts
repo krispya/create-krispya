@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generate } from '../src/index.js';
-import { generateMonorepo } from '../src/generators/monorepo.js';
-import { generatePackageJson } from '../src/generators/package-json.js';
+import { planProject, planWorkspace } from '../src/index.js';
+
+import { renderPackageJson } from '../src/renderers/package-json.js';
 
 function readPackageJsonContent(
     file: { type: 'text'; content: string } | { type: 'remote'; url: string }
@@ -13,13 +13,13 @@ function readPackageJsonContent(
     return JSON.parse(file.content);
 }
 
-describe('generatePackageJson', () => {
+describe('renderPackageJson', () => {
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('defaults standalone libraries to version 0.1.0', () => {
-        const result = generatePackageJson({
+    it('defaults single-package libraries to version 0.1.0', async () => {
+        const result = renderPackageJson({
             name: 'my-lib',
             baseTemplate: 'vanilla',
             language: 'typescript',
@@ -37,8 +37,8 @@ describe('generatePackageJson', () => {
         expect(packageJson.version).toBe('0.1.0');
     });
 
-    it('defaults workspace libraries to version 0.1.0', () => {
-        const result = generatePackageJson({
+    it('defaults workspace libraries to version 0.1.0', async () => {
+        const result = renderPackageJson({
             name: '@scope/my-lib',
             baseTemplate: 'vanilla',
             language: 'typescript',
@@ -57,8 +57,8 @@ describe('generatePackageJson', () => {
         expect(packageJson.version).toBe('0.1.0');
     });
 
-    it('uses the selected node version for both types and engines', () => {
-        const result = generatePackageJson({
+    it('adds @types/node based on the selected engine', async () => {
+        const result = renderPackageJson({
             name: 'my-app',
             baseTemplate: 'vanilla',
             language: 'javascript',
@@ -78,8 +78,8 @@ describe('generatePackageJson', () => {
         expect(packageJson.engines.node).toBe('>=25.0.0');
     });
 
-    it('uses the resolved @types/node version when available', () => {
-        const result = generatePackageJson({
+    it('prefers explicit @types/node versions', async () => {
+        const result = renderPackageJson({
             name: 'my-app',
             baseTemplate: 'vanilla',
             language: 'javascript',
@@ -100,8 +100,8 @@ describe('generatePackageJson', () => {
         expect(packageJson.engines.node).toBe('>=25.0.0');
     });
 
-    it('adds readable default app scripts for TypeScript projects', () => {
-        const result = generatePackageJson({
+    it('uses the shared script registry for single-package defaults', async () => {
+        const result = renderPackageJson({
             name: 'my-app',
             baseTemplate: 'vanilla',
             language: 'typescript',
@@ -125,8 +125,8 @@ describe('generatePackageJson', () => {
         });
     });
 
-    it('merges default scripts with library overrides', () => {
-        const result = generatePackageJson({
+    it('merges package scripts with shared defaults', async () => {
+        const result = renderPackageJson({
             name: 'my-lib',
             baseTemplate: 'vanilla',
             language: 'typescript',
@@ -152,8 +152,8 @@ describe('generatePackageJson', () => {
         });
     });
 
-    it('composes standalone scripts from the shared script registry', () => {
-        const files = generate({
+    it('composes single-package scripts from the shared script registry', async () => {
+        const { files } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             testing: 'vitest',
@@ -183,8 +183,8 @@ describe('generatePackageJson', () => {
         });
     });
 
-    it('adds editorconfig to standalone projects', () => {
-        const files = generate({
+    it('adds editorconfig to single-package workspaces', async () => {
+        const { files } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             formatter: 'prettier',
@@ -207,8 +207,8 @@ describe('generatePackageJson', () => {
         });
     });
 
-    it('omits vscode files when standalone IDE is none', () => {
-        const files = generate({
+    it('omits vscode files when single-package IDE is none', async () => {
+        const { files } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             formatter: 'prettier',
@@ -220,8 +220,8 @@ describe('generatePackageJson', () => {
         expect(files['.vscode/extensions.json']).toBeUndefined();
     });
 
-    it('uses the shared script registry for monorepo root scripts', () => {
-        const { files } = generateMonorepo({
+    it('uses the shared script registry for monorepo root scripts', async () => {
+        const { files } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -238,20 +238,20 @@ describe('generatePackageJson', () => {
         });
     });
 
-    it('generates prettier ignore files for lock files', () => {
-        const standaloneFiles = generate({
+    it('generates prettier ignore files for lock files', async () => {
+        const { files: singlePackageFiles } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             formatter: 'prettier',
         });
-        const { files: monorepoFiles } = generateMonorepo({
+        const { files: monorepoFiles } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',
             packageManager: { name: 'pnpm', version: '10.0.0' },
         });
 
-        expect(standaloneFiles['.config/prettierignore']).toEqual({
+        expect(singlePackageFiles['.config/prettierignore']).toEqual({
             type: 'text',
             content: [
                 'package-lock.json',
@@ -264,17 +264,17 @@ describe('generatePackageJson', () => {
             ].join('\n'),
         });
         expect(monorepoFiles['.config/prettier/prettierignore']).toEqual(
-            standaloneFiles['.config/prettierignore']
+            singlePackageFiles['.config/prettierignore']
         );
     });
 
-    it('adds formatter ignore patterns to oxfmt configs', () => {
-        const standaloneFiles = generate({
+    it('adds formatter ignore patterns to oxfmt configs', async () => {
+        const { files: singlePackageFiles } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             formatter: 'oxfmt',
         });
-        const { files: monorepoFiles } = generateMonorepo({
+        const { files: monorepoFiles } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'oxfmt',
@@ -290,15 +290,15 @@ describe('generatePackageJson', () => {
             'bun.lock',
             'bun.lockb',
         ];
-        const standaloneConfig = JSON.parse(standaloneFiles['.config/oxfmt.json'].content);
+        const singlePackageConfig = JSON.parse(singlePackageFiles['.config/oxfmt.json'].content);
         const monorepoConfig = JSON.parse(monorepoFiles['.config/oxfmt/base.json'].content);
 
-        expect(standaloneConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
+        expect(singlePackageConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
         expect(monorepoConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
     });
 
-    it('adds editorconfig to monorepo roots', () => {
-        const { files } = generateMonorepo({
+    it('adds editorconfig to monorepo roots', async () => {
+        const { files } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -308,8 +308,8 @@ describe('generatePackageJson', () => {
         expect(files['.editorconfig']).toBeDefined();
     });
 
-    it('omits vscode files when monorepo IDE is none', () => {
-        const { files } = generateMonorepo({
+    it('omits vscode files when monorepo IDE is none', async () => {
+        const { files } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',
@@ -322,8 +322,8 @@ describe('generatePackageJson', () => {
         expect(files['.vscode/extensions.json']).toBeUndefined();
     });
 
-    it('adds typescript to generated TypeScript projects', () => {
-        const files = generate({
+    it('adds typescript to generated TypeScript projects', async () => {
+        const { files } = await planProject({
             name: 'my-app',
             template: 'vanilla',
             linter: 'oxlint',
@@ -344,8 +344,8 @@ describe('generatePackageJson', () => {
         expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
     });
 
-    it('adds oxlint type-aware support to monorepo roots', () => {
-        const { files } = generateMonorepo({
+    it('adds oxlint type-aware support to monorepo roots', async () => {
+        const { files } = await planWorkspace({
             name: 'workspace',
             linter: 'oxlint',
             formatter: 'prettier',

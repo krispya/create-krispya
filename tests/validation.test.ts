@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePackageName } from '../src/utils.js';
+import { validatePackageName } from '../src/utils/index.js';
 
 describe('validatePackageName', () => {
     describe('valid names', () => {

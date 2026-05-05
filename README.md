@@ -1,7 +1,7 @@
 # create-krispya
 
 > [!WARNING]
-> I maintain the standalone library and application templates with vanilla. React, R3F and monorepo is currently experimental.
+> I maintain the single-package library and application templates with vanilla. React, R3F and monorepo is currently experimental.
 
 > Full AI generated docs can be found [here](./docs/api.md).
 

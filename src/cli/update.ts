@@ -1,37 +1,23 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 
-import { generateAiFiles } from '../generators/ai-files.js';
-import type { AiPlatform, Linter, Formatter } from '../types.js';
 import {
-    applyMigration,
     applyUpdates,
     compareWithDisk,
     detectCurrentConfig,
     formatFileChange,
-    formatMigrationChange,
-    generateExpectedFiles,
-    getMigrationPlan,
     getOxlintConfigReplacementUpdates,
     getPackageJsonScriptUpdates,
+    planExpectedFiles,
     getWorkspaceConfigUpdates,
-    needsMigration,
     type CategoryUpdate,
     type FileChange,
-    type MigrationTarget,
     type UpdateCategory,
     type WorkspaceConfig,
-} from '../update.js';
+} from './update-core.js';
 import { validateWorkspace } from '../validate.js';
 import type { CliOptions } from '../cli.js';
-import {
-    detectMonorepoRoot,
-    detectPackageRoot,
-    fileExists,
-    getMonorepoScope,
-} from './workspace-utils.js';
+import { detectMonorepoRoot, detectPackageRoot } from './workspace-utils.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 
@@ -109,7 +95,7 @@ async function collectUpdateCategories(
     config: WorkspaceConfig,
     isMonorepo: boolean
 ): Promise<CategoryUpdate[]> {
-    const expected = await generateExpectedFiles(config);
+    const expected = await planExpectedFiles(config);
     const categories = await compareWithDisk(expected, projectRoot);
 
     const allCategories = categories.filter((category) => category.category !== 'workspace-config');
@@ -150,96 +136,6 @@ async function collectUpdateCategories(
     }
 
     return orderUpdateCategories(allCategories);
-}
-
-async function handleMigration(
-    config: WorkspaceConfig,
-    target: MigrationTarget,
-    root: string,
-    options: CliOptions
-): Promise<void> {
-    const plan = await getMigrationPlan(config, target, root);
-
-    console.log(color.cyan('Migration:'));
-    if (plan.fromLinter !== plan.toLinter) {
-        console.log(`  Linter: ${color.dim(plan.fromLinter)} -> ${color.green(plan.toLinter)}`);
-    }
-    if (plan.fromFormatter !== plan.toFormatter) {
-        console.log(
-            `  Formatter: ${color.dim(plan.fromFormatter)} -> ${color.green(plan.toFormatter)}`
-        );
-    }
-    console.log();
-
-    console.log(color.cyan('Changes:'));
-    for (const change of plan.changes) {
-        console.log(formatMigrationChange(change));
-    }
-
-    if (plan.subPackageUpdates.length > 0) {
-        console.log();
-        console.log(color.cyan(`Sub-packages (${plan.subPackageUpdates.length}):`));
-        for (const update of plan.subPackageUpdates) {
-            const changes = [
-                ...update.remove.map((dependency) => `-${dependency}`),
-                ...update.add.map((dependency) => `+${dependency}`),
-            ].join(', ');
-            console.log(`  ~ ${update.path} (${changes})`);
-        }
-    }
-    console.log();
-
-    if (!options.yes) {
-        const confirm = await p.confirm({
-            message: 'Apply migration?',
-            initialValue: true,
-        });
-
-        if (p.isCancel(confirm) || !confirm) {
-            console.log(color.dim('  Migration cancelled'));
-            process.exit(0);
-        }
-    }
-
-    await applyMigration(plan, root);
-
-    const aiWorkspacePath = join(root, '.ai/workspace.md');
-    const aiRulesExist = await fileExists(aiWorkspacePath);
-    if (aiRulesExist) {
-        console.log();
-        console.log(color.cyan('Updating AI rules...'));
-
-        const scope = await getMonorepoScope(root);
-        const existingPlatforms: AiPlatform[] = [];
-        if (await fileExists(join(root, 'AGENTS.md'))) {
-            existingPlatforms.push('agents');
-        }
-        if (await fileExists(join(root, 'CLAUDE.md'))) {
-            existingPlatforms.push('claude');
-        }
-
-        const aiFilesOutput: Record<string, { type: 'text'; content: string }> = {};
-        generateAiFiles(aiFilesOutput, {
-            name: scope,
-            packageManager: 'pnpm',
-            linter: plan.toLinter,
-            formatter: plan.toFormatter,
-            isMonorepo: true,
-            platforms: existingPlatforms.length > 0 ? existingPlatforms : ['agents'],
-        });
-
-        for (const [filePath, file] of Object.entries(aiFilesOutput)) {
-            const fullPath = join(root, filePath);
-            await mkdir(dirname(fullPath), { recursive: true });
-            await writeFile(fullPath, file.content);
-            console.log(color.dim(`  ${filePath}`));
-        }
-    }
-
-    console.log();
-    console.log(color.green('✓') + ` Migrated to ${plan.toLinter}/${plan.toFormatter}`);
-    console.log(color.dim('  Run `pnpm install` to update dependencies'));
-    process.exit(0);
 }
 
 async function processUpdateCategory(
@@ -342,23 +238,16 @@ export async function handleUpdateCommand(
                 formatter: options.formatter ?? preFixConfig.formatter,
             });
         }
-    } else if (options.linter || options.formatter) {
-        console.log(
-            color.yellow('!') + ' Linter/formatter migrations in --update are currently monorepo-only'
-        );
-        console.log(color.dim('  Continuing with standalone shared config updates'));
-        console.log();
     }
 
     const config = await detectCurrentConfig(projectRoot, isMonorepo);
-    const migrationTarget = {
-        linter: options.linter as Linter | undefined,
-        formatter: options.formatter as Formatter | undefined,
-    };
-
-    if (isMonorepo && needsMigration(config, migrationTarget)) {
-        await handleMigration(config, migrationTarget, projectRoot, options);
-        return;
+    if (options.linter || options.formatter) {
+        console.log(
+            color.yellow('!') +
+                ' Linter/formatter migration is not part of --update in this architecture pass'
+        );
+        console.log(color.dim('  Continuing with updates for the detected current tooling'));
+        console.log();
     }
 
     console.log(

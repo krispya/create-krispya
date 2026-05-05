@@ -16,25 +16,21 @@ import {
     type InheritedWorkspaceSettings,
 } from './workspace-utils.js';
 import {
-    generate,
     getBaseTemplate,
+    planProject,
+    resolveProjectPlanInput,
     validatePackageName,
-    type File,
-    type GenerateOptions,
+    type VirtualFile,
+    type ProjectOptions,
     type ProjectType,
     type Template,
 } from '../index.js';
-import {
-    resolveEngine,
-    resolvePackageManager,
-    resolveProjectPackageVersions,
-} from '../package-versions.js';
 import type { PackageManagerName } from '../types.js';
 import type { CliOptions } from '../cli.js';
 
 const require = createRequire(import.meta.url);
 
-type WriteGeneratedFiles = (basePath: string, files: Record<string, File>) => Promise<void>;
+type WriteGeneratedFiles = (basePath: string, files: Record<string, VirtualFile>) => Promise<void>;
 
 export async function createPackageInWorkspace(
     monorepoRoot: string,
@@ -124,10 +120,6 @@ export async function createPackageInWorkspace(
     packageOptions.workspaceRoot = workspaceRoot;
     packageOptions.name = scopedName;
 
-    packageOptions.packageManager = await resolvePackageManager(packageOptions);
-    packageOptions.engine = await resolveEngine(packageOptions);
-    packageOptions.versions = await resolveProjectPackageVersions(packageOptions);
-
     const workspacePackages = packageType === 'app' ? await getWorkspacePackages(monorepoRoot) : [];
     if (workspacePackages.length > 0) {
         const selectedDeps = await p.multiselect({
@@ -146,7 +138,7 @@ export async function createPackageInWorkspace(
     spinner.start('Creating package...');
 
     try {
-        const files = generate(packageOptions);
+        const { files } = await planProject(resolveProjectPlanInput(packageOptions));
         await writeGeneratedFiles(outputPath, files);
 
         spinner.stop(color.green.inverse(` ✓ Package created at ${relativePkgPath}! `));
@@ -217,7 +209,7 @@ export async function handleWorkspaceCommand(
     const relativePkgPath = join(targetDir, name);
     const workspaceRoot = calculateWorkspaceRoot(relativePkgPath);
 
-    const generateOptions: GenerateOptions = {
+    const projectOptions: ProjectOptions = {
         name: scopedName,
         projectType,
         libraryBundler: isLibrary ? (options.bundler ?? 'unbuild') : undefined,
@@ -244,14 +236,10 @@ export async function handleWorkspaceCommand(
         }),
     };
 
-    generateOptions.packageManager = await resolvePackageManager(generateOptions);
-    generateOptions.engine = await resolveEngine(generateOptions);
-    generateOptions.versions = await resolveProjectPackageVersions(generateOptions);
-
     console.log(color.cyan('Creating') + ` ${scopedName} in ${targetDir}/${name}...`);
 
     try {
-        const files = generate(generateOptions);
+        const { files } = await planProject(resolveProjectPlanInput(projectOptions));
         await writeGeneratedFiles(fullPackagePath, files);
 
         console.log(color.green('✓') + ` Created ${scopedName} at ${targetDir}/${name}`);
@@ -271,7 +259,7 @@ export async function handleInteractiveMonorepoMode(
         message: 'Detected monorepo workspace',
         options: [
             { value: 'add', label: 'Add new package to this workspace' },
-            { value: 'standalone', label: 'Create standalone project' },
+            { value: 'standalone', label: 'Create single-package workspace' },
         ],
         initialValue: 'add',
     });

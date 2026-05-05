@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getLatestNodeVersion, getLatestNpmMajorVersion } from '../src/utils.js';
+import { getLatestNodeVersion, getLatestNpmMajorVersion } from '../src/utils/index.js';
 
 describe('getLatestNodeVersion', () => {
     afterEach(() => {

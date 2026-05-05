@@ -1,7 +1,7 @@
 import {
     type EngineSpec,
     type Formatter,
-    type GenerateOptions,
+    type ProjectOptions,
     getBaseTemplate,
     getLanguageFromTemplate,
     type Linter,
@@ -17,7 +17,7 @@ import {
     getLatestNpmVersion,
     getLatestPnpmVersion,
     getLatestYarnVersion,
-} from './utils.js';
+} from './utils/index.js';
 
 type PackageVersionDefinition = {
     fallbackVersion: string;
@@ -73,7 +73,7 @@ function addPackageName(
     }
 }
 
-function getExplicitVersionPackages(options: GenerateOptions): Set<string> {
+function getExplicitVersionPackages(options: ProjectOptions): Set<string> {
     return new Set([
         ...Object.keys(options.dependencies ?? {}),
         ...Object.keys(options.versions ?? {}),
@@ -170,7 +170,7 @@ export function parseEngine(engines?: Record<string, string>): EngineSpec | unde
     return { name, version };
 }
 
-export async function resolvePackageManager(options: GenerateOptions) {
+export async function resolvePackageManager(options: ProjectOptions) {
     const packageManager = getPackageManagerSpec(options.packageManager);
     if (packageManager.version == null) {
         if (packageManager.name === 'pnpm') {
@@ -185,7 +185,7 @@ export async function resolvePackageManager(options: GenerateOptions) {
     return packageManager;
 }
 
-export async function resolveEngine(options: GenerateOptions) {
+export async function resolveEngine(options: ProjectOptions) {
     const engine = getEngineSpec(options.engine);
     if ((engine.version == null || engine.version === 'latest') && engine.name === 'node') {
         engine.version = await getLatestNodeVersion();
@@ -248,7 +248,7 @@ export async function resolvePackageVersions(
 }
 
 export async function resolveProjectPackageVersions(
-    options: GenerateOptions
+    options: ProjectOptions
 ): Promise<PackageVersions> {
     const packageNames = collectProjectPackageNames(options);
     const versions = await resolvePackageVersions(
@@ -289,7 +289,7 @@ export async function resolveMonorepoRootPackageVersions(params: {
     return versions;
 }
 
-function collectProjectPackageNames(options: GenerateOptions): string[] {
+function collectProjectPackageNames(options: ProjectOptions): string[] {
     const packageNames = new Set<string>();
     const explicitVersions = getExplicitVersionPackages(options);
     const template = options.template ?? 'vanilla';

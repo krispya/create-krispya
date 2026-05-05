@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateVscodeFiles } from '../src/generators/vscode.js';
+import { renderVscodeFiles } from '../src/renderers/vscode.js';
 
 function readJsonFile(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
     if (file.type !== 'text') {
@@ -9,9 +9,9 @@ function readJsonFile(file: { type: 'text'; content: string } | { type: 'remote'
     return JSON.parse(file.content);
 }
 
-describe('generateVscodeFiles', () => {
+describe('renderVscodeFiles', () => {
     it('adds default explorer nesting settings', () => {
-        const files = generateVscodeFiles({});
+        const files = renderVscodeFiles({});
         const settings = readJsonFile(files['.vscode/settings.json']);
 
         expect(settings['explorer.fileNesting.enabled']).toBe(true);
@@ -23,7 +23,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('nests pnpm lock and workspace files under package.json', () => {
-        const files = generateVscodeFiles({ packageManager: 'pnpm' });
+        const files = renderVscodeFiles({ packageManager: 'pnpm' });
         const settings = readJsonFile(files['.vscode/settings.json']);
 
         expect(settings['explorer.fileNesting.patterns']).toEqual({
@@ -34,7 +34,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('nests npm lock files under package.json', () => {
-        const files = generateVscodeFiles({ packageManager: 'npm' });
+        const files = renderVscodeFiles({ packageManager: 'npm' });
         const settings = readJsonFile(files['.vscode/settings.json']);
 
         expect(settings['explorer.fileNesting.patterns']).toEqual({
@@ -45,7 +45,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('nests yarn lock files under package.json', () => {
-        const files = generateVscodeFiles({ packageManager: 'yarn' });
+        const files = renderVscodeFiles({ packageManager: 'yarn' });
         const settings = readJsonFile(files['.vscode/settings.json']);
 
         expect(settings['explorer.fileNesting.patterns']).toEqual({
@@ -56,7 +56,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('adds editor settings that match formatter defaults', () => {
-        const files = generateVscodeFiles({});
+        const files = renderVscodeFiles({});
         const settings = readJsonFile(files['.vscode/settings.json']);
 
         expect(settings['editor.detectIndentation']).toBe(false);
@@ -66,8 +66,8 @@ describe('generateVscodeFiles', () => {
         expect(settings['files.insertFinalNewline']).toBe(true);
     });
 
-    it('resolves standalone linter and formatter settings centrally', () => {
-        const files = generateVscodeFiles({
+    it('resolves single-package linter and formatter settings centrally', () => {
+        const files = renderVscodeFiles({
             linter: 'oxlint',
             formatter: 'prettier',
             configStrategy: 'stealth',
@@ -86,7 +86,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('lets biome formatter override lint extension toggles', () => {
-        const files = generateVscodeFiles({
+        const files = renderVscodeFiles({
             linter: 'eslint',
             formatter: 'biome',
             configStrategy: 'stealth',
@@ -104,7 +104,7 @@ describe('generateVscodeFiles', () => {
     });
 
     it('uses the same shared formatter settings for monorepos', () => {
-        const files = generateVscodeFiles({
+        const files = renderVscodeFiles({
             linter: 'oxlint',
             formatter: 'oxfmt',
             isMonorepo: true,

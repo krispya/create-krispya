@@ -2,7 +2,7 @@ import * as p from '@clack/prompts';
 import { getConfigStrategy } from '../config.js';
 import type {
     EngineSpec,
-    GenerateOptions,
+    ProjectOptions,
     Ide,
     LibraryBundler,
     PackageManagerName,
@@ -12,7 +12,7 @@ import type {
 } from '../types.js';
 import { getBaseTemplate } from '../types.js';
 import { getPackageManagerName } from '../package-versions.js';
-import { generateRandomName } from '../utils.js';
+import { generateRandomName } from '../utils/index.js';
 import { formatConfigSummary, formatMonorepoConfigSummary } from './format.js';
 
 const R3F_INTEGRATION_OPTIONS = [
@@ -32,22 +32,22 @@ const R3F_INTEGRATION_OPTIONS = [
 
 type R3fIntegration = (typeof R3F_INTEGRATION_OPTIONS)[number]['value'];
 
-function getR3fIntegrationFlags(integrations?: string[]): Partial<GenerateOptions> {
-    if (!integrations) return {};
+function getR3fIntegrationFlags(features?: string[]): Partial<ProjectOptions> {
+    if (!features) return {};
 
     return {
-        drei: integrations.includes('drei') ? {} : undefined,
-        handle: integrations.includes('handle') ? {} : undefined,
-        leva: integrations.includes('leva') ? {} : undefined,
-        postprocessing: integrations.includes('postprocessing') ? {} : undefined,
-        rapier: integrations.includes('rapier') ? {} : undefined,
-        xr: integrations.includes('xr') ? {} : undefined,
-        uikit: integrations.includes('uikit') ? {} : undefined,
-        offscreen: integrations.includes('offscreen') ? {} : undefined,
-        zustand: integrations.includes('zustand') ? {} : undefined,
-        koota: integrations.includes('koota') ? {} : undefined,
-        triplex: integrations.includes('triplex') ? {} : undefined,
-        viverse: integrations.includes('viverse') ? {} : undefined,
+        drei: features.includes('drei') ? {} : undefined,
+        handle: features.includes('handle') ? {} : undefined,
+        leva: features.includes('leva') ? {} : undefined,
+        postprocessing: features.includes('postprocessing') ? {} : undefined,
+        rapier: features.includes('rapier') ? {} : undefined,
+        xr: features.includes('xr') ? {} : undefined,
+        uikit: features.includes('uikit') ? {} : undefined,
+        offscreen: features.includes('offscreen') ? {} : undefined,
+        zustand: features.includes('zustand') ? {} : undefined,
+        koota: features.includes('koota') ? {} : undefined,
+        triplex: features.includes('triplex') ? {} : undefined,
+        viverse: features.includes('viverse') ? {} : undefined,
     };
 }
 
@@ -77,7 +77,7 @@ async function promptForProceed(): Promise<boolean> {
 
 /**
  * Gets default options for a given template and project type.
- * For R3F templates, pass integrations array to specify which integrations to include.
+ * For R3F templates, pass features array to specify which features to include.
  * When inheritedSettings is provided, uses those values instead of defaults.
  */
 export function getDefaultOptions(
@@ -85,11 +85,11 @@ export function getDefaultOptions(
     name: string,
     projectType: ProjectType = 'app',
     libraryBundler?: LibraryBundler,
-    integrations?: string[],
+    features?: string[],
     inheritedSettings?: InheritedWorkspaceSettings
-): GenerateOptions {
+): ProjectOptions {
     const baseTemplate = getBaseTemplate(template);
-    const base: GenerateOptions = {
+    const base: ProjectOptions = {
         name,
         template,
         projectType,
@@ -107,7 +107,7 @@ export function getDefaultOptions(
 
     return {
         ...base,
-        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(integrations) : {}),
+        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
     };
 }
 
@@ -127,11 +127,11 @@ export function getDefaultProjectName(template: Template): string {
 }
 
 /**
- * Prompts for R3F integrations selection.
+ * Prompts for R3F features selection.
  */
 async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]> {
     const selected = await p.multiselect({
-        message: 'R3F integrations',
+        message: 'R3F features',
         options: [...R3F_INTEGRATION_OPTIONS],
         initialValues: getInitialR3fIntegrations(presets),
         required: false,
@@ -147,7 +147,7 @@ async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]>
 
 /**
  * Prompts user for customization options.
- * For R3F templates, integrations should be passed in (already selected upfront).
+ * For R3F templates, features should be passed in (already selected upfront).
  * When inheritedSettings is provided, workspace-level settings are skipped.
  * When presets are provided, they pre-fill prompt defaults.
  */
@@ -155,10 +155,10 @@ export async function promptForCustomization(
     template: Template,
     name: string,
     projectType: ProjectType,
-    integrations?: string[],
+    features?: string[],
     inheritedSettings?: InheritedWorkspaceSettings,
     presets?: CliPresets
-): Promise<GenerateOptions> {
+): Promise<ProjectOptions> {
     // Library bundler selection (only for libraries)
     let libraryBundler: LibraryBundler | undefined;
     if (projectType === 'library') {
@@ -342,7 +342,7 @@ export async function promptForCustomization(
     const finalTemplate: Template =
         language === 'javascript' ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
 
-    const base: GenerateOptions = {
+    const base: ProjectOptions = {
         name,
         template: finalTemplate,
         projectType,
@@ -359,7 +359,7 @@ export async function promptForCustomization(
 
     return {
         ...base,
-        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(integrations) : {}),
+        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
     };
 }
 
@@ -388,7 +388,7 @@ export async function promptForInitialPackage(): Promise<'app' | 'library' | 'sk
 /**
  * Gets default options for a monorepo workspace.
  */
-export function getDefaultMonorepoOptions(name: string): GenerateOptions {
+export function getDefaultMonorepoOptions(name: string): ProjectOptions {
     return {
         name,
         projectType: 'monorepo',
@@ -407,7 +407,7 @@ export function getDefaultMonorepoOptions(name: string): GenerateOptions {
 async function promptForMonorepoCustomization(
     name: string,
     presets?: CliPresets
-): Promise<GenerateOptions> {
+): Promise<ProjectOptions> {
     const nodeVersion = await p.text({
         message: 'Node.js version',
         placeholder: presets?.engine?.version ?? 'latest',
@@ -498,7 +498,7 @@ async function promptForMonorepoCustomization(
 async function promptForMonorepo(
     workspaceName: string,
     presets?: CliPresets
-): Promise<GenerateOptions> {
+): Promise<ProjectOptions> {
     const defaultOptions = getDefaultMonorepoOptions(workspaceName);
 
     // Apply presets to defaults
@@ -539,7 +539,7 @@ async function promptForMonorepo(
 export async function promptForOptions(
     name: string | undefined,
     presets?: CliPresets
-): Promise<GenerateOptions> {
+): Promise<ProjectOptions> {
     // Step 1: Project Name (if not provided via argument)
     let projectName = name;
     if (!projectName) {
@@ -604,7 +604,7 @@ export type CliPresets = {
     engine?: EngineSpec;
     pnpmManageVersions?: boolean;
     ide?: Ide;
-    // R3F integrations
+    // R3F features
     drei?: boolean;
     handle?: boolean;
     leva?: boolean;
@@ -644,7 +644,7 @@ export async function promptForPackageOptions(
     projectType: 'app' | 'library',
     inheritedSettings?: InheritedWorkspaceSettings,
     presets?: CliPresets
-): Promise<GenerateOptions> {
+): Promise<ProjectOptions> {
     // Select template (TypeScript by default, customize for JavaScript)
     const templateSelection = await p.select({
         message: 'Select a template',
@@ -664,10 +664,10 @@ export async function promptForPackageOptions(
     const template = templateSelection as Template;
     const baseTemplate = getBaseTemplate(template);
 
-    // For R3F, immediately prompt for integrations
-    let integrations: string[] | undefined;
+    // For R3F, immediately prompt for features
+    let features: string[] | undefined;
     if (baseTemplate === 'r3f') {
-        integrations = await promptForR3fIntegrations(presets);
+        features = await promptForR3fIntegrations(presets);
     }
 
     const defaultOptions = getDefaultOptions(
@@ -675,7 +675,7 @@ export async function promptForPackageOptions(
         projectName,
         projectType,
         presets?.bundler,
-        integrations,
+        features,
         inheritedSettings ?? presetsToInheritedSettings(presets)
     );
     if (presets?.ide && !inheritedSettings) {
@@ -692,12 +692,12 @@ export async function promptForPackageOptions(
         return defaultOptions;
     }
 
-    // Customize (pass integrations for R3F so they're preserved)
+    // Customize (pass features for R3F so they're preserved)
     return promptForCustomization(
         template,
         projectName,
         projectType,
-        integrations,
+        features,
         inheritedSettings,
         presets
     );
