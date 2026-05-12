@@ -2,6 +2,7 @@ import {
     htmlContent,
     indexContent,
     viteHtmlContent,
+    viteEnvContent,
     viteIndexContent,
     viteStyleContent,
 } from '../defaults/html.js';
@@ -28,6 +29,10 @@ export function renderSourceFiles(params: SourceFilesParams): Record<string, Vir
     const isVanilla = baseTemplate === 'vanilla';
     const isReact = baseTemplate === 'react';
     const isR3f = baseTemplate === 'r3f';
+
+    if (!isLibrary && language === 'typescript') {
+        files['src/vite-env.d.ts'] = { type: 'text', content: viteEnvContent };
+    }
 
     if (isLibrary) {
         // Library entry point
@@ -67,21 +72,31 @@ export function renderSourceFiles(params: SourceFilesParams): Record<string, Vir
     } else if (isVanilla) {
         // Vanilla template
         files[`src/main.${ext}`] = { type: 'text', content: viteIndexContent };
-        files['src/style.css'] = { type: 'text', content: viteStyleContent };
+        files['src/index.css'] = { type: 'text', content: viteStyleContent };
         const indexHtml = viteHtmlContent
             .replace('$indexPath', `./src/main.${ext}`)
             .replace('$title', name);
         files['index.html'] = { type: 'text', content: indexHtml };
     } else {
         // React and R3F templates
-        files[`src/index.tsx`] = { type: 'text', content: indexContent };
+        files[`src/main.${jsxExt}`] = {
+            type: 'text',
+            content:
+                language === 'typescript'
+                    ? indexContent
+                    : indexContent.replace(
+                          "document.getElementById('root')!",
+                          "document.getElementById('root')"
+                      ),
+        };
+        files['src/index.css'] = { type: 'text', content: viteStyleContent };
 
         const indexHtml = htmlContent
-            .replace('$indexPath', language === 'javascript' ? './src/index.jsx' : './src/index.tsx')
+            .replace('$indexPath', `./src/main.${jsxExt}`)
             .replace('$title', name);
         files['index.html'] = { type: 'text', content: indexHtml };
 
-        // Generate app.tsx
+        // Generate app component
         codeSnippets['dom-end']?.reverse();
         codeSnippets['global-end']?.reverse();
         codeSnippets['scene-end']?.reverse();
@@ -126,7 +141,7 @@ export function renderSourceFiles(params: SourceFilesParams): Record<string, Vir
         for (const { search, replace } of replacements) {
             appCode = appCode.replace(search, replace);
         }
-        files[`src/app.tsx`] = { type: 'text', content: appCode };
+        files[`src/app.${jsxExt}`] = { type: 'text', content: appCode };
     }
 
     return files;

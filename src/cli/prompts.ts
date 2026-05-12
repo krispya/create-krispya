@@ -1,4 +1,5 @@
 import * as p from '@clack/prompts';
+import color from 'chalk';
 import { getConfigStrategy } from '../config.js';
 import type {
     EngineSpec,
@@ -544,7 +545,7 @@ export async function promptForOptions(
     let projectName = name;
     if (!projectName) {
         const nameResult = await p.text({
-            message: 'What is your project named?',
+            message: 'Project name:',
             placeholder: generateRandomName(),
             defaultValue: generateRandomName(),
             validate: (value) => {
@@ -560,7 +561,7 @@ export async function promptForOptions(
 
     // Step 2: Select project type (app, library, or monorepo)
     const projectType = await p.select({
-        message: 'Project type',
+        message: 'Project type:',
         options: [
             { value: 'app', label: 'Application' },
             { value: 'library', label: 'Library' },
@@ -647,11 +648,11 @@ export async function promptForPackageOptions(
 ): Promise<ProjectOptions> {
     // Select template (TypeScript by default, customize for JavaScript)
     const templateSelection = await p.select({
-        message: 'Select a template',
+        message: 'Select a template:',
         options: [
-            { value: 'vanilla', label: 'Vanilla' },
-            { value: 'react', label: 'React', hint: 'experimental' },
-            { value: 'r3f', label: 'React Three Fiber', hint: 'experimental' },
+            { value: 'vanilla', label: color.yellow('Vanilla') },
+            { value: 'react', label: color.cyan('React'), hint: 'experimental' },
+            { value: 'r3f', label: color.magenta('React Three Fiber'), hint: 'experimental' },
         ],
         initialValue: presets?.template ? getBaseTemplate(presets.template) : 'vanilla',
     });

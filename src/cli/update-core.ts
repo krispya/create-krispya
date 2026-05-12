@@ -2,7 +2,14 @@ import { readFile, access, writeFile, mkdir } from 'fs/promises';
 import { constants } from 'fs';
 import { join, dirname } from 'path';
 
-import type { ConfigStrategy, Linter, Formatter, VirtualFile, PackageManagerName } from '../types.js';
+import type {
+    BaseTemplate,
+    ConfigStrategy,
+    Linter,
+    Formatter,
+    VirtualFile,
+    PackageManagerName,
+} from '../types.js';
 import {
     renderTypescriptConfigPackage,
     renderOxlintConfigPackage,
@@ -26,6 +33,7 @@ import {
 } from '../renderers/package-json-scripts.js';
 import { toPrettierIgnoreContent } from '../adapters/formatter-config.js';
 import { renderOxlintConfig } from '../renderers/oxlint-config.js';
+import { renderViteConfig } from '../renderers/vite-config.js';
 import { detectTooling } from '../utils/index.js';
 
 // =============================================================================
@@ -69,6 +77,7 @@ export type WorkspaceConfig = {
     isMonorepo: boolean;
     configStrategy?: ConfigStrategy;
     hasTypecheck?: boolean;
+    viteTemplate?: BaseTemplate;
 };
 
 type PackageJsonForScripts = {
@@ -83,6 +92,33 @@ type PackageJsonForScripts = {
     files?: unknown;
 };
 
+function detectViteTemplate(pkg: PackageJsonForScripts): BaseTemplate | undefined {
+    if (!hasPackage(pkg, 'vite')) return undefined;
+    if (hasPackage(pkg, '@react-three/fiber')) return 'r3f';
+    if (hasPackage(pkg, 'react') || hasPackage(pkg, '@vitejs/plugin-react')) return 'react';
+    return 'vanilla';
+}
+
+function renderExpectedViteConfig(template: BaseTemplate): VirtualFile {
+    const isReact = template === 'react' || template === 'r3f';
+    const codeSnippets = isReact
+        ? { 'vite-config-import': ["import react from '@vitejs/plugin-react';"] }
+        : {};
+    const viteConfig: Record<string, unknown> = {
+        base: './',
+    };
+
+    if (isReact) {
+        viteConfig.plugins = ['$raw:react()'];
+    }
+
+    if (template === 'r3f') {
+        viteConfig.resolve = { dedupe: ['three'] };
+    }
+
+    return renderViteConfig({ viteConfig, codeSnippets });
+}
+
 // =============================================================================
 // Config Detection
 // =============================================================================
@@ -96,13 +132,13 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
     let name = root.split(/[/\\]/).pop() ?? 'workspace';
     let packageManager = 'pnpm';
     let hasTypecheck = false;
+    let viteTemplate: BaseTemplate | undefined;
     try {
         const pkgPath = join(root, 'package.json');
         const content = await readFile(pkgPath, 'utf-8');
-        const pkgJson = JSON.parse(content) as {
+        const pkgJson = JSON.parse(content) as PackageJsonForScripts & {
             name?: string;
             packageManager?: string;
-            scripts?: Record<string, string>;
         };
         if (pkgJson.name) {
             name = pkgJson.name.replace(/^@/, '').replace(/\/.*$/, '');
@@ -111,6 +147,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
             packageManager = pkgJson.packageManager.split('@')[0] ?? packageManager;
         }
         hasTypecheck = pkgJson.scripts?.typecheck != null;
+        viteTemplate = detectViteTemplate(pkgJson);
     } catch {
         // Use directory name
     }
@@ -127,6 +164,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
         isMonorepo,
         configStrategy,
         hasTypecheck,
+        viteTemplate,
     };
 }
 
@@ -217,6 +255,10 @@ export async function planExpectedFiles(
             type: 'text',
             content: toPrettierIgnoreContent(),
         };
+    }
+
+    if (!isMonorepo && config.viteTemplate != null) {
+        rootConfig['vite.config.ts'] = renderExpectedViteConfig(config.viteTemplate);
     }
 
     // Biome config if using biome

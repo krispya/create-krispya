@@ -132,7 +132,7 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
 
     // Setup vite config imports based on template (only for apps)
     if (!isLibrary && (isReact || isR3f)) {
-        codeSnippets['vite-config-import'] = ["import react from '@vitejs/plugin-react'"];
+        codeSnippets['vite-config-import'] = ["import react from '@vitejs/plugin-react';"];
     }
 
     // Setup R3F-specific imports (only for apps)

@@ -78,13 +78,14 @@ export function renderReadme(params: ReadmeParams): VirtualFile {
     } else if (isReact) {
         architectureDesc = [
             `- \`src/app.${jsxExt}\` defines the main application component`,
-            `- \`src/index.${jsxExt}\` renders the React app into the DOM`,
+            `- \`src/main.${jsxExt}\` renders the React app into the DOM`,
             `- \`tests/\` contains your test files`,
             `- Static assets can be placed in the \`public\` folder`,
         ];
     } else {
         architectureDesc = [
-            `- \`app.${jsxExt}\` defines the main application component containing your 3D content`,
+            `- \`src/app.${jsxExt}\` defines the main application component containing your 3D content`,
+            `- \`src/main.${jsxExt}\` renders the React app into the DOM`,
             `- Modify the content inside the \`<Canvas>\` component to change what is visible on screen`,
             `- \`tests/\` contains your test files`,
             `- Static assets can be placed in the \`public\` folder`,

@@ -5,9 +5,9 @@ export const htmlContent = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>$title</title>
 </head>
-<body style="margin: 0; overscroll-behavior: none; user-select: none; touch-action: none;">
+<body>
+    <div id="root"></div>
     <script type="module" src="$indexPath"></script>
-    <div style="width: 100dvw; height: 100dvh; overflow: hidden;" id="root"></div>
 </body>
 </html>`;
 
@@ -26,6 +26,7 @@ export const viteHtmlContent = `<!DOCTYPE html>
 
 export const indexContent = `import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import './index.css'
 import { App } from './app.js'
 
 createRoot(document.getElementById('root')!).render(
@@ -34,26 +35,30 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )`;
 
-export const viteIndexContent = `import './style.css'
+export const viteIndexContent = `import './index.css'
 
 document.querySelector('#app')!.innerHTML = \`
   <h1>Hello Vite!</h1>
   <p>Edit src/main.ts and save to see HMR in action.</p>
 \``;
 
-export const viteStyleContent = `body {
-  font-family: system-ui, -apple-system, sans-serif;
+export const viteStyleContent = `:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
   margin: 0;
-  padding: 2rem;
-  min-height: 100vh;
-  background: #1a1a1a;
-  color: #fff;
-}
-
-h1 {
-  color: #646cff;
-}
-
-a {
-  color: #646cff;
 }`;
+
+export const viteEnvContent = `/// <reference types="vite/client" />`;

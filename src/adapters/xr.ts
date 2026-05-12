@@ -17,7 +17,7 @@ export function planXr(builder: PlanBuilder, options: PlanXrOptions | undefined)
     builder.inject('scene-start', '<XR store={store}>');
     builder.inject('scene-end', '</XR>');
 
-    builder.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl'");
+    builder.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl';");
     builder.configureVite({
         server: {
             host: true,
