@@ -1,33 +1,33 @@
 import type { PlanXrOptions, PlanBuilder } from '../types.js';
 
 export function planXr(builder: PlanBuilder, options: PlanXrOptions | undefined) {
-    if (options == null || options === false) {
-        return;
-    }
-    if (options === true) {
-        options = {};
-    }
-    builder.addDependency('@react-three/xr');
-    builder.addDependency('@vitejs/plugin-basic-ssl');
-    builder.inject('import', "import { XR, createXRStore } from '@react-three/xr'");
-    builder.inject(
-        `global-start`,
-        `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`
-    );
-    builder.inject('scene-start', '<XR store={store}>');
-    builder.inject('scene-end', '</XR>');
+  if (options == null || options === false) {
+    return;
+  }
+  if (options === true) {
+    options = {};
+  }
+  builder.addDependency('@react-three/xr');
+  builder.addDependency('@vitejs/plugin-basic-ssl');
+  builder.inject('import', "import { XR, createXRStore } from '@react-three/xr'");
+  builder.inject(
+    `global-start`,
+    `const store = createXRStore(${JSON.stringify(options.storeOptions ?? {})})`
+  );
+  builder.inject('scene-start', '<XR store={store}>');
+  builder.inject('scene-end', '</XR>');
 
-    builder.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl';");
-    builder.configureVite({
-        server: {
-            host: true,
-        },
-        plugins: ['$raw:basicSsl()'],
-    });
+  builder.inject('vite-config-import', "import basicSsl from '@vitejs/plugin-basic-ssl';");
+  builder.configureVite({
+    server: {
+      host: true,
+    },
+    plugins: ['$raw:basicSsl()'],
+  });
 
-    builder.inject(
-        'dom-start',
-        `<div style={{
+  builder.inject(
+    'dom-start',
+    `<div style={{
         display: "flex",
           flexDirection: "row",
           gap: "1rem",
@@ -56,9 +56,9 @@ export function planXr(builder: PlanBuilder, options: PlanXrOptions | undefined)
       >
         Enter VR
       </button></div>`
-    );
-    builder.inject(
-        'readme-libraries',
-        `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`
-    );
+  );
+  builder.inject(
+    'readme-libraries',
+    `[@react-three/xr](https://pmndrs.github.io/xr/docs/) - VR/AR support for @react-three/fiber`
+  );
 }

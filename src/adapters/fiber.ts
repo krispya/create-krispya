@@ -1,21 +1,21 @@
 import type { PlanFiberOptions, PlanBuilder } from '../types.js';
 
 export function planFiber(builder: PlanBuilder, _options: PlanFiberOptions | undefined) {
-    builder.inject('import', `import { Box } from "./box.js"`);
-    builder.inject(
-        'scene',
-        [
-            `<ambientLight intensity={Math.PI / 2} />`,
-            `<spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />`,
-            `<pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />`,
-            `<Box position={[-1.2, 0, 0]} />`,
-            `<Box position={[1.2, 0, 0]} />`,
-        ].join('\n')
-    );
+  builder.inject('import', `import { Box } from "./box.js"`);
+  builder.inject(
+    'scene',
+    [
+      `<ambientLight intensity={Math.PI / 2} />`,
+      `<spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />`,
+      `<pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />`,
+      `<Box position={[-1.2, 0, 0]} />`,
+      `<Box position={[1.2, 0, 0]} />`,
+    ].join('\n')
+  );
 
-    builder.addFile('src/box.tsx', {
-        type: 'text',
-        content: `import type { Mesh } from 'three'
+  builder.addFile('src/box.tsx', {
+    type: 'text',
+    content: `import type { Mesh } from 'three'
 import { useRef, useState } from 'react'
 import { useFrame, ThreeElements } from '@react-three/fiber'
 
@@ -37,5 +37,5 @@ export function Box(props: ThreeElements['mesh']) {
     </mesh>
   )
 }`,
-    });
+  });
 }

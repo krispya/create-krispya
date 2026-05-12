@@ -1,11 +1,11 @@
 export function unique<T>(...array: T[][]): T[] {
-    const set = new Set<T>();
+  const set = new Set<T>();
 
-    for (const arr of array) {
-        for (const item of arr) {
-            set.add(item);
-        }
+  for (const arr of array) {
+    for (const item of arr) {
+      set.add(item);
     }
+  }
 
-    return Array.from(set);
+  return Array.from(set);
 }

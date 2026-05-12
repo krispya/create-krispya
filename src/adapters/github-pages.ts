@@ -2,12 +2,12 @@ import { getPackageManagerName } from '../package-versions.js';
 import type { PlanGithubPagesOptions, PlanBuilder } from '../types.js';
 
 export function planGithubPages(builder: PlanBuilder, options: PlanGithubPagesOptions | undefined) {
-    if (options === false || getPackageManagerName(builder.options.packageManager) !== 'npm') {
-        return;
-    }
-    builder.addFile('.github/workflows/gh-pages.yml', {
-        type: 'text',
-        content: `name: Deploy to Github Pages
+  if (options === false || getPackageManagerName(builder.options.packageManager) !== 'npm') {
+    return;
+  }
+  builder.addFile('.github/workflows/gh-pages.yml', {
+    type: 'text',
+    content: `name: Deploy to Github Pages
 
 on:
   push:
@@ -50,14 +50,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 `,
-    });
+  });
 
-    builder.inject('readme-start', `A github pages deployment action is configurd.`);
-    if (builder.options.githubUserName != null && builder.options.githubRepoName != null) {
-        const address = `${builder.options.githubUserName}.github.io/${builder.options.githubRepoName}`;
-        builder.inject(
-            'readme-start',
-            `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`
-        );
-    }
+  builder.inject('readme-start', `A github pages deployment action is configurd.`);
+  if (builder.options.githubUserName != null && builder.options.githubRepoName != null) {
+    const address = `${builder.options.githubUserName}.github.io/${builder.options.githubRepoName}`;
+    builder.inject(
+      'readme-start',
+      `Your app will be publish at [${address}](https://${address}) once the github action is finished.\n`
+    );
+  }
 }

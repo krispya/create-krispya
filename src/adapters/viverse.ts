@@ -2,13 +2,13 @@ import { getPackageManagerName } from '../package-versions.js';
 import type { PlanViverseOptions, PlanBuilder } from '../types.js';
 
 export function planViverse(builder: PlanBuilder, options: PlanViverseOptions | undefined) {
-    if (options == null || getPackageManagerName(builder.options.packageManager) !== 'npm') {
-        return;
-    }
+  if (options == null || getPackageManagerName(builder.options.packageManager) !== 'npm') {
+    return;
+  }
 
-    builder.addFile('.github/workflows/viverse.yml', {
-        type: 'text',
-        content: `name: Deploy to Viverse
+  builder.addFile('.github/workflows/viverse.yml', {
+    type: 'text',
+    content: `name: Deploy to Viverse
 
 on:
   push:
@@ -60,13 +60,13 @@ jobs:
         run: npx viverse-cli app publish ./dist --auto-create-app --name ${builder.options.name}
 
 `,
-    });
+  });
 
-    builder.addDependency('@viverse/cli');
+  builder.addDependency('@viverse/cli');
 
-    builder.inject(
-        'readme-start',
-        `A GitHub CI/CD workflow for publishing to Viverse is configured.
+  builder.inject(
+    'readme-start',
+    `A GitHub CI/CD workflow for publishing to Viverse is configured.
 
 To use publish to viverse via the CI/CD workflow:
 1. Set \`VIVERSE_EMAIL\` and \`VIVERSE_PASSWORD\` secrets in your repository settings under \`Secrets and Variables\` > \`Actions\` > \`New repository secret\`
@@ -79,5 +79,5 @@ viverse-cli auth login -e <email> -p <password>
 npm run build
 viverse-cli app publish ./dist --auto-create-app --name ${builder.options.name}
 \`\`\`\n`
-    );
+  );
 }

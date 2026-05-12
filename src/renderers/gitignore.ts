@@ -3,23 +3,21 @@ import type { VirtualFile } from '../types.js';
 export type GitignoreVariant = 'standalone' | 'workspace-root';
 
 const COMMON_GITIGNORE_LINES = [
-    'node_modules',
-    'dist',
-    '*.tsbuildinfo',
-    '.env',
-    '.env.*',
-    '!.env.example',
-    '.pnpm-store',
+  'node_modules',
+  'dist',
+  '*.tsbuildinfo',
+  '.env',
+  '.env.*',
+  '!.env.example',
+  '.pnpm-store',
 ];
 
 export function renderGitignore(variant: GitignoreVariant): VirtualFile {
-    const lines =
-        variant === 'workspace-root'
-            ? [...COMMON_GITIGNORE_LINES, '.DS_Store']
-            : COMMON_GITIGNORE_LINES;
+  const lines =
+    variant === 'workspace-root' ? [...COMMON_GITIGNORE_LINES, '.DS_Store'] : COMMON_GITIGNORE_LINES;
 
-    return {
-        type: 'text',
-        content: lines.join('\n'),
-    };
+  return {
+    type: 'text',
+    content: lines.join('\n'),
+  };
 }

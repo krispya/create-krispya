@@ -2,14 +2,14 @@ import * as p from '@clack/prompts';
 import color from 'chalk';
 import { getConfigStrategy } from '../config.js';
 import type {
-    EngineSpec,
-    ProjectOptions,
-    Ide,
-    LibraryBundler,
-    PackageManagerName,
-    PackageManagerSpec,
-    ProjectType,
-    Template,
+  EngineSpec,
+  ProjectOptions,
+  Ide,
+  LibraryBundler,
+  PackageManagerName,
+  PackageManagerSpec,
+  ProjectType,
+  Template,
 } from '../types.js';
 import { getBaseTemplate } from '../types.js';
 import { getPackageManagerName } from '../package-versions.js';
@@ -17,63 +17,63 @@ import { generateRandomName } from '../utils/index.js';
 import { formatConfigSummary, formatMonorepoConfigSummary } from './format.js';
 
 const R3F_INTEGRATION_OPTIONS = [
-    { value: 'drei', label: 'Drei' },
-    { value: 'handle', label: 'Handle' },
-    { value: 'leva', label: 'Leva' },
-    { value: 'postprocessing', label: 'Postprocessing' },
-    { value: 'rapier', label: 'Rapier' },
-    { value: 'xr', label: 'XR' },
-    { value: 'uikit', label: 'UIKit' },
-    { value: 'offscreen', label: 'Offscreen' },
-    { value: 'zustand', label: 'Zustand' },
-    { value: 'koota', label: 'Koota' },
-    { value: 'triplex', label: 'Triplex' },
-    { value: 'viverse', label: 'Viverse' },
+  { value: 'drei', label: 'Drei' },
+  { value: 'handle', label: 'Handle' },
+  { value: 'leva', label: 'Leva' },
+  { value: 'postprocessing', label: 'Postprocessing' },
+  { value: 'rapier', label: 'Rapier' },
+  { value: 'xr', label: 'XR' },
+  { value: 'uikit', label: 'UIKit' },
+  { value: 'offscreen', label: 'Offscreen' },
+  { value: 'zustand', label: 'Zustand' },
+  { value: 'koota', label: 'Koota' },
+  { value: 'triplex', label: 'Triplex' },
+  { value: 'viverse', label: 'Viverse' },
 ] as const;
 
 type R3fIntegration = (typeof R3F_INTEGRATION_OPTIONS)[number]['value'];
 
 function getR3fIntegrationFlags(features?: string[]): Partial<ProjectOptions> {
-    if (!features) return {};
+  if (!features) return {};
 
-    return {
-        drei: features.includes('drei') ? {} : undefined,
-        handle: features.includes('handle') ? {} : undefined,
-        leva: features.includes('leva') ? {} : undefined,
-        postprocessing: features.includes('postprocessing') ? {} : undefined,
-        rapier: features.includes('rapier') ? {} : undefined,
-        xr: features.includes('xr') ? {} : undefined,
-        uikit: features.includes('uikit') ? {} : undefined,
-        offscreen: features.includes('offscreen') ? {} : undefined,
-        zustand: features.includes('zustand') ? {} : undefined,
-        koota: features.includes('koota') ? {} : undefined,
-        triplex: features.includes('triplex') ? {} : undefined,
-        viverse: features.includes('viverse') ? {} : undefined,
-    };
+  return {
+    drei: features.includes('drei') ? {} : undefined,
+    handle: features.includes('handle') ? {} : undefined,
+    leva: features.includes('leva') ? {} : undefined,
+    postprocessing: features.includes('postprocessing') ? {} : undefined,
+    rapier: features.includes('rapier') ? {} : undefined,
+    xr: features.includes('xr') ? {} : undefined,
+    uikit: features.includes('uikit') ? {} : undefined,
+    offscreen: features.includes('offscreen') ? {} : undefined,
+    zustand: features.includes('zustand') ? {} : undefined,
+    koota: features.includes('koota') ? {} : undefined,
+    triplex: features.includes('triplex') ? {} : undefined,
+    viverse: features.includes('viverse') ? {} : undefined,
+  };
 }
 
 function getInitialR3fIntegrations(presets?: CliPresets): R3fIntegration[] {
-    if (!presets) return ['drei'];
+  if (!presets) return ['drei'];
 
-    const initialValues = R3F_INTEGRATION_OPTIONS.filter(({ value }) => presets[value]).map(
-        ({ value }) => value
-    );
+  const initialValues = R3F_INTEGRATION_OPTIONS.filter(({ value }) => presets[value]).map(
+    ({ value }) => value
+  );
 
-    return initialValues.length > 0 ? initialValues : ['drei'];
+  return initialValues.length > 0 ? initialValues : ['drei'];
 }
 
 async function promptForProceed(): Promise<boolean> {
-    const proceed = await p.confirm({
-        message: 'Proceed with these settings?',
-        initialValue: true,
-    });
+  const proceed = await p.confirm({
+    message: 'Proceed with these settings?',
+    initialValue: true,
+  });
 
-    if (p.isCancel(proceed)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(proceed)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    return proceed;
+  return proceed;
 }
 
 /**
@@ -82,68 +82,68 @@ async function promptForProceed(): Promise<boolean> {
  * When inheritedSettings is provided, uses those values instead of defaults.
  */
 export function getDefaultOptions(
-    template: Template,
-    name: string,
-    projectType: ProjectType = 'app',
-    libraryBundler?: LibraryBundler,
-    features?: string[],
-    inheritedSettings?: InheritedWorkspaceSettings
+  template: Template,
+  name: string,
+  projectType: ProjectType = 'app',
+  libraryBundler?: LibraryBundler,
+  features?: string[],
+  inheritedSettings?: InheritedWorkspaceSettings
 ): ProjectOptions {
-    const baseTemplate = getBaseTemplate(template);
-    const base: ProjectOptions = {
-        name,
-        template,
-        projectType,
-        libraryBundler: projectType === 'library' ? (libraryBundler ?? 'unbuild') : undefined,
-        packageManager: inheritedSettings?.packageManager ?? { name: 'pnpm' },
-        pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
-        engine: inheritedSettings?.engine ?? { name: 'node', version: 'latest' },
-        linter: inheritedSettings?.linter ?? 'oxlint',
-        formatter: inheritedSettings?.formatter ?? 'prettier',
-        // Libraries get vitest by default, apps don't
-        testing: projectType === 'library' ? 'vitest' : 'none',
-        configStrategy: getConfigStrategy(),
-        ide: 'vscode',
-    };
+  const baseTemplate = getBaseTemplate(template);
+  const base: ProjectOptions = {
+    name,
+    template,
+    projectType,
+    libraryBundler: projectType === 'library' ? (libraryBundler ?? 'unbuild') : undefined,
+    packageManager: inheritedSettings?.packageManager ?? { name: 'pnpm' },
+    pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
+    engine: inheritedSettings?.engine ?? { name: 'node', version: 'latest' },
+    linter: inheritedSettings?.linter ?? 'oxlint',
+    formatter: inheritedSettings?.formatter ?? 'prettier',
+    // Libraries get vitest by default, apps don't
+    testing: projectType === 'library' ? 'vitest' : 'none',
+    configStrategy: getConfigStrategy(),
+    ide: 'vscode',
+  };
 
-    return {
-        ...base,
-        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
-    };
+  return {
+    ...base,
+    ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
+  };
 }
 
 /**
  * Gets the default project name based on template.
  */
 export function getDefaultProjectName(template: Template): string {
-    const base = getBaseTemplate(template);
-    switch (base) {
-        case 'vanilla':
-            return `vanilla-${generateRandomName()}`;
-        case 'react':
-            return `react-${generateRandomName()}`;
-        case 'r3f':
-            return `react-three-${generateRandomName()}`;
-    }
+  const base = getBaseTemplate(template);
+  switch (base) {
+    case 'vanilla':
+      return `vanilla-${generateRandomName()}`;
+    case 'react':
+      return `react-${generateRandomName()}`;
+    case 'r3f':
+      return `react-three-${generateRandomName()}`;
+  }
 }
 
 /**
  * Prompts for R3F features selection.
  */
 async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]> {
-    const selected = await p.multiselect({
-        message: 'R3F features',
-        options: [...R3F_INTEGRATION_OPTIONS],
-        initialValues: getInitialR3fIntegrations(presets),
-        required: false,
-    });
+  const selected = await p.multiselect({
+    message: 'R3F features',
+    options: [...R3F_INTEGRATION_OPTIONS],
+    initialValues: getInitialR3fIntegrations(presets),
+    required: false,
+  });
 
-    if (p.isCancel(selected)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(selected)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    return selected as string[];
+  return selected as string[];
 }
 
 /**
@@ -153,384 +153,384 @@ async function promptForR3fIntegrations(presets?: CliPresets): Promise<string[]>
  * When presets are provided, they pre-fill prompt defaults.
  */
 export async function promptForCustomization(
-    template: Template,
-    name: string,
-    projectType: ProjectType,
-    features?: string[],
-    inheritedSettings?: InheritedWorkspaceSettings,
-    presets?: CliPresets
+  template: Template,
+  name: string,
+  projectType: ProjectType,
+  features?: string[],
+  inheritedSettings?: InheritedWorkspaceSettings,
+  presets?: CliPresets
 ): Promise<ProjectOptions> {
-    // Library bundler selection (only for libraries)
-    let libraryBundler: LibraryBundler | undefined;
-    if (projectType === 'library') {
-        const bundler = await p.select({
-            message: 'Library bundler',
-            options: [
-                { value: 'unbuild', label: 'unbuild', hint: 'unjs, simple config' },
-                { value: 'tsdown', label: 'tsdown', hint: 'fast, esbuild-based' },
-            ],
-            initialValue: presets?.bundler ?? 'unbuild',
-        });
-
-        if (p.isCancel(bundler)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-        libraryBundler = bundler as LibraryBundler;
-    }
-
-    // Skip workspace-level settings if inherited from workspace
-    let engine: EngineSpec = inheritedSettings?.engine ??
-        presets?.engine ?? { name: 'node', version: 'latest' };
-    let finalPackageManager: PackageManagerName =
-        inheritedSettings?.packageManager?.name ?? presets?.packageManager ?? 'pnpm';
-    let pnpmManageVersions: boolean =
-        inheritedSettings?.pnpmManageVersions ?? presets?.pnpmManageVersions ?? true;
-
-    if (!inheritedSettings?.engine?.version) {
-        const nodeVersionInput = await p.text({
-            message: 'Node.js version',
-            placeholder: presets?.engine?.version ?? 'latest',
-            defaultValue: presets?.engine?.version ?? 'latest',
-            validate: (value) => {
-                if (!value.length) return 'Required';
-                if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
-                    return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
-                }
-            },
-        });
-
-        if (p.isCancel(nodeVersionInput)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-        engine = { name: 'node', version: nodeVersionInput };
-    }
-
-    if (!inheritedSettings?.packageManager) {
-        const packageManager = await p.select({
-            message: 'Package manager',
-            options: [
-                { value: 'pnpm', label: 'pnpm' },
-                { value: 'npm', label: 'npm' },
-                { value: 'yarn', label: 'yarn' },
-            ],
-            initialValue: presets?.packageManager ?? 'pnpm',
-        });
-
-        if (p.isCancel(packageManager)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-
-        finalPackageManager = packageManager as PackageManagerName;
-
-        if (packageManager === 'pnpm') {
-            const managePnpm = await p.confirm({
-                message: 'Enable manage-package-manager-versions?',
-                initialValue: presets?.pnpmManageVersions ?? true,
-            });
-            if (p.isCancel(managePnpm)) {
-                p.cancel('Operation cancelled.');
-                process.exit(0);
-            }
-            pnpmManageVersions = managePnpm;
-        }
-    }
-
-    // Skip linter/formatter prompts if inherited from workspace
-    let linter: 'oxlint' | 'eslint' | 'biome' =
-        inheritedSettings?.linter ?? presets?.linter ?? 'oxlint';
-    let formatter: 'oxfmt' | 'prettier' | 'biome' =
-        inheritedSettings?.formatter ?? presets?.formatter ?? 'prettier';
-
-    if (!inheritedSettings?.linter) {
-        const linterChoice = await p.select({
-            message: 'Linter',
-            options: [
-                { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
-                { value: 'eslint', label: 'ESLint', hint: 'classic' },
-                { value: 'biome', label: 'Biome', hint: 'all-in-one' },
-            ],
-            initialValue: presets?.linter ?? 'oxlint',
-        });
-
-        if (p.isCancel(linterChoice)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-        linter = linterChoice as 'oxlint' | 'eslint' | 'biome';
-    }
-
-    if (!inheritedSettings?.formatter) {
-        const formatterChoice = await p.select({
-            message: 'Formatter',
-            options: [
-                { value: 'prettier', label: 'Prettier', hint: 'widely adopted' },
-                { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
-                { value: 'biome', label: 'Biome', hint: 'all-in-one' },
-            ],
-            initialValue: presets?.formatter ?? 'prettier',
-        });
-
-        if (p.isCancel(formatterChoice)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-        formatter = formatterChoice as 'oxfmt' | 'prettier' | 'biome';
-    }
-
-    // Testing - default to vitest for libraries, none for apps
-    const testing = await p.select({
-        message: 'Testing',
-        options: [
-            { value: 'vitest', label: 'Vitest', hint: 'fast, Vite-native' },
-            { value: 'none', label: 'None' },
-        ],
-        initialValue: projectType === 'library' ? 'vitest' : 'none',
+  // Library bundler selection (only for libraries)
+  let libraryBundler: LibraryBundler | undefined;
+  if (projectType === 'library') {
+    const bundler = await p.select({
+      message: 'Library bundler',
+      options: [
+        { value: 'unbuild', label: 'unbuild', hint: 'unjs, simple config' },
+        { value: 'tsdown', label: 'tsdown', hint: 'fast, esbuild-based' },
+      ],
+      initialValue: presets?.bundler ?? 'unbuild',
     });
 
-    if (p.isCancel(testing)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
+    if (p.isCancel(bundler)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
     }
+    libraryBundler = bundler as LibraryBundler;
+  }
 
-    const language = await p.select({
-        message: 'Language',
-        options: [
-            { value: 'typescript', label: 'TypeScript' },
-            { value: 'javascript', label: 'JavaScript' },
-        ],
-        initialValue: 'typescript',
+  // Skip workspace-level settings if inherited from workspace
+  let engine: EngineSpec = inheritedSettings?.engine ??
+    presets?.engine ?? { name: 'node', version: 'latest' };
+  let finalPackageManager: PackageManagerName =
+    inheritedSettings?.packageManager?.name ?? presets?.packageManager ?? 'pnpm';
+  let pnpmManageVersions: boolean =
+    inheritedSettings?.pnpmManageVersions ?? presets?.pnpmManageVersions ?? true;
+
+  if (!inheritedSettings?.engine?.version) {
+    const nodeVersionInput = await p.text({
+      message: 'Node.js version',
+      placeholder: presets?.engine?.version ?? 'latest',
+      defaultValue: presets?.engine?.version ?? 'latest',
+      validate: (value) => {
+        if (!value.length) return 'Required';
+        if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+          return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
+        }
+      },
     });
 
-    if (p.isCancel(language)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
+    if (p.isCancel(nodeVersionInput)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
     }
+    engine = { name: 'node', version: nodeVersionInput };
+  }
 
-    // Config strategy
-    const configStrategyChoice = await p.select({
-        message: 'Config strategy',
-        options: [
-            { value: 'stealth', label: 'stealth', hint: 'configs in .config/' },
-            { value: 'root', label: 'root', hint: 'configs at project root' },
-        ],
-        initialValue: getConfigStrategy(),
+  if (!inheritedSettings?.packageManager) {
+    const packageManager = await p.select({
+      message: 'Package manager',
+      options: [
+        { value: 'pnpm', label: 'pnpm' },
+        { value: 'npm', label: 'npm' },
+        { value: 'yarn', label: 'yarn' },
+      ],
+      initialValue: presets?.packageManager ?? 'pnpm',
     });
 
-    if (p.isCancel(configStrategyChoice)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
+    if (p.isCancel(packageManager)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
     }
 
-    const ideChoice = await p.select({
-        message: 'IDE config',
-        options: [
-            { value: 'vscode', label: 'vscode' },
-            { value: 'none', label: 'None' },
-        ],
-        initialValue: presets?.ide ?? 'vscode',
+    finalPackageManager = packageManager as PackageManagerName;
+
+    if (packageManager === 'pnpm') {
+      const managePnpm = await p.confirm({
+        message: 'Enable manage-package-manager-versions?',
+        initialValue: presets?.pnpmManageVersions ?? true,
+      });
+      if (p.isCancel(managePnpm)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+      }
+      pnpmManageVersions = managePnpm;
+    }
+  }
+
+  // Skip linter/formatter prompts if inherited from workspace
+  let linter: 'oxlint' | 'eslint' | 'biome' =
+    inheritedSettings?.linter ?? presets?.linter ?? 'oxlint';
+  let formatter: 'oxfmt' | 'prettier' | 'biome' =
+    inheritedSettings?.formatter ?? presets?.formatter ?? 'prettier';
+
+  if (!inheritedSettings?.linter) {
+    const linterChoice = await p.select({
+      message: 'Linter',
+      options: [
+        { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
+        { value: 'eslint', label: 'ESLint', hint: 'classic' },
+        { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+      ],
+      initialValue: presets?.linter ?? 'oxlint',
     });
 
-    if (p.isCancel(ideChoice)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
+    if (p.isCancel(linterChoice)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
     }
+    linter = linterChoice as 'oxlint' | 'eslint' | 'biome';
+  }
 
-    // Derive final template based on language selection
-    const baseTemplate = getBaseTemplate(template);
-    const finalTemplate: Template =
-        language === 'javascript' ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
+  if (!inheritedSettings?.formatter) {
+    const formatterChoice = await p.select({
+      message: 'Formatter',
+      options: [
+        { value: 'prettier', label: 'Prettier', hint: 'widely adopted' },
+        { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
+        { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+      ],
+      initialValue: presets?.formatter ?? 'prettier',
+    });
 
-    const base: ProjectOptions = {
-        name,
-        template: finalTemplate,
-        projectType,
-        libraryBundler: projectType === 'library' ? libraryBundler : undefined,
-        engine,
-        packageManager: { name: finalPackageManager },
-        pnpmManageVersions,
-        linter,
-        formatter,
-        testing: testing as 'vitest' | 'none',
-        configStrategy: configStrategyChoice as 'stealth' | 'root',
-        ide: ideChoice as Ide,
-    };
+    if (p.isCancel(formatterChoice)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
+    }
+    formatter = formatterChoice as 'oxfmt' | 'prettier' | 'biome';
+  }
 
-    return {
-        ...base,
-        ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
-    };
+  // Testing - default to vitest for libraries, none for apps
+  const testing = await p.select({
+    message: 'Testing',
+    options: [
+      { value: 'vitest', label: 'Vitest', hint: 'fast, Vite-native' },
+      { value: 'none', label: 'None' },
+    ],
+    initialValue: projectType === 'library' ? 'vitest' : 'none',
+  });
+
+  if (p.isCancel(testing)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  const language = await p.select({
+    message: 'Language',
+    options: [
+      { value: 'typescript', label: 'TypeScript' },
+      { value: 'javascript', label: 'JavaScript' },
+    ],
+    initialValue: 'typescript',
+  });
+
+  if (p.isCancel(language)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  // Config strategy
+  const configStrategyChoice = await p.select({
+    message: 'Config strategy',
+    options: [
+      { value: 'stealth', label: 'stealth', hint: 'configs in .config/' },
+      { value: 'root', label: 'root', hint: 'configs at project root' },
+    ],
+    initialValue: getConfigStrategy(),
+  });
+
+  if (p.isCancel(configStrategyChoice)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  const ideChoice = await p.select({
+    message: 'IDE config',
+    options: [
+      { value: 'vscode', label: 'vscode' },
+      { value: 'none', label: 'None' },
+    ],
+    initialValue: presets?.ide ?? 'vscode',
+  });
+
+  if (p.isCancel(ideChoice)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  // Derive final template based on language selection
+  const baseTemplate = getBaseTemplate(template);
+  const finalTemplate: Template =
+    language === 'javascript' ? (`${baseTemplate}-js` as Template) : (baseTemplate as Template);
+
+  const base: ProjectOptions = {
+    name,
+    template: finalTemplate,
+    projectType,
+    libraryBundler: projectType === 'library' ? libraryBundler : undefined,
+    engine,
+    packageManager: { name: finalPackageManager },
+    pnpmManageVersions,
+    linter,
+    formatter,
+    testing: testing as 'vitest' | 'none',
+    configStrategy: configStrategyChoice as 'stealth' | 'root',
+    ide: ideChoice as Ide,
+  };
+
+  return {
+    ...base,
+    ...(baseTemplate === 'r3f' ? getR3fIntegrationFlags(features) : {}),
+  };
 }
 
 /**
  * Prompts for initial package in a monorepo.
  */
 export async function promptForInitialPackage(): Promise<'app' | 'library' | 'skip'> {
-    const choice = await p.select({
-        message: 'Add an initial package?',
-        options: [
-            { value: 'app', label: 'Application' },
-            { value: 'library', label: 'Library' },
-            { value: 'skip', label: 'Skip' },
-        ],
-        initialValue: 'app',
-    });
+  const choice = await p.select({
+    message: 'Add an initial package?',
+    options: [
+      { value: 'app', label: 'Application' },
+      { value: 'library', label: 'Library' },
+      { value: 'skip', label: 'Skip' },
+    ],
+    initialValue: 'app',
+  });
 
-    if (p.isCancel(choice)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(choice)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    return choice as 'app' | 'library' | 'skip';
+  return choice as 'app' | 'library' | 'skip';
 }
 
 /**
  * Gets default options for a monorepo workspace.
  */
 export function getDefaultMonorepoOptions(name: string): ProjectOptions {
-    return {
-        name,
-        projectType: 'monorepo',
-        packageManager: { name: 'pnpm' },
-        pnpmManageVersions: true,
-        engine: { name: 'node', version: 'latest' },
-        linter: 'oxlint',
-        formatter: 'prettier',
-        ide: 'vscode',
-    };
+  return {
+    name,
+    projectType: 'monorepo',
+    packageManager: { name: 'pnpm' },
+    pnpmManageVersions: true,
+    engine: { name: 'node', version: 'latest' },
+    linter: 'oxlint',
+    formatter: 'prettier',
+    ide: 'vscode',
+  };
 }
 
 /**
  * Prompts for monorepo customization.
  */
 async function promptForMonorepoCustomization(
-    name: string,
-    presets?: CliPresets
+  name: string,
+  presets?: CliPresets
 ): Promise<ProjectOptions> {
-    const nodeVersion = await p.text({
-        message: 'Node.js version',
-        placeholder: presets?.engine?.version ?? 'latest',
-        defaultValue: presets?.engine?.version ?? 'latest',
-        validate: (value) => {
-            if (!value.length) return 'Required';
-            if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
-                return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
-            }
-        },
-    });
+  const nodeVersion = await p.text({
+    message: 'Node.js version',
+    placeholder: presets?.engine?.version ?? 'latest',
+    defaultValue: presets?.engine?.version ?? 'latest',
+    validate: (value) => {
+      if (!value.length) return 'Required';
+      if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
+        return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
+      }
+    },
+  });
 
-    if (p.isCancel(nodeVersion)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(nodeVersion)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    // Monorepos are currently pnpm-only
-    // TODO: Support yarn and npm workspaces in the future
-    const managePnpm = await p.confirm({
-        message: 'Enable manage-package-manager-versions?',
-        initialValue: presets?.pnpmManageVersions ?? true,
-    });
-    if (p.isCancel(managePnpm)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  // Monorepos are currently pnpm-only
+  // TODO: Support yarn and npm workspaces in the future
+  const managePnpm = await p.confirm({
+    message: 'Enable manage-package-manager-versions?',
+    initialValue: presets?.pnpmManageVersions ?? true,
+  });
+  if (p.isCancel(managePnpm)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    const linter = await p.select({
-        message: 'Linter',
-        options: [
-            { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
-            { value: 'eslint', label: 'ESLint', hint: 'classic' },
-            { value: 'biome', label: 'Biome', hint: 'all-in-one' },
-        ],
-        initialValue: presets?.linter ?? 'oxlint',
-    });
+  const linter = await p.select({
+    message: 'Linter',
+    options: [
+      { value: 'oxlint', label: 'Oxlint', hint: 'fast, from OXC' },
+      { value: 'eslint', label: 'ESLint', hint: 'classic' },
+      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+    ],
+    initialValue: presets?.linter ?? 'oxlint',
+  });
 
-    if (p.isCancel(linter)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(linter)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    const formatter = await p.select({
-        message: 'Formatter',
-        options: [
-            { value: 'prettier', label: 'Prettier', hint: 'widely adopted' },
-            { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
-            { value: 'biome', label: 'Biome', hint: 'all-in-one' },
-        ],
-        initialValue: presets?.formatter ?? 'prettier',
-    });
+  const formatter = await p.select({
+    message: 'Formatter',
+    options: [
+      { value: 'prettier', label: 'Prettier', hint: 'widely adopted' },
+      { value: 'oxfmt', label: 'Oxfmt', hint: 'fast, Prettier-compatible' },
+      { value: 'biome', label: 'Biome', hint: 'all-in-one' },
+    ],
+    initialValue: presets?.formatter ?? 'prettier',
+  });
 
-    if (p.isCancel(formatter)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(formatter)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    const ide = await p.select({
-        message: 'IDE config',
-        options: [
-            { value: 'vscode', label: 'vscode' },
-            { value: 'none', label: 'None' },
-        ],
-        initialValue: presets?.ide ?? 'vscode',
-    });
+  const ide = await p.select({
+    message: 'IDE config',
+    options: [
+      { value: 'vscode', label: 'vscode' },
+      { value: 'none', label: 'None' },
+    ],
+    initialValue: presets?.ide ?? 'vscode',
+  });
 
-    if (p.isCancel(ide)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(ide)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    return {
-        name,
-        projectType: 'monorepo',
-        engine: { name: 'node', version: nodeVersion },
-        packageManager: { name: 'pnpm' },
-        pnpmManageVersions: managePnpm,
-        linter: linter as 'eslint' | 'oxlint' | 'biome',
-        formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
-        ide: ide as Ide,
-    };
+  return {
+    name,
+    projectType: 'monorepo',
+    engine: { name: 'node', version: nodeVersion },
+    packageManager: { name: 'pnpm' },
+    pnpmManageVersions: managePnpm,
+    linter: linter as 'eslint' | 'oxlint' | 'biome',
+    formatter: formatter as 'prettier' | 'oxfmt' | 'biome',
+    ide: ide as Ide,
+  };
 }
 
 /**
  * Main prompt flow for creating a monorepo workspace.
  */
 async function promptForMonorepo(
-    workspaceName: string,
-    presets?: CliPresets
+  workspaceName: string,
+  presets?: CliPresets
 ): Promise<ProjectOptions> {
-    const defaultOptions = getDefaultMonorepoOptions(workspaceName);
+  const defaultOptions = getDefaultMonorepoOptions(workspaceName);
 
-    // Apply presets to defaults
-    if (presets) {
-        if (presets.linter) defaultOptions.linter = presets.linter;
-        if (presets.formatter) defaultOptions.formatter = presets.formatter;
-        if (presets.ide) defaultOptions.ide = presets.ide;
-        if (presets.engine) defaultOptions.engine = presets.engine;
-        if (presets.pnpmManageVersions !== undefined)
-            defaultOptions.pnpmManageVersions = presets.pnpmManageVersions;
-    }
+  // Apply presets to defaults
+  if (presets) {
+    if (presets.linter) defaultOptions.linter = presets.linter;
+    if (presets.formatter) defaultOptions.formatter = presets.formatter;
+    if (presets.ide) defaultOptions.ide = presets.ide;
+    if (presets.engine) defaultOptions.engine = presets.engine;
+    if (presets.pnpmManageVersions !== undefined)
+      defaultOptions.pnpmManageVersions = presets.pnpmManageVersions;
+  }
 
-    // Show summary and ask confirm/customize
-    p.note(
-        formatMonorepoConfigSummary({
-            name: defaultOptions.name,
-            engine: defaultOptions.engine ?? { name: 'node', version: 'latest' },
-            packageManager: getPackageManagerName(defaultOptions.packageManager),
-            pnpmManageVersions: defaultOptions.pnpmManageVersions,
-            linter: defaultOptions.linter ?? 'oxlint',
-            formatter: defaultOptions.formatter ?? 'prettier',
-            ide: defaultOptions.ide ?? 'vscode',
-        }),
-        'Workspace Configuration'
-    );
+  // Show summary and ask confirm/customize
+  p.note(
+    formatMonorepoConfigSummary({
+      name: defaultOptions.name,
+      engine: defaultOptions.engine ?? { name: 'node', version: 'latest' },
+      packageManager: getPackageManagerName(defaultOptions.packageManager),
+      pnpmManageVersions: defaultOptions.pnpmManageVersions,
+      linter: defaultOptions.linter ?? 'oxlint',
+      formatter: defaultOptions.formatter ?? 'prettier',
+      ide: defaultOptions.ide ?? 'vscode',
+    }),
+    'Workspace Configuration'
+  );
 
-    if (await promptForProceed()) {
-        return defaultOptions;
-    }
+  if (await promptForProceed()) {
+    return defaultOptions;
+  }
 
-    return promptForMonorepoCustomization(workspaceName, presets);
+  return promptForMonorepoCustomization(workspaceName, presets);
 }
 
 /**
@@ -538,57 +538,57 @@ async function promptForMonorepo(
  * When presets are provided, they pre-fill prompt defaults.
  */
 export async function promptForOptions(
-    name: string | undefined,
-    presets?: CliPresets
+  name: string | undefined,
+  presets?: CliPresets
 ): Promise<ProjectOptions> {
-    // Step 1: Project Name (if not provided via argument)
-    let projectName = name;
-    if (!projectName) {
-        const nameResult = await p.text({
-            message: 'Project name:',
-            placeholder: generateRandomName(),
-            defaultValue: generateRandomName(),
-            validate: (value) => {
-                if (!value.length) return 'Project name is required';
-            },
-        });
-        if (p.isCancel(nameResult)) {
-            p.cancel('Operation cancelled.');
-            process.exit(0);
-        }
-        projectName = nameResult;
-    }
-
-    // Step 2: Select project type (app, library, or monorepo)
-    const projectType = await p.select({
-        message: 'Project type:',
-        options: [
-            { value: 'app', label: 'Application' },
-            { value: 'library', label: 'Library' },
-            { value: 'monorepo', label: 'Monorepo', hint: 'experimental' },
-        ],
-        initialValue: presets?.type ?? 'app',
+  // Step 1: Project Name (if not provided via argument)
+  let projectName = name;
+  if (!projectName) {
+    const nameResult = await p.text({
+      message: 'Project name:',
+      placeholder: generateRandomName(),
+      defaultValue: generateRandomName(),
+      validate: (value) => {
+        if (!value.length) return 'Project name is required';
+      },
     });
-
-    if (p.isCancel(projectType)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
+    if (p.isCancel(nameResult)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
     }
+    projectName = nameResult;
+  }
 
-    // If monorepo, handle differently
-    if (projectType === 'monorepo') {
-        return promptForMonorepo(projectName, presets);
-    }
+  // Step 2: Select project type (app, library, or monorepo)
+  const projectType = await p.select({
+    message: 'Project type:',
+    options: [
+      { value: 'app', label: 'Application' },
+      { value: 'library', label: 'Library' },
+      { value: 'monorepo', label: 'Monorepo', hint: 'experimental' },
+    ],
+    initialValue: presets?.type ?? 'app',
+  });
 
-    return promptForPackageOptions(projectName, projectType as 'app' | 'library', undefined, presets);
+  if (p.isCancel(projectType)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  // If monorepo, handle differently
+  if (projectType === 'monorepo') {
+    return promptForMonorepo(projectName, presets);
+  }
+
+  return promptForPackageOptions(projectName, projectType as 'app' | 'library', undefined, presets);
 }
 
 export type InheritedWorkspaceSettings = {
-    linter?: 'oxlint' | 'eslint' | 'biome';
-    formatter?: 'oxfmt' | 'prettier' | 'biome';
-    packageManager?: PackageManagerSpec;
-    engine?: EngineSpec;
-    pnpmManageVersions?: boolean;
+  linter?: 'oxlint' | 'eslint' | 'biome';
+  formatter?: 'oxfmt' | 'prettier' | 'biome';
+  packageManager?: PackageManagerSpec;
+  engine?: EngineSpec;
+  pnpmManageVersions?: boolean;
 };
 
 /**
@@ -596,42 +596,42 @@ export type InheritedWorkspaceSettings = {
  * These are used when flags are passed but --yes is not.
  */
 export type CliPresets = {
-    type?: 'app' | 'library' | 'monorepo';
-    template?: Template;
-    bundler?: 'unbuild' | 'tsdown';
-    linter?: 'oxlint' | 'eslint' | 'biome';
-    formatter?: 'oxfmt' | 'prettier' | 'biome';
-    packageManager?: PackageManagerName;
-    engine?: EngineSpec;
-    pnpmManageVersions?: boolean;
-    ide?: Ide;
-    // R3F features
-    drei?: boolean;
-    handle?: boolean;
-    leva?: boolean;
-    postprocessing?: boolean;
-    rapier?: boolean;
-    xr?: boolean;
-    uikit?: boolean;
-    offscreen?: boolean;
-    zustand?: boolean;
-    koota?: boolean;
-    triplex?: boolean;
-    viverse?: boolean;
+  type?: 'app' | 'library' | 'monorepo';
+  template?: Template;
+  bundler?: 'unbuild' | 'tsdown';
+  linter?: 'oxlint' | 'eslint' | 'biome';
+  formatter?: 'oxfmt' | 'prettier' | 'biome';
+  packageManager?: PackageManagerName;
+  engine?: EngineSpec;
+  pnpmManageVersions?: boolean;
+  ide?: Ide;
+  // R3F features
+  drei?: boolean;
+  handle?: boolean;
+  leva?: boolean;
+  postprocessing?: boolean;
+  rapier?: boolean;
+  xr?: boolean;
+  uikit?: boolean;
+  offscreen?: boolean;
+  zustand?: boolean;
+  koota?: boolean;
+  triplex?: boolean;
+  viverse?: boolean;
 };
 
 /**
  * Converts CLI presets to inherited settings format for getDefaultOptions.
  */
 function presetsToInheritedSettings(presets?: CliPresets): InheritedWorkspaceSettings | undefined {
-    if (!presets) return undefined;
-    return {
-        linter: presets.linter,
-        formatter: presets.formatter,
-        packageManager: presets.packageManager ? { name: presets.packageManager } : undefined,
-        engine: presets.engine,
-        pnpmManageVersions: presets.pnpmManageVersions,
-    };
+  if (!presets) return undefined;
+  return {
+    linter: presets.linter,
+    formatter: presets.formatter,
+    packageManager: presets.packageManager ? { name: presets.packageManager } : undefined,
+    engine: presets.engine,
+    pnpmManageVersions: presets.pnpmManageVersions,
+  };
 }
 
 /**
@@ -641,65 +641,65 @@ function presetsToInheritedSettings(presets?: CliPresets): InheritedWorkspaceSet
  * When presets are provided, they pre-fill prompt defaults.
  */
 export async function promptForPackageOptions(
-    projectName: string,
-    projectType: 'app' | 'library',
-    inheritedSettings?: InheritedWorkspaceSettings,
-    presets?: CliPresets
+  projectName: string,
+  projectType: 'app' | 'library',
+  inheritedSettings?: InheritedWorkspaceSettings,
+  presets?: CliPresets
 ): Promise<ProjectOptions> {
-    // Select template (TypeScript by default, customize for JavaScript)
-    const templateSelection = await p.select({
-        message: 'Select a template:',
-        options: [
-            { value: 'vanilla', label: color.yellow('Vanilla') },
-            { value: 'react', label: color.cyan('React'), hint: 'experimental' },
-            { value: 'r3f', label: color.magenta('React Three Fiber'), hint: 'experimental' },
-        ],
-        initialValue: presets?.template ? getBaseTemplate(presets.template) : 'vanilla',
-    });
+  // Select template (TypeScript by default, customize for JavaScript)
+  const templateSelection = await p.select({
+    message: 'Select a template:',
+    options: [
+      { value: 'vanilla', label: color.yellow('Vanilla') },
+      { value: 'react', label: color.cyan('React'), hint: 'experimental' },
+      { value: 'r3f', label: color.magenta('React Three Fiber'), hint: 'experimental' },
+    ],
+    initialValue: presets?.template ? getBaseTemplate(presets.template) : 'vanilla',
+  });
 
-    if (p.isCancel(templateSelection)) {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-    }
+  if (p.isCancel(templateSelection)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
-    const template = templateSelection as Template;
-    const baseTemplate = getBaseTemplate(template);
+  const template = templateSelection as Template;
+  const baseTemplate = getBaseTemplate(template);
 
-    // For R3F, immediately prompt for features
-    let features: string[] | undefined;
-    if (baseTemplate === 'r3f') {
-        features = await promptForR3fIntegrations(presets);
-    }
+  // For R3F, immediately prompt for features
+  let features: string[] | undefined;
+  if (baseTemplate === 'r3f') {
+    features = await promptForR3fIntegrations(presets);
+  }
 
-    const defaultOptions = getDefaultOptions(
-        template,
-        projectName,
-        projectType,
-        presets?.bundler,
-        features,
-        inheritedSettings ?? presetsToInheritedSettings(presets)
-    );
-    if (presets?.ide && !inheritedSettings) {
-        defaultOptions.ide = presets.ide;
-    }
+  const defaultOptions = getDefaultOptions(
+    template,
+    projectName,
+    projectType,
+    presets?.bundler,
+    features,
+    inheritedSettings ?? presetsToInheritedSettings(presets)
+  );
+  if (presets?.ide && !inheritedSettings) {
+    defaultOptions.ide = presets.ide;
+  }
 
-    // Show summary and ask confirm/customize
-    const configTitle = inheritedSettings
-        ? 'Template Configuration (using workspace settings)'
-        : 'Template Configuration';
-    p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
+  // Show summary and ask confirm/customize
+  const configTitle = inheritedSettings
+    ? 'Template Configuration (using workspace settings)'
+    : 'Template Configuration';
+  p.note(formatConfigSummary(defaultOptions, inheritedSettings), configTitle);
 
-    if (await promptForProceed()) {
-        return defaultOptions;
-    }
+  if (await promptForProceed()) {
+    return defaultOptions;
+  }
 
-    // Customize (pass features for R3F so they're preserved)
-    return promptForCustomization(
-        template,
-        projectName,
-        projectType,
-        features,
-        inheritedSettings,
-        presets
-    );
+  // Customize (pass features for R3F so they're preserved)
+  return promptForCustomization(
+    template,
+    projectName,
+    projectType,
+    features,
+    inheritedSettings,
+    presets
+  );
 }

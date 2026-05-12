@@ -10,21 +10,13 @@
   "arrowParens": "always",
   "overrides": [
     {
-      "files": [
-        "*.md",
-        "**/*.md"
-      ],
+      "files": ["*.md", "**/*.md"],
       "options": {
         "semi": false
       }
     },
     {
-      "files": [
-        "*.yml",
-        "*.yaml",
-        "**/*.yml",
-        "**/*.yaml"
-      ],
+      "files": ["*.yml", "*.yaml", "**/*.yml", "**/*.yaml"],
       "options": {
         "semi": false
       }
