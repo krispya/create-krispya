@@ -121,7 +121,7 @@ function generateProvidersModule(builder: PlanBuilder): string {
     const inlineComponents = resolvedProviders.filter((provider) => provider.type === 'inline-jsx');
     const layoutEffects = resolvedProviders.filter((provider) => provider.type === 'layout-effect');
     const declaredProps = providerProps
-      .map((prop) => `${prop.declaredPropName} = ${prop.declaredPropDefaultValue}`)
+      .map((prop) => `${prop.declaredPropName} = ${String(prop.declaredPropDefaultValue)}`)
       .join(', ');
     const declaredTypes = providerProps
       .map((prop) => `${prop.declaredPropName}?: ${prop.declaredPropType}`)
@@ -148,13 +148,13 @@ ${jsdoc
             ? `
           useLayoutEffect(() => {
             ${layoutEffects.map((effect) => effect.code).join('\n')}
-          }, [${layoutEffects.map((effect) => effect.props?.[0]?.propValue)}]);
+          }, [${layoutEffects.map((effect) => effect.props?.[0]?.propValue).join(', ')}]);
         `
             : ''
         }
         return (
           <>
-            ${inlineComponents.map((provider) => provider.code)}
+            ${inlineComponents.map((provider) => provider.code).join('\n')}
             ${wrappedComponents.reduce((acc, provider) => {
               const props = provider.props
                 ?.map((prop) => `${prop.propName}={${prop.propValue}}`)
