@@ -292,6 +292,59 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     }
   });
 
+  it('offers React Compiler dependencies during single-package React updates', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-react-compiler-update-'));
+    try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'my-app',
+            type: 'module',
+            dependencies: {
+              react: '^19.0.0',
+              'react-dom': '^19.0.0',
+            },
+            devDependencies: {
+              '@vitejs/plugin-react': '^6.0.0',
+              typescript: '^5.9.0',
+              vite: '^8.0.0',
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      const changes = await getPackageJsonScriptUpdates(tempDir, {
+        name: 'my-app',
+        linter: 'eslint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+        viteTemplate: 'react',
+      });
+
+      expect(changes).toHaveLength(1);
+      expect(changes[0]?.status).toBe('modified');
+
+      const packageJson = JSON.parse(changes[0]!.newContent);
+      expect(Object.keys(packageJson.devDependencies)).toEqual(
+        expect.arrayContaining([
+          '@babel/core',
+          '@rolldown/plugin-babel',
+          '@types/babel__core',
+          'babel-plugin-react-compiler',
+        ])
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('offers oxlint config replacement during single-package updates', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-oxlint-config-'));
     try {

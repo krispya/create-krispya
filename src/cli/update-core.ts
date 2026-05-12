@@ -593,6 +593,16 @@ function sortPackageMap(packageMap: Record<string, string>): Record<string, stri
   return Object.fromEntries(Object.entries(packageMap).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+function addMissingDevDependency(
+  pkg: PackageJsonForScripts,
+  devDependencies: Record<string, string>,
+  name: string
+) {
+  if (!hasPackage(pkg, name)) {
+    devDependencies[name] = formatResolvedPackageVersion({}, name);
+  }
+}
+
 async function detectTypeScriptPackage(root: string, pkg: PackageJsonForScripts): Promise<boolean> {
   if (hasPackage(pkg, 'typescript')) return true;
 
@@ -705,21 +715,12 @@ async function getExpectedPackageDevDependencies(
   }
 
   if (!config.isMonorepo && config.viteTemplate === 'react') {
-    nextDevDependencies['@babel/core'] ??= formatResolvedPackageVersion({}, '@babel/core');
-    nextDevDependencies['@rolldown/plugin-babel'] ??= formatResolvedPackageVersion(
-      {},
-      '@rolldown/plugin-babel'
-    );
-    nextDevDependencies['babel-plugin-react-compiler'] ??= formatResolvedPackageVersion(
-      {},
-      'babel-plugin-react-compiler'
-    );
+    addMissingDevDependency(pkg, nextDevDependencies, '@babel/core');
+    addMissingDevDependency(pkg, nextDevDependencies, '@rolldown/plugin-babel');
+    addMissingDevDependency(pkg, nextDevDependencies, 'babel-plugin-react-compiler');
 
     if (await detectTypeScriptPackage(root, pkg)) {
-      nextDevDependencies['@types/babel__core'] ??= formatResolvedPackageVersion(
-        {},
-        '@types/babel__core'
-      );
+      addMissingDevDependency(pkg, nextDevDependencies, '@types/babel__core');
     }
   }
 
