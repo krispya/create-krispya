@@ -423,6 +423,7 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
                     linter,
                     formatter,
                     isMonorepo: true,
+                    hasTypecheck: false,
                     platforms,
                 });
                 for (const [filePath, file] of Object.entries(aiFilesOutput)) {

@@ -283,6 +283,7 @@ To add a new package to this workspace, run create-krispya from this directory a
             linter,
             formatter,
             isMonorepo: true,
+            hasTypecheck: false,
             platforms: aiPlatforms,
         });
     }

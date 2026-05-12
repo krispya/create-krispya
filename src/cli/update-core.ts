@@ -34,12 +34,16 @@ import { detectTooling } from '../utils/index.js';
 
 export type UpdateCategory =
     | 'ai-files'
+    | 'ai-files-install'
+    | 'ai-files-update'
     | 'vscode'
     | 'package-json'
     | 'config-packages'
     | 'tooling-config'
     | 'workspace-config'
     | 'root-config';
+
+type ExpectedUpdateCategory = Exclude<UpdateCategory, 'ai-files-install' | 'ai-files-update'>;
 
 export type FileChangeStatus = 'added' | 'modified' | 'unchanged';
 
@@ -64,6 +68,7 @@ export type WorkspaceConfig = {
     packageManager: string;
     isMonorepo: boolean;
     configStrategy?: ConfigStrategy;
+    hasTypecheck?: boolean;
 };
 
 type PackageJsonForScripts = {
@@ -90,16 +95,22 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
     // Read name from package.json or directory
     let name = root.split(/[/\\]/).pop() ?? 'workspace';
     let packageManager = 'pnpm';
+    let hasTypecheck = false;
     try {
         const pkgPath = join(root, 'package.json');
         const content = await readFile(pkgPath, 'utf-8');
-        const pkgJson = JSON.parse(content) as { name?: string; packageManager?: string };
+        const pkgJson = JSON.parse(content) as {
+            name?: string;
+            packageManager?: string;
+            scripts?: Record<string, string>;
+        };
         if (pkgJson.name) {
             name = pkgJson.name.replace(/^@/, '').replace(/\/.*$/, '');
         }
         if (pkgJson.packageManager) {
             packageManager = pkgJson.packageManager.split('@')[0] ?? packageManager;
         }
+        hasTypecheck = pkgJson.scripts?.typecheck != null;
     } catch {
         // Use directory name
     }
@@ -115,6 +126,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
         packageManager,
         isMonorepo,
         configStrategy,
+        hasTypecheck,
     };
 }
 
@@ -138,8 +150,9 @@ async function detectSinglePackageConfigStrategy(root: string): Promise<ConfigSt
  */
 export async function planExpectedFiles(
     config: WorkspaceConfig
-): Promise<Record<UpdateCategory, Record<string, VirtualFile>>> {
-    const { name, linter, formatter, packageManager, isMonorepo, configStrategy } = config;
+): Promise<Record<ExpectedUpdateCategory, Record<string, VirtualFile>>> {
+    const { name, linter, formatter, packageManager, isMonorepo, configStrategy, hasTypecheck } =
+        config;
     const versions =
         linter === 'biome' || formatter === 'biome'
             ? await resolveMonorepoRootPackageVersions({ linter, formatter })
@@ -154,6 +167,7 @@ export async function planExpectedFiles(
         formatter,
         isMonorepo,
         configStrategy,
+        hasTypecheck,
         platforms: ALL_AI_PLATFORMS,
     });
 
@@ -236,6 +250,7 @@ export async function planExpectedFiles(
         vscode: vscodeFiles,
         'package-json': {},
         'config-packages': configPackages,
+        'tooling-config': {},
         'workspace-config': workspaceConfig,
         'root-config': rootConfig,
     };
@@ -407,11 +422,13 @@ function fileContentsEqual(filePath: string, currentContent: string, newContent:
  * Compares expected files with disk and categorizes changes.
  */
 export async function compareWithDisk(
-    expected: Record<UpdateCategory, Record<string, VirtualFile>>,
+    expected: Record<ExpectedUpdateCategory, Record<string, VirtualFile>>,
     root: string
 ): Promise<CategoryUpdate[]> {
     const categoryLabels: Record<UpdateCategory, string> = {
         'ai-files': 'AI Files',
+        'ai-files-install': 'Install More AI Files',
+        'ai-files-update': 'Update Existing AI Files',
         vscode: 'VS Code',
         'package-json': 'package.json Scripts',
         'config-packages': 'Config Packages',
@@ -423,7 +440,7 @@ export async function compareWithDisk(
     const categories: CategoryUpdate[] = [];
 
     for (const [category, files] of Object.entries(expected) as [
-        UpdateCategory,
+        ExpectedUpdateCategory,
         Record<string, VirtualFile>,
     ][]) {
         const changes: FileChange[] = [];
@@ -458,6 +475,32 @@ export async function compareWithDisk(
                     newContent,
                 });
             }
+        }
+
+        // Split AI files into separate prompts for installing missing files and updating existing ones.
+        if (category === 'ai-files') {
+            const newAiFiles = changes.filter((change) => change.status === 'added');
+            const modifiedAiFiles = changes.filter((change) => change.status === 'modified');
+
+            if (newAiFiles.length > 0) {
+                categories.push({
+                    category: 'ai-files-install',
+                    label: categoryLabels['ai-files-install'],
+                    changes: newAiFiles,
+                    hasUserModifications: false,
+                });
+            }
+
+            if (modifiedAiFiles.length > 0) {
+                categories.push({
+                    category: 'ai-files-update',
+                    label: categoryLabels['ai-files-update'],
+                    changes: modifiedAiFiles,
+                    hasUserModifications: true,
+                });
+            }
+
+            continue;
         }
 
         // Skip empty categories

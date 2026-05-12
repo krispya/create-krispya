@@ -124,6 +124,42 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         }
     });
 
+    it('splits AI file installs from existing AI file updates', async () => {
+        const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-ai-files-'));
+        try {
+            const expected = await planExpectedFiles({
+                name: 'my-app',
+                linter: 'oxlint',
+                formatter: 'prettier',
+                packageManager: 'pnpm',
+                isMonorepo: false,
+                configStrategy: 'stealth',
+            });
+
+            await writeFile(join(tempDir, 'AGENTS.md'), '# Custom agent notes\n');
+
+            const categories = await compareWithDisk(expected, tempDir);
+            const installCategory = categories.find(
+                (category) => category.category === 'ai-files-install'
+            );
+            const updateCategory = categories.find(
+                (category) => category.category === 'ai-files-update'
+            );
+
+            expect(categories.some((category) => category.category === 'ai-files')).toBe(false);
+            expect(installCategory?.label).toBe('Install More AI Files');
+            expect(installCategory?.changes).toEqual([
+                expect.objectContaining({ path: 'CLAUDE.md', status: 'added' }),
+            ]);
+            expect(updateCategory?.label).toBe('Update Existing AI Files');
+            expect(updateCategory?.changes).toEqual([
+                expect.objectContaining({ path: 'AGENTS.md', status: 'modified' }),
+            ]);
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
     it('regenerates single-package scripts with typecheck watch', async () => {
         const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-scripts-'));
         try {

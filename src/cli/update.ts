@@ -29,6 +29,8 @@ const UPDATE_CATEGORY_ORDER = [
     'vscode',
     'package-json',
     'ai-files',
+    'ai-files-install',
+    'ai-files-update',
 ] satisfies UpdateCategory[];
 
 function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
@@ -77,6 +79,22 @@ async function promptForUpdateSelections(category: CategoryUpdate) {
     }
 
     return selectableChanges.filter((change) => selectedFiles.includes(change.path));
+}
+
+async function promptForAiFileInstall(category: CategoryUpdate): Promise<FileChange[]> {
+    const newChanges = category.changes.filter((change) => change.status === 'added');
+    const fileList = newChanges.map((change) => change.path).join(', ');
+    const shouldInstall = await p.confirm({
+        message: fileList ? `Install more AI files? (${fileList})` : 'Install more AI files?',
+        initialValue: true,
+    });
+
+    if (p.isCancel(shouldInstall)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+    }
+
+    return shouldInstall ? newChanges : [];
 }
 
 function getCategoryOrder(category: UpdateCategory): number {
@@ -175,7 +193,10 @@ async function processUpdateCategory(
             }
         }
     } else {
-        changesToApply = await promptForUpdateSelections(category);
+        changesToApply =
+            category.category === 'ai-files-install'
+                ? await promptForAiFileInstall(category)
+                : await promptForUpdateSelections(category);
     }
 
     if (changesToApply.length > 0) {

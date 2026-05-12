@@ -371,6 +371,7 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
             formatter: clonedOptions.formatter ?? 'prettier',
             isMonorepo: false,
             configStrategy: clonedOptions.configStrategy,
+            hasTypecheck: language === 'typescript',
             platforms: planInput.aiAgents.config.platforms,
         });
     }
