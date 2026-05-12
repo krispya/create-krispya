@@ -71,7 +71,7 @@ describe('renderPackageJson', () => {
     expect(packageJson.version).toBe('0.1.0');
   });
 
-  it('adds @types/node based on the selected engine', async () => {
+  it('adds the known @types/node fallback when versions have not been resolved', async () => {
     const result = renderPackageJson({
       name: 'my-app',
       baseTemplate: 'vanilla',
@@ -88,8 +88,29 @@ describe('renderPackageJson', () => {
     });
 
     const packageJson = readPackageJsonContent(result.files['package.json']);
-    expect(packageJson.devDependencies['@types/node']).toBe('^25.0.0');
+    expect(packageJson.devDependencies['@types/node']).toBe('^25.3.5');
     expect(packageJson.engines.node).toBe('>=25.0.0');
+  });
+
+  it('uses the known @types/node fallback instead of inventing an engine major', async () => {
+    const result = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'javascript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        engine: { name: 'node', version: '26.1.0' },
+      },
+    });
+
+    const packageJson = readPackageJsonContent(result.files['package.json']);
+    expect(packageJson.devDependencies['@types/node']).not.toBe('^26.0.0');
+    expect(packageJson.devDependencies['@types/node']).toBe('^25.3.5');
   });
 
   it('prefers explicit @types/node versions', async () => {

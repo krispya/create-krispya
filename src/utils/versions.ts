@@ -26,6 +26,15 @@ function compareNumericSemver(a: string, b: string): number {
   return 0;
 }
 
+function getLatestMatchingMajorVersion(
+  versions: Iterable<string>,
+  majorVersion: string
+): string | undefined {
+  return [...versions]
+    .filter((version) => version.split('.')[0] === majorVersion)
+    .sort((a, b) => compareNumericSemver(b, a))[0];
+}
+
 /**
  * Fetches the latest npm version within a specific major version.
  */
@@ -37,11 +46,41 @@ export async function getLatestNpmMajorVersion(
   try {
     const response = await fetch(`https://registry.npmjs.org/${packageName}`);
     const data = (await response.json()) as { versions?: Record<string, unknown> };
-    const latestMatchingVersion = Object.keys(data.versions ?? {})
-      .filter((version) => version.split('.')[0] === majorVersion)
-      .sort((a, b) => compareNumericSemver(b, a))[0];
+    const latestMatchingVersion = getLatestMatchingMajorVersion(
+      Object.keys(data.versions ?? {}),
+      majorVersion
+    );
 
     return latestMatchingVersion ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Fetches the latest npm version within the requested major, falling back to lower majors.
+ */
+export async function getLatestNpmMajorVersionAtOrBelow(
+  packageName: string,
+  majorVersion: string,
+  fallback: string
+): Promise<string> {
+  try {
+    const response = await fetch(`https://registry.npmjs.org/${packageName}`);
+    const data = (await response.json()) as { versions?: Record<string, unknown> };
+    const versions = Object.keys(data.versions ?? {});
+    const requestedMajor = Number.parseInt(majorVersion, 10);
+
+    if (Number.isFinite(requestedMajor)) {
+      for (let major = requestedMajor; major >= 0; major -= 1) {
+        const latestMatchingVersion = getLatestMatchingMajorVersion(versions, String(major));
+        if (latestMatchingVersion != null) {
+          return latestMatchingVersion;
+        }
+      }
+    }
+
+    return fallback;
   } catch {
     return fallback;
   }

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getLatestNodeVersion, getLatestNpmMajorVersion } from '../src/utils/index.js';
+import {
+  getLatestNodeVersion,
+  getLatestNpmMajorVersion,
+  getLatestNpmMajorVersionAtOrBelow,
+} from '../src/utils/index.js';
 
 describe('getLatestNodeVersion', () => {
   afterEach(() => {
@@ -54,5 +58,55 @@ describe('getLatestNpmMajorVersion', () => {
     } as Response);
 
     await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe('25.0.0');
+  });
+});
+
+describe('getLatestNpmMajorVersionAtOrBelow', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns the newest version for the requested major when available', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: async () => ({
+        versions: {
+          '25.3.5': {},
+          '26.0.1': {},
+          '26.1.0': {},
+        },
+      }),
+    } as Response);
+
+    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
+      '26.1.0'
+    );
+  });
+
+  it('falls back to the newest lower major when the requested major is missing', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: async () => ({
+        versions: {
+          '24.12.0': {},
+          '25.3.4': {},
+          '25.7.0': {},
+        },
+      }),
+    } as Response);
+
+    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
+      '25.7.0'
+    );
+  });
+
+  it('uses the fallback when no lower matching major exists', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: async () => ({
+        versions: {},
+      }),
+    } as Response);
+
+    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
+      '25.0.0'
+    );
   });
 });

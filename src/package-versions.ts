@@ -13,7 +13,7 @@ import {
 } from './types.js';
 import {
   getLatestNodeVersion,
-  getLatestNpmMajorVersion,
+  getLatestNpmMajorVersionAtOrBelow,
   getLatestNpmCliVersion,
   getLatestNpmVersion,
   getLatestPnpmVersion,
@@ -40,6 +40,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
   '@testing-library/dom': { fallbackVersion: '10.4.0' },
   '@testing-library/react': { fallbackVersion: '16.2.0' },
   '@types/babel__core': { fallbackVersion: '7.20.5' },
+  '@types/node': { fallbackVersion: '25.3.5' },
   '@types/react': { fallbackVersion: '19.0.0' },
   '@types/react-dom': { fallbackVersion: '19.0.0' },
   '@types/three': { fallbackVersion: '0.175.0', prefix: '~' },
@@ -198,19 +199,13 @@ export async function resolveEngine(options: ProjectOptions) {
   return engine;
 }
 
-export function formatNodeTypesVersion(versions: PackageVersions = {}, engine?: EngineSpec): string {
+export function formatNodeTypesVersion(versions: PackageVersions = {}, _engine?: EngineSpec): string {
   const resolvedVersion = versions['@types/node'];
   if (resolvedVersion != null) {
     return `^${resolvedVersion}`;
   }
 
-  const engineSpec = getEngineSpec(engine);
-  if (engineSpec.name === 'node' && engineSpec.version) {
-    const majorVersion = engineSpec.version.split('.')[0];
-    return `^${majorVersion}.0.0`;
-  }
-
-  return '^22.0.0';
+  return formatResolvedPackageVersion(versions, '@types/node');
 }
 
 async function resolveNodeTypesVersion(
@@ -228,7 +223,11 @@ async function resolveNodeTypesVersion(
 
   const nodeVersion = engineSpec.version ?? (await getLatestNodeVersion());
   const majorVersion = nodeVersion.split('.')[0];
-  return getLatestNpmMajorVersion('@types/node', majorVersion, `${majorVersion}.0.0`);
+  return getLatestNpmMajorVersionAtOrBelow(
+    '@types/node',
+    majorVersion,
+    getPackageFallbackVersion('@types/node')
+  );
 }
 
 export async function resolvePackageVersions(
