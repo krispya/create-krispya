@@ -19,6 +19,14 @@ function readPackageJsonContent(
   return JSON.parse(file.content);
 }
 
+function readTextFile(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
+  if (file.type !== 'text') {
+    throw new Error('Expected file to be text');
+  }
+
+  return file.content;
+}
+
 describe('renderPackageJson', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -190,6 +198,39 @@ describe('renderPackageJson', () => {
     });
   });
 
+  it('adds React Compiler dev dependencies to TypeScript React apps by default', async () => {
+    const { files } = await planProject({
+      name: 'my-app',
+      template: 'react',
+      packageManager: { name: 'pnpm', version: '10.0.0' },
+      engine: { name: 'node', version: '25.1.0' },
+    });
+
+    const packageJson = readPackageJsonContent(files['package.json']);
+    expect(Object.keys(packageJson.devDependencies)).toEqual(
+      expect.arrayContaining([
+        '@babel/core',
+        '@rolldown/plugin-babel',
+        '@types/babel__core',
+        '@vitejs/plugin-react',
+        'babel-plugin-react-compiler',
+      ])
+    );
+  });
+
+  it('omits Babel core types for JavaScript React apps with React Compiler', async () => {
+    const { files } = await planProject({
+      name: 'my-app',
+      template: 'react-js',
+      packageManager: { name: 'pnpm', version: '10.0.0' },
+      engine: { name: 'node', version: '25.1.0' },
+    });
+
+    const packageJson = readPackageJsonContent(files['package.json']);
+    expect(packageJson.devDependencies['@babel/core']).toBeDefined();
+    expect(packageJson.devDependencies['@types/babel__core']).toBeUndefined();
+  });
+
   it('adds editorconfig to single-package workspaces', async () => {
     const { files } = await planProject({
       name: 'my-app',
@@ -298,8 +339,8 @@ describe('renderPackageJson', () => {
       'bun.lock',
       'bun.lockb',
     ];
-    const singlePackageConfig = JSON.parse(singlePackageFiles['.config/oxfmt.json'].content);
-    const monorepoConfig = JSON.parse(monorepoFiles['.config/oxfmt/base.json'].content);
+    const singlePackageConfig = JSON.parse(readTextFile(singlePackageFiles['.config/oxfmt.json']));
+    const monorepoConfig = JSON.parse(readTextFile(monorepoFiles['.config/oxfmt/base.json']));
 
     expect(singlePackageConfig.ignorePatterns).toEqual(expectedIgnorePatterns);
     expect(monorepoConfig.ignorePatterns).toEqual(expectedIgnorePatterns);

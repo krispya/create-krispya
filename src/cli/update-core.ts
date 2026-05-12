@@ -101,15 +101,25 @@ function detectViteTemplate(pkg: PackageJsonForScripts): BaseTemplate | undefine
 
 function renderExpectedViteConfig(template: BaseTemplate): VirtualFile {
   const isReact = template === 'react' || template === 'r3f';
+  const useReactCompiler = template === 'react';
   const codeSnippets = isReact
-    ? { 'vite-config-import': ["import react from '@vitejs/plugin-react';"] }
+    ? {
+        'vite-config-import': [
+          useReactCompiler
+            ? "import react, { reactCompilerPreset } from '@vitejs/plugin-react';"
+            : "import react from '@vitejs/plugin-react';",
+          ...(useReactCompiler ? ["import babel from '@rolldown/plugin-babel';"] : []),
+        ],
+      }
     : {};
   const viteConfig: Record<string, unknown> = {
     base: './',
   };
 
   if (isReact) {
-    viteConfig.plugins = ['$raw:react()'];
+    viteConfig.plugins = useReactCompiler
+      ? ['$raw:react()', '$raw:babel({ presets: [reactCompilerPreset()] })']
+      : ['$raw:react()'];
   }
 
   if (template === 'r3f') {
@@ -692,6 +702,25 @@ async function getExpectedPackageDevDependencies(
 
   if (shouldAddOxlintTypeAwareBackend) {
     nextDevDependencies['oxlint-tsgolint'] = formatResolvedPackageVersion({}, 'oxlint-tsgolint');
+  }
+
+  if (!config.isMonorepo && config.viteTemplate === 'react') {
+    nextDevDependencies['@babel/core'] ??= formatResolvedPackageVersion({}, '@babel/core');
+    nextDevDependencies['@rolldown/plugin-babel'] ??= formatResolvedPackageVersion(
+      {},
+      '@rolldown/plugin-babel'
+    );
+    nextDevDependencies['babel-plugin-react-compiler'] ??= formatResolvedPackageVersion(
+      {},
+      'babel-plugin-react-compiler'
+    );
+
+    if (await detectTypeScriptPackage(root, pkg)) {
+      nextDevDependencies['@types/babel__core'] ??= formatResolvedPackageVersion(
+        {},
+        '@types/babel__core'
+      );
+    }
   }
 
   return sortPackageMap(nextDevDependencies);

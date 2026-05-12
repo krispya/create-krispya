@@ -4,6 +4,7 @@ import {
   type ProjectOptions,
   getBaseTemplate,
   getLanguageFromTemplate,
+  shouldEnableReactCompiler,
   type Linter,
   type PackageManagerName,
   type PackageManagerSpec,
@@ -25,6 +26,7 @@ type PackageVersionDefinition = {
 };
 
 const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
+  '@babel/core': { fallbackVersion: '7.29.0' },
   '@biomejs/biome': { fallbackVersion: '2.0.0' },
   '@react-three/drei': { fallbackVersion: '10.0.0' },
   '@react-three/fiber': { fallbackVersion: '9.0.0' },
@@ -34,16 +36,19 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
   '@react-three/rapier': { fallbackVersion: '2.1.0' },
   '@react-three/uikit': { fallbackVersion: '0.8.15' },
   '@react-three/xr': { fallbackVersion: '6.6.16' },
+  '@rolldown/plugin-babel': { fallbackVersion: '0.2.3' },
   '@testing-library/dom': { fallbackVersion: '10.4.0' },
   '@testing-library/react': { fallbackVersion: '16.2.0' },
+  '@types/babel__core': { fallbackVersion: '7.20.5' },
   '@types/react': { fallbackVersion: '19.0.0' },
   '@types/react-dom': { fallbackVersion: '19.0.0' },
   '@types/three': { fallbackVersion: '0.175.0', prefix: '~' },
   '@vitejs/plugin-basic-ssl': { fallbackVersion: '2.0.0' },
-  '@vitejs/plugin-react': { fallbackVersion: '4.4.1' },
+  '@vitejs/plugin-react': { fallbackVersion: '6.0.1' },
   '@viverse/cli': { fallbackVersion: '0.9.5-beta.8' },
   eslint: { fallbackVersion: '9.17.0' },
   'eslint-plugin-react-hooks': { fallbackVersion: '5.1.0' },
+  'babel-plugin-react-compiler': { fallbackVersion: '1.0.0' },
   jsdom: { fallbackVersion: '26.0.0' },
   koota: { fallbackVersion: '0.4.0' },
   leva: { fallbackVersion: '0.10.0' },
@@ -58,7 +63,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
   typescript: { fallbackVersion: '5.9.3' },
   'typescript-eslint': { fallbackVersion: '8.18.0' },
   unbuild: { fallbackVersion: '3.5.0' },
-  vite: { fallbackVersion: '6.3.4' },
+  vite: { fallbackVersion: '8.0.12' },
   vitest: { fallbackVersion: '4.0.0' },
   zustand: { fallbackVersion: '5.0.3' },
 };
@@ -299,6 +304,7 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
   const isReact = baseTemplate === 'react' || baseTemplate === 'r3f';
   const isR3f = baseTemplate === 'r3f';
   const isTypescript = language === 'typescript';
+  const useReactCompiler = shouldEnableReactCompiler(options);
   const inWorkspace = options.workspaceRoot != null;
   const testing = options.testing ?? (isLibrary ? 'vitest' : 'none');
   const linter = options.linter ?? 'oxlint';
@@ -324,11 +330,19 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
       addPackageName(packageNames, explicitVersions, 'react');
       addPackageName(packageNames, explicitVersions, 'react-dom');
       addPackageName(packageNames, explicitVersions, '@vitejs/plugin-react');
+      if (useReactCompiler) {
+        addPackageName(packageNames, explicitVersions, '@babel/core');
+        addPackageName(packageNames, explicitVersions, '@rolldown/plugin-babel');
+        addPackageName(packageNames, explicitVersions, 'babel-plugin-react-compiler');
+      }
     }
 
     if (isTypescript) {
       addPackageName(packageNames, explicitVersions, '@types/react');
       addPackageName(packageNames, explicitVersions, '@types/react-dom');
+      if (useReactCompiler) {
+        addPackageName(packageNames, explicitVersions, '@types/babel__core');
+      }
     }
   }
 

@@ -292,3 +292,10 @@ export function getLanguageFromTemplate(template: Template): 'javascript' | 'typ
 export function getBaseTemplate(template: Template): BaseTemplate {
   return template.replace('-js', '') as BaseTemplate;
 }
+
+export function shouldEnableReactCompiler(
+  options: Pick<ProjectOptions, 'projectType' | 'template'>
+): boolean {
+  const template = options.template ?? 'vanilla';
+  return getBaseTemplate(template) === 'react' && (options.projectType ?? 'app') === 'app';
+}

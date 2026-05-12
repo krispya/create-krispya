@@ -49,6 +49,7 @@ import {
   type PlanBuilder,
   getBaseTemplate,
   getLanguageFromTemplate,
+  shouldEnableReactCompiler,
 } from '../types.js';
 import { isProjectPlanInput, projectPlanInputToOptions, resolveProjectPlanInput } from './input.js';
 import { resolveProjectFacts } from './resolve.js';
@@ -74,6 +75,7 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
   const isReact = baseTemplate === 'react';
   const isR3f = baseTemplate === 'r3f';
   const isLibrary = clonedOptions.projectType === 'library';
+  const useReactCompiler = shouldEnableReactCompiler(clonedOptions);
   const libraryBundler = planInput.libraryBundler.tool;
   const ide = planInput.ide.tool;
 
@@ -101,6 +103,11 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
       assignResolvedPackageVersion(dependencies, versions, 'react');
       assignResolvedPackageVersion(dependencies, versions, 'react-dom');
       assignResolvedPackageVersion(devDependencies, versions, '@vitejs/plugin-react');
+      if (useReactCompiler) {
+        assignResolvedPackageVersion(devDependencies, versions, '@babel/core');
+        assignResolvedPackageVersion(devDependencies, versions, '@rolldown/plugin-babel');
+        assignResolvedPackageVersion(devDependencies, versions, 'babel-plugin-react-compiler');
+      }
     }
   }
 
@@ -124,6 +131,9 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
     });
     Object.assign(files, tsResult.files);
     Object.assign(devDependencies, tsResult.devDependencies);
+    if (useReactCompiler) {
+      assignResolvedPackageVersion(devDependencies, versions, '@types/babel__core');
+    }
   }
 
   const codeSnippets: Partial<Record<CodeInjectionLocation, Array<string>>> = {};
@@ -132,7 +142,14 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
 
   // Setup vite config imports based on template (only for apps)
   if (!isLibrary && (isReact || isR3f)) {
-    codeSnippets['vite-config-import'] = ["import react from '@vitejs/plugin-react';"];
+    codeSnippets['vite-config-import'] = [
+      useReactCompiler
+        ? "import react, { reactCompilerPreset } from '@vitejs/plugin-react';"
+        : "import react from '@vitejs/plugin-react';",
+    ];
+    if (useReactCompiler) {
+      codeSnippets['vite-config-import'].push("import babel from '@rolldown/plugin-babel';");
+    }
   }
 
   // Setup R3F-specific imports (only for apps)
@@ -149,7 +166,9 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
   };
 
   if (!isLibrary && (isReact || isR3f)) {
-    viteConfig.plugins = ['$raw:react()'];
+    viteConfig.plugins = useReactCompiler
+      ? ['$raw:react()', '$raw:babel({ presets: [reactCompilerPreset()] })']
+      : ['$raw:react()'];
   }
 
   if (!isLibrary && isR3f) {
@@ -247,7 +266,7 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
   // Testing - only if enabled (libraries default to vitest, apps default to none)
   const testing = planInput.testing.tool;
   if (testing === 'vitest') {
-    planVitest(builder, planInput.testing);
+    planVitest(builder, planInput.testing as Parameters<typeof planVitest>[1]);
   }
 
   // Linter and formatter adapters
@@ -256,24 +275,29 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
 
   // Generate linter adapters
   if (planInput.linter.tool === 'eslint') {
-    planEslint(builder, planInput.linter);
+    planEslint(builder, planInput.linter as Parameters<typeof planEslint>[1]);
   } else if (planInput.linter.tool === 'oxlint') {
-    planOxlint(builder, planInput.linter);
+    planOxlint(builder, planInput.linter as Parameters<typeof planOxlint>[1]);
   } else if (planInput.linter.tool === 'biome') {
     planBiome(builder, {
-      linter: planInput.linter,
-      formatter: planInput.formatter.tool === 'biome' ? planInput.formatter : undefined,
+      linter: planInput.linter as NonNullable<Parameters<typeof planBiome>[1]>['linter'],
+      formatter:
+        planInput.formatter.tool === 'biome'
+          ? (planInput.formatter as NonNullable<Parameters<typeof planBiome>[1]>['formatter'])
+          : undefined,
     });
   }
 
   // Generate formatter adapters (skip biome if already handled above)
   if (planInput.formatter.tool === 'prettier') {
-    planPrettier(builder, planInput.formatter);
+    planPrettier(builder, planInput.formatter as Parameters<typeof planPrettier>[1]);
   } else if (planInput.formatter.tool === 'oxfmt') {
-    planOxfmt(builder, planInput.formatter);
+    planOxfmt(builder, planInput.formatter as Parameters<typeof planOxfmt>[1]);
   } else if (planInput.formatter.tool === 'biome' && planInput.linter.tool !== 'biome') {
     // Only generate biome for formatting if it wasn't already generated for linting
-    planBiome(builder, { formatter: planInput.formatter });
+    planBiome(builder, {
+      formatter: planInput.formatter as NonNullable<Parameters<typeof planBiome>[1]>['formatter'],
+    });
   }
 
   for (const { code, location } of clonedOptions.injections ?? []) {

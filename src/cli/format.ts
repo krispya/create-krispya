@@ -1,7 +1,7 @@
 import color from 'chalk';
 import { getEngineName, getPackageManagerName } from '../package-versions.js';
 import type { EngineSpec, ProjectOptions, PackageManagerName, PackageManagerSpec } from '../types.js';
-import { getBaseTemplate, getLanguageFromTemplate } from '../types.js';
+import { getBaseTemplate, getLanguageFromTemplate, shouldEnableReactCompiler } from '../types.js';
 
 export type MonorepoConfigOptions = {
   name: string;
@@ -49,6 +49,7 @@ export function formatConfigSummary(options: ProjectOptions, inherited?: Inherit
   const baseTemplate = options.template ? getBaseTemplate(options.template) : 'vanilla';
   if (baseTemplate === 'react') {
     lines.push(formatRow('Framework', 'React'));
+    lines.push(formatRow('↳ React compiler', shouldEnableReactCompiler(options) ? 'yes' : 'no'));
   } else if (baseTemplate === 'r3f') {
     lines.push(formatRow('Framework', 'React Three Fiber'));
   }

@@ -43,11 +43,12 @@ describe('source file generation', () => {
     expect(readTextFile(files['vite.config.ts'])).toBe(
       [
         "import { defineConfig } from 'vite';",
-        "import react from '@vitejs/plugin-react';",
+        "import react, { reactCompilerPreset } from '@vitejs/plugin-react';",
+        "import babel from '@rolldown/plugin-babel';",
         '',
         'export default defineConfig({',
         `${formatterIndent}base: './',`,
-        `${formatterIndent}plugins: [react()],`,
+        `${formatterIndent}plugins: [react(), babel({ presets: [reactCompilerPreset()] })],`,
         '});',
         '',
       ].join('\n')
