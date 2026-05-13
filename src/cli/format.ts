@@ -48,8 +48,9 @@ export function formatConfigSummary(options: ProjectOptions, inherited?: Inherit
   const projectType = options.projectType ?? 'app';
   const baseTemplate = options.template ? getBaseTemplate(options.template) : 'vanilla';
   if (baseTemplate === 'react') {
-    lines.push(formatRow('Framework', 'React'));
-    lines.push(formatRow('↳ React compiler', shouldEnableReactCompiler(options) ? 'yes' : 'no'));
+    lines.push(
+      formatRow('Framework', shouldEnableReactCompiler(options) ? 'React + compiler' : 'React')
+    );
   } else if (baseTemplate === 'r3f') {
     lines.push(formatRow('Framework', 'React Three Fiber'));
   }

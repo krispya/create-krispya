@@ -320,7 +320,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
 
       const changes = await getPackageJsonScriptUpdates(tempDir, {
         name: 'my-app',
-        linter: 'eslint',
+        linter: 'oxlint',
         formatter: 'prettier',
         packageManager: 'pnpm',
         isMonorepo: false,
@@ -338,6 +338,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
           '@rolldown/plugin-babel',
           '@types/babel__core',
           'babel-plugin-react-compiler',
+          'eslint-plugin-react-hooks',
         ])
       );
     } finally {
@@ -379,6 +380,53 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
       const oxlintConfig = JSON.parse(changes[0]!.newContent);
       expect(oxlintConfig.options).toEqual({ typeAware: true });
       expect(oxlintConfig.ignorePatterns).toEqual(['dist']);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('offers React Compiler Oxlint JS plugin rules during single-package React updates', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-react-oxlint-config-'));
+    try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(
+        join(tempDir, '.config/oxlint.json'),
+        JSON.stringify(
+          {
+            $schema: '../node_modules/oxlint/configuration_schema.json',
+            plugins: ['unicorn', 'typescript', 'oxc', 'react'],
+            rules: {
+              'no-useless-escape': 'off',
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      const changes = await getOxlintConfigReplacementUpdates(tempDir, {
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+        viteTemplate: 'react',
+      });
+
+      expect(changes).toHaveLength(1);
+      expect(changes[0]?.status).toBe('modified');
+
+      const oxlintConfig = JSON.parse(changes[0]!.newContent);
+      expect(oxlintConfig.jsPlugins).toEqual([
+        {
+          name: 'react-hooks-js',
+          specifier: 'eslint-plugin-react-hooks',
+        },
+      ]);
+      expect(oxlintConfig.rules['react-hooks-js/set-state-in-render']).toBe('error');
+      expect(oxlintConfig.rules['react-hooks-js/rules-of-hooks']).toBeUndefined();
+      expect(oxlintConfig.rules['react-hooks-js/exhaustive-deps']).toBeUndefined();
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

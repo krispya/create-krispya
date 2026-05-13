@@ -48,7 +48,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
   '@vitejs/plugin-react': { fallbackVersion: '6.0.1' },
   '@viverse/cli': { fallbackVersion: '0.9.5-beta.8' },
   eslint: { fallbackVersion: '9.17.0' },
-  'eslint-plugin-react-hooks': { fallbackVersion: '5.1.0' },
+  'eslint-plugin-react-hooks': { fallbackVersion: '7.1.1' },
   'babel-plugin-react-compiler': { fallbackVersion: '1.0.0' },
   jsdom: { fallbackVersion: '26.0.0' },
   koota: { fallbackVersion: '0.4.0' },
@@ -413,6 +413,9 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
       addPackageName(packageNames, explicitVersions, 'oxlint');
       if (isTypescript) {
         addPackageName(packageNames, explicitVersions, 'oxlint-tsgolint');
+      }
+      if (useReactCompiler) {
+        addPackageName(packageNames, explicitVersions, 'eslint-plugin-react-hooks');
       }
     }
   } else if (linter === 'biome') {

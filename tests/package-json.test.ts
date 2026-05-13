@@ -235,8 +235,47 @@ describe('renderPackageJson', () => {
         '@types/babel__core',
         '@vitejs/plugin-react',
         'babel-plugin-react-compiler',
+        'eslint-plugin-react-hooks',
       ])
     );
+  });
+
+  it('adds React Compiler JS plugin rules to Oxlint React apps', async () => {
+    const { files } = await planProject({
+      name: 'my-app',
+      template: 'react',
+      linter: 'oxlint',
+      packageManager: { name: 'pnpm', version: '10.0.0' },
+      engine: { name: 'node', version: '25.1.0' },
+    });
+
+    const oxlintConfig = readPackageJsonContent(files['.config/oxlint.json']);
+    expect(oxlintConfig.plugins).toContain('react');
+    expect(oxlintConfig.jsPlugins).toEqual([
+      {
+        name: 'react-hooks-js',
+        specifier: 'eslint-plugin-react-hooks',
+      },
+    ]);
+    expect(oxlintConfig.rules['react-hooks-js/set-state-in-render']).toBe('error');
+    expect(oxlintConfig.rules['react-hooks-js/rules-of-hooks']).toBeUndefined();
+    expect(oxlintConfig.rules['react-hooks-js/exhaustive-deps']).toBeUndefined();
+  });
+
+  it('does not add React Compiler JS plugin rules to Oxlint React libraries', async () => {
+    const { files } = await planProject({
+      name: 'my-lib',
+      projectType: 'library',
+      template: 'react',
+      linter: 'oxlint',
+      packageManager: { name: 'pnpm', version: '10.0.0' },
+      engine: { name: 'node', version: '25.1.0' },
+    });
+
+    const oxlintConfig = readPackageJsonContent(files['.config/oxlint.json']);
+    expect(oxlintConfig.plugins).toContain('react');
+    expect(oxlintConfig.jsPlugins).toBeUndefined();
+    expect(oxlintConfig.rules['react-hooks-js/set-state-in-render']).toBeUndefined();
   });
 
   it('omits Babel core types for JavaScript React apps with React Compiler', async () => {

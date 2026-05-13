@@ -718,6 +718,9 @@ async function getExpectedPackageDevDependencies(
     addMissingDevDependency(pkg, nextDevDependencies, '@babel/core');
     addMissingDevDependency(pkg, nextDevDependencies, '@rolldown/plugin-babel');
     addMissingDevDependency(pkg, nextDevDependencies, 'babel-plugin-react-compiler');
+    if (config.linter === 'oxlint') {
+      addMissingDevDependency(pkg, nextDevDependencies, 'eslint-plugin-react-hooks');
+    }
 
     if (await detectTypeScriptPackage(root, pkg)) {
       addMissingDevDependency(pkg, nextDevDependencies, '@types/babel__core');
@@ -796,6 +799,8 @@ function planSinglePackageOxlintConfig(config: WorkspaceConfig): FileChange | un
     schemaPath: isStealth
       ? '../node_modules/oxlint/configuration_schema.json'
       : './node_modules/oxlint/configuration_schema.json',
+    react: config.viteTemplate === 'react' || config.viteTemplate === 'r3f',
+    reactCompiler: config.viteTemplate === 'react',
     typescript: true,
   });
 

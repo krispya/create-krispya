@@ -3,6 +3,7 @@ import { packageJsonScripts } from '../renderers/package-json-scripts.js';
 import {
   getBaseTemplate,
   getLanguageFromTemplate,
+  shouldEnableReactCompiler,
   type LinterMetaConfig,
   type PlanBuilder,
   type ToolConfig,
@@ -20,6 +21,7 @@ export function planOxlint(builder: PlanBuilder, options: PlanOxlintOptions | un
   const baseTemplate = getBaseTemplate(template);
   const isTypescript = getLanguageFromTemplate(template) === 'typescript';
   const isReact = baseTemplate === 'react' || baseTemplate === 'r3f';
+  const useReactCompiler = shouldEnableReactCompiler(builder.options);
 
   // Check if we're in a monorepo context (workspaceRoot is set)
   const isMonorepo = builder.options.workspaceRoot != null;
@@ -39,6 +41,9 @@ export function planOxlint(builder: PlanBuilder, options: PlanOxlintOptions | un
     if (isTypescript) {
       builder.addDevDependency('oxlint-tsgolint');
     }
+    if (useReactCompiler) {
+      builder.addDevDependency('eslint-plugin-react-hooks');
+    }
 
     const isStealth = builder.isStealthConfig();
 
@@ -47,6 +52,7 @@ export function planOxlint(builder: PlanBuilder, options: PlanOxlintOptions | un
         ? '../node_modules/oxlint/configuration_schema.json'
         : './node_modules/oxlint/configuration_schema.json',
       react: isReact,
+      reactCompiler: useReactCompiler,
       typescript: isTypescript,
       config: options.config,
     });
