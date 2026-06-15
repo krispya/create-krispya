@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
+import { spawn } from 'node:child_process';
 
 import {
   applyUpdates,
@@ -20,6 +21,11 @@ import type { CliOptions } from '../cli.js';
 import { detectMonorepoRoot, detectPackageRoot } from './workspace-utils.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
+type PackageUpdateCommand = {
+  command: string;
+  args: string[];
+  displayCommand: string;
+};
 
 const UPDATE_CATEGORY_ORDER = [
   'root-config',
@@ -106,6 +112,90 @@ function orderUpdateCategories(categories: CategoryUpdate[]): CategoryUpdate[] {
   return [...categories].sort(
     (left, right) => getCategoryOrder(left.category) - getCategoryOrder(right.category)
   );
+}
+
+export function getPackageUpdateCommand(packageManager: string): PackageUpdateCommand | undefined {
+  const packageManagerName = packageManager.split('@')[0] ?? packageManager;
+  if (packageManagerName === 'pnpm') {
+    return {
+      command: 'pnpm',
+      args: ['update'],
+      displayCommand: 'pnpm update',
+    };
+  }
+
+  if (packageManagerName === 'npm') {
+    return {
+      command: 'npm',
+      args: ['update'],
+      displayCommand: 'npm update',
+    };
+  }
+
+  return undefined;
+}
+
+async function runPackageUpdate(
+  projectRoot: string,
+  updateCommand: PackageUpdateCommand
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(updateCommand.command, updateCommand.args, {
+      cwd: projectRoot,
+      shell: process.platform === 'win32',
+      stdio: 'inherit',
+    });
+
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(`${updateCommand.displayCommand} exited with code ${code ?? 'unknown'}`));
+    });
+  });
+}
+
+async function promptForPackageUpdate(
+  projectRoot: string,
+  config: WorkspaceConfig,
+  options: CliOptions
+): Promise<void> {
+  const updateCommand = getPackageUpdateCommand(config.packageManager);
+  if (!updateCommand) {
+    console.log(color.dim(`  Package updates are not supported for ${config.packageManager}`));
+    return;
+  }
+
+  const shouldUpdatePackages =
+    options.yes ||
+    (await p.confirm({
+      message: 'Update packages?',
+      initialValue: true,
+    }));
+
+  if (p.isCancel(shouldUpdatePackages)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  if (!shouldUpdatePackages) {
+    console.log(color.dim('  Skipped package updates'));
+    return;
+  }
+
+  console.log();
+  console.log(color.cyan(`Running ${updateCommand.displayCommand}...`));
+  try {
+    await runPackageUpdate(projectRoot, updateCommand);
+    console.log(color.green('✓') + ' Packages updated');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(color.red('✗') + ` Package update failed: ${message}`);
+    process.exit(1);
+  }
 }
 
 async function collectUpdateCategories(
@@ -203,12 +293,9 @@ async function processUpdateCategory(
     if (addedCount > 0) parts.push(`added ${addedCount}`);
     if (updatedFilesCount > 0) parts.push(`updated ${updatedFilesCount}`);
     console.log(color.green('✓') + ` ${category.label}: ${parts.join(', ')}`);
-    console.log();
     return 'updated';
   }
 
-  console.log(color.dim(`  Skipped ${category.label}`));
-  console.log();
   return 'skipped';
 }
 
@@ -290,6 +377,8 @@ export async function handleUpdateCommand(
       console.log(color.dim(`  Skipped ${skippedCount}`));
     }
   }
+
+  await promptForPackageUpdate(projectRoot, config, options);
 
   process.exit(0);
 }
