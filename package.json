@@ -55,9 +55,9 @@
     "unbuild": "^3.6.1",
     "vitest": "^4.1.9"
   },
-  "packageManager": "pnpm@10.30.3",
+  "packageManager": "pnpm@11.9.0",
   "engines": {
-    "pnpm": ">=10.0.0",
+    "pnpm": ">=11.0.0",
     "node": ">=26.0.0"
   }
 }
