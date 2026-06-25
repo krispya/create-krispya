@@ -1,13 +1,14 @@
 import { formatNodeTypesVersion } from '../workflow/resolve/package-versions.js';
 import { getEngineName, getEngineSpec } from '../workflow/resolve/engine.js';
+import { getSemverMajorString } from '../utils/index.js';
 import {
   formatPackageManager,
   getPackageManagerProfile,
   getPackageManagerSpec,
+  renderPnpmWorkspaceConfig,
 } from '../package-managers/index.js';
 import type { BaseTemplate, VirtualFile, ProjectOptions } from '../types.js';
 import { mergePackageJsonScripts, resolveDefaultPackageJsonScripts } from './package-json-scripts.js';
-import { renderPnpmWorkspaceConfig } from './pnpm-workspace.js';
 
 const DEFAULT_LIBRARY_VERSION = '0.1.0';
 
@@ -115,13 +116,13 @@ export function renderPackageJson(params: PackageJsonParams): PackageJsonResult 
     const engines: Record<string, string> = {};
 
     if (packageManager.version != null) {
-      const majorVersion = packageManager.version.split('.')[0];
+      const majorVersion = getSemverMajorString(packageManager.version);
       engines[packageManager.name] = `>=${majorVersion}.0.0`;
       packageJson.packageManager = formatPackageManager(packageManager);
     }
 
     if (engine.version != null) {
-      const majorVersion = engine.version.split('.')[0];
+      const majorVersion = getSemverMajorString(engine.version);
       engines[engine.name] = `>=${majorVersion}.0.0`;
     }
 

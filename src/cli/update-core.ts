@@ -36,8 +36,11 @@ import { toPrettierIgnoreContent } from '../tools/formatter-config.js';
 import { renderOxlintConfig } from '../renderers/oxlint-config.js';
 import { renderViteConfig } from '../renderers/vite-config.js';
 import { detectTooling } from '../utils/index.js';
-import { getPackageManagerProfile, parsePackageManagerSpec } from '../package-managers/index.js';
-import { renderPnpmWorkspaceConfig } from '../renderers/pnpm-workspace.js';
+import {
+  getPackageManagerProfile,
+  parsePackageManagerSpec,
+  renderPnpmWorkspaceConfig,
+} from '../package-managers/index.js';
 
 // =============================================================================
 // Types

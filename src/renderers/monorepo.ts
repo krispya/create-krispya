@@ -14,7 +14,12 @@ import {
   formatNodeTypesVersion,
   getResolvedPackageVersion,
 } from '../workflow/resolve/package-versions.js';
-import { formatPackageManager, getPackageManagerProfile } from '../package-managers/index.js';
+import {
+  formatPackageManager,
+  getPackageManagerProfile,
+  renderPnpmWorkspaceConfig,
+} from '../package-managers/index.js';
+import { getSemverMajorString } from '../utils/index.js';
 import {
   renderTypescriptConfigPackage,
   renderOxlintConfigPackage,
@@ -25,7 +30,6 @@ import {
 import { renderEditorConfig } from './editorconfig.js';
 import { renderGitignore } from './gitignore.js';
 import { packageJsonScripts } from './package-json-scripts.js';
-import { renderPnpmWorkspaceConfig } from './pnpm-workspace.js';
 import { renderVscodeFiles as renderSharedVscodeFiles } from './vscode.js';
 
 /**
@@ -116,13 +120,13 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
   const engines: Record<string, string> = {};
 
   if (isPnpm && packageManager.version) {
-    const majorVersion = packageManager.version.split('.')[0];
+    const majorVersion = getSemverMajorString(packageManager.version);
     engines.pnpm = `>=${majorVersion}.0.0`;
     rootPackageJson.packageManager = formatPackageManager(packageManager);
   }
 
   if (engine?.version) {
-    const majorVersion = engine.version.split('.')[0];
+    const majorVersion = getSemverMajorString(engine.version);
     engines[engine.name] = `>=${majorVersion}.0.0`;
   }
 

@@ -11,6 +11,16 @@ export async function getLatestNpmVersion(packageName: string, fallback: string)
   }
 }
 
+export function getSemverMajor(version?: string): number | undefined {
+  if (version == null) return undefined;
+  const major = Number.parseInt(version, 10);
+  return Number.isFinite(major) ? major : undefined;
+}
+
+export function getSemverMajorString(version: string): string {
+  return String(getSemverMajor(version) ?? version.split('.')[0]);
+}
+
 function compareNumericSemver(a: string, b: string): number {
   const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
   const bParts = b.split('.').map((part) => Number.parseInt(part, 10) || 0);
@@ -69,9 +79,9 @@ export async function getLatestNpmMajorVersionAtOrBelow(
     const response = await fetch(`https://registry.npmjs.org/${packageName}`);
     const data = (await response.json()) as { versions?: Record<string, unknown> };
     const versions = Object.keys(data.versions ?? {});
-    const requestedMajor = Number.parseInt(majorVersion, 10);
+    const requestedMajor = getSemverMajor(majorVersion);
 
-    if (Number.isFinite(requestedMajor)) {
+    if (requestedMajor !== undefined) {
       for (let major = requestedMajor; major >= 0; major -= 1) {
         const latestMatchingVersion = getLatestMatchingMajorVersion(versions, String(major));
         if (latestMatchingVersion != null) {

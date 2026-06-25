@@ -11,6 +11,7 @@ import {
   getLatestNodeVersion,
   getLatestNpmMajorVersionAtOrBelow,
   getLatestNpmVersion,
+  getSemverMajorString,
 } from '../../utils/index.js';
 import { getPackageManagerName } from '../../package-managers/index.js';
 import { getEngineName, getEngineSpec } from './engine.js';
@@ -134,7 +135,7 @@ async function resolveNodeTypesVersion(
   }
 
   const nodeVersion = engineSpec.version ?? (await getLatestNodeVersion());
-  const majorVersion = nodeVersion.split('.')[0];
+  const majorVersion = getSemverMajorString(nodeVersion);
   return getLatestNpmMajorVersionAtOrBelow(
     '@types/node',
     majorVersion,
