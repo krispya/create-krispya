@@ -6,11 +6,7 @@ import type {
   ProjectOptions,
   VersionRangePrefix,
 } from '../../types.js';
-import {
-  getBaseTemplate,
-  getLanguageFromTemplate,
-  shouldEnableReactCompiler,
-} from '../../types.js';
+import { getBaseTemplate, getLanguageFromTemplate, shouldEnableReactCompiler } from '../../types.js';
 import {
   getLatestNodeVersion,
   getLatestNpmMajorVersionAtOrBelow,

@@ -1,10 +1,4 @@
-export {
-  formatEngine,
-  getEngineName,
-  getEngineSpec,
-  parseEngine,
-  resolveEngine,
-} from './engine.js';
+export { formatEngine, getEngineName, getEngineSpec, parseEngine, resolveEngine } from './engine.js';
 export {
   assignResolvedPackageVersion,
   formatNodeTypesVersion,
