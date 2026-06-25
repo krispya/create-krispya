@@ -15,8 +15,8 @@ import {
 import {
   getResolvedPackageVersion,
   resolveMonorepoRootPackageVersions,
-} from '../package-versions.js';
-import { validateWorkspace } from '../validate.js';
+} from '../workflow/resolve/package-versions.js';
+import { validateWorkspace } from '../validation/index.js';
 import type { CliOptions } from '../cli.js';
 import { promptForAiAgentPlatforms } from './ai.js';
 import {

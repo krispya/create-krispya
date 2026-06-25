@@ -6,13 +6,17 @@ export {
   resolveProjectPlanInput,
   resolveWorkspacePlanInput,
   workspacePlanInputToMonorepoParams,
-} from './planner/index.js';
+} from './workflow/plan/index.js';
 export type {
   MetaConfig,
   PartialPlan,
   ProjectContext,
   ProjectPlan,
   ToolSelections,
-} from './planner/index.js';
+} from './workflow/plan/index.js';
 export * from './types.js';
 export * from './utils/index.js';
+export * from './package-managers/index.js';
+export * from './workflow/index.js';
+export * from './config/index.js';
+export * from './validation/index.js';

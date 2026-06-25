@@ -1,4 +1,4 @@
-import { getPackageManagerName } from '../package-versions.js';
+import { getPackageManagerName } from '../package-managers/index.js';
 import type { PlanViverseOptions, PlanBuilder } from '../types.js';
 
 export function planViverse(builder: PlanBuilder, options: PlanViverseOptions | undefined) {

@@ -1,4 +1,4 @@
-import { getPackageManagerName } from '../package-versions.js';
+import { getPackageManagerName } from '../package-managers/index.js';
 import type { PlanGithubPagesOptions, PlanBuilder } from '../types.js';
 
 export function planGithubPages(builder: PlanBuilder, options: PlanGithubPagesOptions | undefined) {

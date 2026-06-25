@@ -1,7 +1,7 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
 
-import { getAiPlatforms } from '../config.js';
+import { getAiPlatforms } from '../config/index.js';
 import { AI_PLATFORM_HINTS, AI_PLATFORM_LABELS, ALL_AI_PLATFORMS } from '../renderers/ai-files.js';
 import type { AiPlatform } from '../types.js';
 

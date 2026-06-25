@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { cwd } from 'node:process';
 import { fetch } from 'undici';
 
-import type { Ide, PackageManagerName } from './types.js';
+import type { Ide } from './types.js';
 
 import { getDefaultProjectName, promptForOptions, type CliPresets } from './cli/index.js';
 import { promptForAiAgentPlatforms } from './cli/ai.js';
@@ -22,7 +22,7 @@ import {
   handleWorkspaceCommand,
 } from './cli/workspace.js';
 import { detectMonorepoRoot, type InheritedWorkspaceSettings } from './cli/workspace-utils.js';
-import { clearConfig, getConfigPath } from './config.js';
+import { clearConfig, getConfigPath } from './config/index.js';
 import {
   getBaseTemplate,
   planProject,
@@ -35,7 +35,8 @@ import {
   type ProjectType,
   type Template,
 } from './index.js';
-import { getPackageManagerName } from './package-versions.js';
+import { getPackageManagerName } from './package-managers/index.js';
+import { parsePackageManagerSpec } from './package-managers/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -63,7 +64,7 @@ export interface CliOptions {
   pnpmManageVersions?: boolean;
   triplex?: boolean;
   viverse?: boolean;
-  packageManager?: PackageManagerName;
+  packageManager?: string;
   ide?: Ide;
   nodeVersion?: string;
   clearConfig?: boolean;
@@ -290,7 +291,7 @@ async function main() {
     .option('--koota', 'add koota (r3f only)')
     .option('--triplex', 'set up triplex development environment (r3f only)')
     .option('--viverse', 'set up viverse deployment (r3f only)')
-    .option('--package-manager <manager>', 'specify package manager (e.g. npm, yarn, pnpm)')
+    .option('--package-manager <manager>', 'specify package manager (e.g. npm, yarn, pnpm@11)')
     .option('--ide <ide>', 'IDE files: vscode or none (default: vscode)')
     .option(
       '--pnpm-manage-versions',
@@ -333,6 +334,13 @@ async function main() {
 
       if (options.ide && !['vscode', 'none'].includes(options.ide)) {
         console.error(color.red('Error:') + ' --ide must be "vscode" or "none"');
+        process.exit(1);
+      }
+
+      const packageManagerSpec = parsePackageManagerSpec(options.packageManager);
+      if (options.packageManager && packageManagerSpec == null) {
+        console.error(color.red('Error:') + ' --package-manager must be npm, yarn, or pnpm');
+        console.log(color.dim('  Version specs are allowed, e.g. pnpm@10 or pnpm@11'));
         process.exit(1);
       }
 
@@ -441,7 +449,7 @@ async function main() {
             viverse: options.viverse ? {} : undefined,
             triplex: options.triplex ? {} : undefined,
           }),
-          packageManager: options.packageManager ? { name: options.packageManager } : undefined,
+          packageManager: packageManagerSpec,
           pnpmManageVersions: options.pnpmManageVersions,
           engine: { name: 'node', version: options.nodeVersion ?? 'latest' },
         };
@@ -454,7 +462,7 @@ async function main() {
               bundler: options.bundler,
               linter: options.linter,
               formatter: options.formatter,
-              packageManager: options.packageManager,
+              packageManager: packageManagerSpec,
               ide: options.ide,
               engine: options.nodeVersion
                 ? { name: 'node', version: options.nodeVersion }

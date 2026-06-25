@@ -1,24 +1,23 @@
+import type {
+  EngineSpec,
+  Formatter,
+  Linter,
+  PackageVersions,
+  ProjectOptions,
+  VersionRangePrefix,
+} from '../../types.js';
 import {
-  type EngineSpec,
-  type Formatter,
-  type ProjectOptions,
   getBaseTemplate,
   getLanguageFromTemplate,
   shouldEnableReactCompiler,
-  type Linter,
-  type PackageManagerName,
-  type PackageManagerSpec,
-  type PackageVersions,
-  type VersionRangePrefix,
-} from './types.js';
+} from '../../types.js';
 import {
   getLatestNodeVersion,
   getLatestNpmMajorVersionAtOrBelow,
-  getLatestNpmCliVersion,
   getLatestNpmVersion,
-  getLatestPnpmVersion,
-  getLatestYarnVersion,
-} from './utils/index.js';
+} from '../../utils/index.js';
+import { getPackageManagerName } from '../../package-managers/index.js';
+import { getEngineName, getEngineSpec } from './engine.js';
 
 type PackageVersionDefinition = {
   fallbackVersion: string;
@@ -114,89 +113,6 @@ export function assignResolvedPackageVersion(
   prefix?: VersionRangePrefix
 ): void {
   target[packageName] = formatResolvedPackageVersion(versions, packageName, prefix);
-}
-
-export function getPackageManagerSpec(packageManager?: PackageManagerSpec): PackageManagerSpec {
-  return packageManager ?? { name: 'pnpm' };
-}
-
-export function getPackageManagerName(packageManager?: PackageManagerSpec): PackageManagerName {
-  return getPackageManagerSpec(packageManager).name;
-}
-
-export function formatPackageManager(packageManager?: PackageManagerSpec): string {
-  const spec = getPackageManagerSpec(packageManager);
-  return spec.version ? `${spec.name}@${spec.version}` : spec.name;
-}
-
-export function parsePackageManager(packageManager?: string): PackageManagerSpec | undefined {
-  if (packageManager == null || packageManager.length === 0) {
-    return undefined;
-  }
-
-  const atIndex = packageManager.indexOf('@');
-  if (atIndex === -1) {
-    return { name: packageManager as PackageManagerName };
-  }
-
-  return {
-    name: packageManager.slice(0, atIndex) as PackageManagerName,
-    version: packageManager.slice(atIndex + 1),
-  };
-}
-
-export function getEngineSpec(engine?: EngineSpec): EngineSpec {
-  return engine ?? { name: 'node' };
-}
-
-export function getEngineName(engine?: EngineSpec): string {
-  return getEngineSpec(engine).name;
-}
-
-export function formatEngine(engine?: EngineSpec): string {
-  const spec = getEngineSpec(engine);
-  return spec.version ? `${spec.name}@${spec.version}` : spec.name;
-}
-
-export function parseEngine(engines?: Record<string, string>): EngineSpec | undefined {
-  if (engines == null) {
-    return undefined;
-  }
-
-  const [name, range] =
-    Object.entries(engines).find(
-      ([engineName]) => engineName !== 'npm' && engineName !== 'pnpm' && engineName !== 'yarn'
-    ) ?? [];
-
-  if (name == null) {
-    return undefined;
-  }
-
-  const version = range?.match(/(\d+(?:\.\d+(?:\.\d+)?)?)/)?.[1];
-  return { name, version };
-}
-
-export async function resolvePackageManager(options: ProjectOptions) {
-  const packageManager = getPackageManagerSpec(options.packageManager);
-  if (packageManager.version == null) {
-    if (packageManager.name === 'pnpm') {
-      packageManager.version = await getLatestPnpmVersion();
-    } else if (packageManager.name === 'yarn') {
-      packageManager.version = await getLatestYarnVersion();
-    } else if (packageManager.name === 'npm') {
-      packageManager.version = await getLatestNpmCliVersion();
-    }
-  }
-
-  return packageManager;
-}
-
-export async function resolveEngine(options: ProjectOptions) {
-  const engine = getEngineSpec(options.engine);
-  if ((engine.version == null || engine.version === 'latest') && engine.name === 'node') {
-    engine.version = await getLatestNodeVersion();
-  }
-  return engine;
 }
 
 export function formatNodeTypesVersion(versions: PackageVersions = {}, _engine?: EngineSpec): string {

@@ -16,7 +16,7 @@ import {
   type UpdateCategory,
   type WorkspaceConfig,
 } from './update-core.js';
-import { validateWorkspace } from '../validate.js';
+import { validateWorkspace } from '../validation/index.js';
 import type { CliOptions } from '../cli.js';
 import { detectMonorepoRoot, detectPackageRoot } from './workspace-utils.js';
 
@@ -228,7 +228,7 @@ async function collectUpdateCategories(
   }
 
   if (isMonorepo) {
-    const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot);
+    const workspaceConfigChanges = await getWorkspaceConfigUpdates(projectRoot, config);
     if (workspaceConfigChanges.length > 0) {
       allCategories.push({
         category: 'workspace-config',

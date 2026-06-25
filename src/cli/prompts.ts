@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
-import { getConfigStrategy } from '../config.js';
+import { getConfigStrategy } from '../config/index.js';
 import type {
   EngineSpec,
   ProjectOptions,
@@ -12,7 +12,6 @@ import type {
   Template,
 } from '../types.js';
 import { getBaseTemplate } from '../types.js';
-import { getPackageManagerName } from '../package-versions.js';
 import { generateRandomName } from '../utils/index.js';
 import { formatConfigSummary, formatMonorepoConfigSummary } from './format.js';
 
@@ -183,7 +182,7 @@ export async function promptForCustomization(
   let engine: EngineSpec = inheritedSettings?.engine ??
     presets?.engine ?? { name: 'node', version: 'latest' };
   let finalPackageManager: PackageManagerName =
-    inheritedSettings?.packageManager?.name ?? presets?.packageManager ?? 'pnpm';
+    inheritedSettings?.packageManager?.name ?? presets?.packageManager?.name ?? 'pnpm';
   let pnpmManageVersions: boolean =
     inheritedSettings?.pnpmManageVersions ?? presets?.pnpmManageVersions ?? true;
 
@@ -193,7 +192,7 @@ export async function promptForCustomization(
       placeholder: presets?.engine?.version ?? 'latest',
       defaultValue: presets?.engine?.version ?? 'latest',
       validate: (value) => {
-        if (!value.length) return 'Required';
+        if (!value?.length) return 'Required';
         if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
           return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
         }
@@ -215,7 +214,7 @@ export async function promptForCustomization(
         { value: 'npm', label: 'npm' },
         { value: 'yarn', label: 'yarn' },
       ],
-      initialValue: presets?.packageManager ?? 'pnpm',
+      initialValue: presets?.packageManager?.name ?? 'pnpm',
     });
 
     if (p.isCancel(packageManager)) {
@@ -349,7 +348,10 @@ export async function promptForCustomization(
     projectType,
     libraryBundler: projectType === 'library' ? libraryBundler : undefined,
     engine,
-    packageManager: { name: finalPackageManager },
+    packageManager:
+      presets?.packageManager?.name === finalPackageManager
+        ? presets.packageManager
+        : { name: finalPackageManager },
     pnpmManageVersions,
     linter,
     formatter,
@@ -414,7 +416,7 @@ async function promptForMonorepoCustomization(
     placeholder: presets?.engine?.version ?? 'latest',
     defaultValue: presets?.engine?.version ?? 'latest',
     validate: (value) => {
-      if (!value.length) return 'Required';
+      if (!value?.length) return 'Required';
       if (value !== 'latest' && !/^\d+(\.\d+(\.\d+)?)?$/.test(value)) {
         return 'Must be "latest" or a valid semver (e.g., "22" or "22.13.0")';
       }
@@ -517,7 +519,7 @@ async function promptForMonorepo(
     formatMonorepoConfigSummary({
       name: defaultOptions.name,
       engine: defaultOptions.engine ?? { name: 'node', version: 'latest' },
-      packageManager: getPackageManagerName(defaultOptions.packageManager),
+      packageManager: defaultOptions.packageManager ?? { name: 'pnpm' },
       pnpmManageVersions: defaultOptions.pnpmManageVersions,
       linter: defaultOptions.linter ?? 'oxlint',
       formatter: defaultOptions.formatter ?? 'prettier',
@@ -549,7 +551,7 @@ export async function promptForOptions(
       placeholder: generateRandomName(),
       defaultValue: generateRandomName(),
       validate: (value) => {
-        if (!value.length) return 'Project name is required';
+        if (!value?.length) return 'Project name is required';
       },
     });
     if (p.isCancel(nameResult)) {
@@ -601,7 +603,7 @@ export type CliPresets = {
   bundler?: 'unbuild' | 'tsdown';
   linter?: 'oxlint' | 'eslint' | 'biome';
   formatter?: 'oxfmt' | 'prettier' | 'biome';
-  packageManager?: PackageManagerName;
+  packageManager?: PackageManagerSpec;
   engine?: EngineSpec;
   pnpmManageVersions?: boolean;
   ide?: Ide;
@@ -628,7 +630,7 @@ function presetsToInheritedSettings(presets?: CliPresets): InheritedWorkspaceSet
   return {
     linter: presets.linter,
     formatter: presets.formatter,
-    packageManager: presets.packageManager ? { name: presets.packageManager } : undefined,
+    packageManager: presets.packageManager,
     engine: presets.engine,
     pnpmManageVersions: presets.pnpmManageVersions,
   };

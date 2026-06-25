@@ -8,9 +8,12 @@ export {
   workspacePlanInputToMonorepoParams,
 } from './input.js';
 export { resolveProjectFacts, resolveWorkspaceFacts } from './resolve.js';
+export { materializeJobs } from './materialize.js';
 export type {
+  LinearPlan,
   MetaConfig,
   PartialPlan,
+  PlanJob,
   ProjectContext,
   ProjectPlan,
   ToolSelections,

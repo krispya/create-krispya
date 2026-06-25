@@ -22,3 +22,25 @@ pnpm lint -- src/App.tsx src/core/systems/move-entity.ts
 pnpm format
 pnpm lint
 ```
+
+## Architecture
+
+The create app allows for building a workspace from a recipe and update it over time.
+
+### Workflow
+
+```
+intent -> resolve -> plan -> apply
+```
+
+**Intent**
+Figure out what the user asked for: CLI flags, prompts, saved config, workspace inheritance.
+
+**Resolve**
+Turn that into concrete facts: exact package manager version, Node version, package versions, pnpm capabilities, detected workspace state.
+
+**Plan**
+Decide what should exist: project files, workspace config, scripts, dependencies, tool configs. This is where feature/tool planners run. This ends with a plan, a single array of jobs.
+
+**Apply**
+Execute the plan and create the workspace on disk.

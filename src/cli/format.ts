@@ -1,12 +1,13 @@
 import color from 'chalk';
-import { getEngineName, getPackageManagerName } from '../package-versions.js';
-import type { EngineSpec, ProjectOptions, PackageManagerName, PackageManagerSpec } from '../types.js';
+import { getPackageManagerName } from '../package-managers/index.js';
+import { getEngineName } from '../workflow/resolve/engine.js';
+import type { EngineSpec, ProjectOptions, PackageManagerSpec } from '../types.js';
 import { getBaseTemplate, getLanguageFromTemplate, shouldEnableReactCompiler } from '../types.js';
 
 export type MonorepoConfigOptions = {
   name: string;
   engine: EngineSpec;
-  packageManager: PackageManagerName;
+  packageManager: PackageManagerSpec;
   pnpmManageVersions?: boolean;
   linter: string;
   formatter: string;
@@ -165,10 +166,11 @@ export function formatMonorepoConfigSummary(options: MonorepoConfigOptions): str
   );
 
   // Package manager
-  lines.push(formatRow('Package manager', options.packageManager));
+  const packageManagerName = getPackageManagerName(options.packageManager);
+  lines.push(formatRow('Package manager', packageManagerName));
 
   // pnpm-specific options
-  if (options.packageManager === 'pnpm') {
+  if (packageManagerName === 'pnpm') {
     const versionManaged = options.pnpmManageVersions ? 'yes' : 'no';
     lines.push(formatRow('↳ Version managed', versionManaged, ''));
   }

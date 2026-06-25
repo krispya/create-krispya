@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { cwd } from 'node:process';
 
 import { detectTooling, parseWorkspaceYamlContent } from '../index.js';
-import { parseEngine, parsePackageManager } from '../package-versions.js';
+import { parsePackageManagerSpec } from '../package-managers/index.js';
+import { parseEngine } from '../workflow/resolve/engine.js';
 import type { EngineSpec, PackageManagerSpec } from '../types.js';
 
 export type InheritedWorkspaceSettings = {
@@ -95,7 +96,7 @@ export async function detectWorkspaceSettings(
       engines?: Record<string, string>;
     };
 
-    const packageManager = parsePackageManager(pkgJson.packageManager);
+    const packageManager = parsePackageManagerSpec(pkgJson.packageManager);
     const engine = parseEngine(pkgJson.engines);
 
     let pnpmManageVersions: boolean | undefined;

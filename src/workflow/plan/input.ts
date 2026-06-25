@@ -1,12 +1,12 @@
-import { defaultFormatterMetaConfig } from '../defaults/formatter.js';
-import { defaultLinterMetaConfig } from '../defaults/linter.js';
-import type { MonorepoParams } from '../renderers/monorepo.js';
+import { defaultFormatterMetaConfig } from '../../defaults/formatter.js';
+import { defaultLinterMetaConfig } from '../../defaults/linter.js';
+import type { MonorepoParams } from '../../renderers/monorepo.js';
 import type {
   ProjectOptions,
   ProjectPlanInput,
   WorkspacePlanInput,
   PackageManagerSpec,
-} from '../types.js';
+} from '../../types.js';
 
 export function resolveProjectPlanInput(options: ProjectOptions): ProjectPlanInput {
   const packageManager = options.packageManager ?? { name: 'pnpm' };

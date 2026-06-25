@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { validateWorkspace } from '../src/validate.js';
+import { validateWorkspace } from '../src/validation/index.js';
 import { planWorkspace } from '../src/index.js';
 
 describe('validateWorkspace', () => {

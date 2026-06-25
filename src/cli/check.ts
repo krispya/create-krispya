@@ -1,6 +1,6 @@
 import color from 'chalk';
 
-import { validateWorkspace } from '../validate.js';
+import { validateWorkspace } from '../validation/index.js';
 import { detectMonorepoRoot } from './workspace-utils.js';
 
 export async function handleCheckCommand(): Promise<void> {

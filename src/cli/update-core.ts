@@ -9,6 +9,7 @@ import type {
   Formatter,
   VirtualFile,
   PackageManagerName,
+  PackageManagerSpec,
 } from '../types.js';
 import {
   renderTypescriptConfigPackage,
@@ -25,16 +26,18 @@ import {
   formatResolvedPackageVersion,
   getResolvedPackageVersion,
   resolveMonorepoRootPackageVersions,
-} from '../package-versions.js';
+} from '../workflow/resolve/package-versions.js';
 import {
   mergePackageJsonScripts,
   packageJsonScripts,
   resolveDefaultPackageJsonScripts,
 } from '../renderers/package-json-scripts.js';
-import { toPrettierIgnoreContent } from '../adapters/formatter-config.js';
+import { toPrettierIgnoreContent } from '../tools/formatter-config.js';
 import { renderOxlintConfig } from '../renderers/oxlint-config.js';
 import { renderViteConfig } from '../renderers/vite-config.js';
 import { detectTooling } from '../utils/index.js';
+import { getPackageManagerProfile, parsePackageManagerSpec } from '../package-managers/index.js';
+import { renderPnpmWorkspaceConfig } from '../renderers/pnpm-workspace.js';
 
 // =============================================================================
 // Types
@@ -74,6 +77,7 @@ export type WorkspaceConfig = {
   linter: Linter;
   formatter: Formatter;
   packageManager: string;
+  packageManagerSpec?: PackageManagerSpec;
   isMonorepo: boolean;
   configStrategy?: ConfigStrategy;
   hasTypecheck?: boolean;
@@ -141,6 +145,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
   // Read name from package.json or directory
   let name = root.split(/[/\\]/).pop() ?? 'workspace';
   let packageManager = 'pnpm';
+  let packageManagerSpec: PackageManagerSpec | undefined = { name: 'pnpm' };
   let hasTypecheck = false;
   let viteTemplate: BaseTemplate | undefined;
   try {
@@ -154,7 +159,8 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
       name = pkgJson.name.replace(/^@/, '').replace(/\/.*$/, '');
     }
     if (pkgJson.packageManager) {
-      packageManager = pkgJson.packageManager.split('@')[0] ?? packageManager;
+      packageManagerSpec = parsePackageManagerSpec(pkgJson.packageManager) ?? packageManagerSpec;
+      packageManager = packageManagerSpec.name;
     }
     hasTypecheck = pkgJson.scripts?.typecheck != null;
     viteTemplate = detectViteTemplate(pkgJson);
@@ -171,6 +177,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
     linter: tooling.linter ?? 'oxlint',
     formatter: tooling.formatter ?? 'prettier',
     packageManager,
+    packageManagerSpec,
     isMonorepo,
     configStrategy,
     hasTypecheck,
@@ -623,7 +630,7 @@ function detectLibraryPackage(pkg: PackageJsonForScripts): boolean {
 }
 
 function getPackageManagerForScripts(config: WorkspaceConfig, pkg: PackageJsonForScripts) {
-  const packageManager = pkg.packageManager?.split('@')[0] ?? config.packageManager;
+  const packageManager = parsePackageManagerSpec(pkg.packageManager)?.name ?? config.packageManager;
   return isPackageManagerName(packageManager) ? packageManager : 'pnpm';
 }
 
@@ -850,13 +857,59 @@ export async function getOxlintConfigReplacementUpdates(
 // Workspace Config Merge
 // =============================================================================
 
+function extractPackagePatterns(content: string): string[] {
+  const patterns: string[] = [];
+  let inPackagesSection = false;
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+
+    if (trimmed === 'packages:') {
+      inPackagesSection = true;
+      continue;
+    }
+
+    if (
+      inPackagesSection &&
+      trimmed &&
+      !line.startsWith(' ') &&
+      !line.startsWith('\t') &&
+      !trimmed.startsWith('-')
+    ) {
+      break;
+    }
+
+    if (inPackagesSection && trimmed.startsWith('-')) {
+      const pattern = trimmed
+        .slice(1)
+        .trim()
+        .replace(/^["']|["']$/g, '');
+      if (pattern.length > 0) {
+        patterns.push(pattern);
+      }
+    }
+  }
+
+  return patterns;
+}
+
+function uniqPackagePatterns(patterns: string[]): string[] {
+  return [...new Set(patterns)];
+}
+
 /**
- * Generates workspace config updates using merge strategy.
- * Adds missing entries while preserving user's custom package paths.
+ * Generates workspace config updates using a package-manager-profile-aware strategy.
+ * Re-renders managed pnpm settings while preserving user's package paths.
  */
-export async function getWorkspaceConfigUpdates(root: string): Promise<FileChange[]> {
+export async function getWorkspaceConfigUpdates(
+  root: string,
+  config?: WorkspaceConfig
+): Promise<FileChange[]> {
   const workspacePath = join(root, 'pnpm-workspace.yaml');
   const changes: FileChange[] = [];
+  const packageManagerSpec = config?.packageManagerSpec ?? { name: 'pnpm' as const };
+  const profile = getPackageManagerProfile(packageManagerSpec);
+  const defaultPackages = ['.config/*', 'apps/*', 'packages/*'];
 
   let currentContent = '';
   let exists = false;
@@ -870,16 +923,11 @@ export async function getWorkspaceConfigUpdates(root: string): Promise<FileChang
 
   if (!exists) {
     // Create new file with defaults
-    const newContent = `manage-package-manager-versions: true
-
-packages:
-  - '.config/*'
-  - 'apps/*'
-  - 'packages/*'
-
-onlyBuiltDependencies:
-  - esbuild
-`;
+    const newContent = `${renderPnpmWorkspaceConfig({
+      profile,
+      manageVersions: true,
+      packages: defaultPackages,
+    })}\n`;
     changes.push({
       path: 'pnpm-workspace.yaml',
       status: 'added',
@@ -888,35 +936,17 @@ onlyBuiltDependencies:
     return changes;
   }
 
-  // Check what's missing and build updated content
-  let updatedContent = currentContent;
-  let needsUpdate = false;
+  const packages = uniqPackagePatterns([
+    ...defaultPackages,
+    ...extractPackagePatterns(currentContent),
+  ]);
+  const updatedContent = `${renderPnpmWorkspaceConfig({
+    profile,
+    manageVersions: true,
+    packages,
+  })}\n`;
 
-  // Check for manage-package-manager-versions
-  if (!currentContent.includes('manage-package-manager-versions')) {
-    updatedContent = `manage-package-manager-versions: true\n\n${updatedContent}`;
-    needsUpdate = true;
-  }
-
-  // Check for onlyBuiltDependencies
-  if (!currentContent.includes('onlyBuiltDependencies')) {
-    updatedContent = `${updatedContent.trimEnd()}\n\nonlyBuiltDependencies:\n  - esbuild\n`;
-    needsUpdate = true;
-  }
-
-  // Check for .config/* in packages
-  if (!currentContent.includes('.config/*')) {
-    // Insert .config/* after packages:
-    const lines = updatedContent.split('\n');
-    const packagesIndex = lines.findIndex((line) => line.trim().startsWith('packages:'));
-    if (packagesIndex !== -1) {
-      lines.splice(packagesIndex + 1, 0, "  - '.config/*'");
-      updatedContent = lines.join('\n');
-      needsUpdate = true;
-    }
-  }
-
-  if (needsUpdate) {
+  if (updatedContent !== currentContent) {
     changes.push({
       path: 'pnpm-workspace.yaml',
       status: 'modified',

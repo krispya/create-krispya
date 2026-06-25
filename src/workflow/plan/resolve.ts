@@ -1,10 +1,10 @@
+import { resolvePackageManager } from '../../package-managers/index.js';
+import { resolveEngine } from '../resolve/engine.js';
 import {
-  resolveEngine,
   resolveMonorepoRootPackageVersions,
-  resolvePackageManager,
   resolveProjectPackageVersions,
-} from '../package-versions.js';
-import type { ProjectPlanInput, WorkspacePlanInput } from '../types.js';
+} from '../resolve/package-versions.js';
+import type { ProjectPlanInput, WorkspacePlanInput } from '../../types.js';
 import {
   projectPlanInputToOptions,
   workspacePlanInputToMonorepoParams,

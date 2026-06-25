@@ -12,9 +12,9 @@ import { renderAiFiles } from './ai-files.js';
 import {
   assignResolvedPackageVersion,
   formatNodeTypesVersion,
-  formatPackageManager,
   getResolvedPackageVersion,
-} from '../package-versions.js';
+} from '../workflow/resolve/package-versions.js';
+import { formatPackageManager, getPackageManagerProfile } from '../package-managers/index.js';
 import {
   renderTypescriptConfigPackage,
   renderOxlintConfigPackage,
@@ -25,6 +25,7 @@ import {
 import { renderEditorConfig } from './editorconfig.js';
 import { renderGitignore } from './gitignore.js';
 import { packageJsonScripts } from './package-json-scripts.js';
+import { renderPnpmWorkspaceConfig } from './pnpm-workspace.js';
 import { renderVscodeFiles as renderSharedVscodeFiles } from './vscode.js';
 
 /**
@@ -136,18 +137,13 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
 
   // pnpm-workspace.yaml - includes .config/* for config packages
   if (isPnpm) {
-    const workspaceLines: string[] = [];
-
-    if (pnpmManageVersions) {
-      workspaceLines.push('manage-package-manager-versions: true', '');
-    }
-
-    workspaceLines.push('packages:', '  - ".config/*"', '  - "apps/*"', '  - "packages/*"', '');
-    workspaceLines.push('onlyBuiltDependencies:', '  - esbuild');
-
     files['pnpm-workspace.yaml'] = {
       type: 'text',
-      content: workspaceLines.join('\n'),
+      content: renderPnpmWorkspaceConfig({
+        profile: getPackageManagerProfile(packageManager),
+        manageVersions: pnpmManageVersions,
+        packages: ['.config/*', 'apps/*', 'packages/*'],
+      }),
     };
   }
 

@@ -71,6 +71,28 @@ describe('renderPackageJson', () => {
     expect(packageJson.version).toBe('0.1.0');
   });
 
+  it('renders pnpm 11 workspace config for single-package projects', async () => {
+    const result = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        packageManager: { name: 'pnpm', version: '11.0.0' },
+      },
+    });
+
+    expect(readTextFile(result.files['pnpm-workspace.yaml'])).toBe(`pmOnFail: download
+
+allowBuilds:
+  esbuild: true`);
+  });
+
   it('adds the known @types/node fallback when versions have not been resolved', async () => {
     const result = renderPackageJson({
       name: 'my-app',
@@ -432,6 +454,15 @@ describe('renderPackageJson', () => {
   });
 
   it('adds typescript to generated TypeScript projects', async () => {
+    const versions = {
+      '@types/node': '25.3.5',
+      oxlint: '1.51.0',
+      'oxlint-tsgolint': '0.99.0',
+      prettier: '3.8.1',
+      typescript: '5.9.3',
+      vite: '6.3.4',
+    };
+
     const { files } = await planProject({
       name: 'my-app',
       template: 'vanilla',
@@ -439,18 +470,12 @@ describe('renderPackageJson', () => {
       formatter: 'prettier',
       packageManager: { name: 'pnpm', version: '10.0.0' },
       engine: { name: 'node', version: '25.1.0' },
-      versions: {
-        '@types/node': '25.3.5',
-        oxlint: '1.51.0',
-        prettier: '3.8.1',
-        typescript: '5.9.3',
-        vite: '6.3.4',
-      },
+      versions,
     });
 
     const packageJson = readPackageJsonContent(files['package.json']);
-    expect(packageJson.devDependencies.typescript).toBe('^5.9.3');
-    expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
+    expect(packageJson.devDependencies.typescript).toBe(`^${versions.typescript}`);
+    expect(packageJson.devDependencies['oxlint-tsgolint']).toBe(`^${versions['oxlint-tsgolint']}`);
   });
 
   it('adds oxlint type-aware support to monorepo roots', async () => {

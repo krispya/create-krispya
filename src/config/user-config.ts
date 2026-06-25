@@ -1,7 +1,7 @@
 import Conf from 'conf';
-import type { AiPlatform, ConfigStrategy } from './types.js';
+import type { AiPlatform, ConfigStrategy } from '../types.js';
 
-export type { AiPlatform } from './types.js';
+export type { AiPlatform } from '../types.js';
 
 interface Schema {
   /** Selected AI platforms to generate files for */

@@ -2,7 +2,7 @@ import {
   toOxfmtConfig,
   toPrettierConfig,
   toPrettierIgnoreContent,
-} from '../adapters/formatter-config.js';
+} from '../tools/formatter-config.js';
 import type { VirtualFile } from '../types.js';
 import { renderOxlintConfig } from './oxlint-config.js';
 

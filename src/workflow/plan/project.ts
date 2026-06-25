@@ -1,5 +1,5 @@
-import { gitAttributesContent } from '../defaults/git.js';
-import { renderAiFiles } from '../renderers/ai-files.js';
+import { gitAttributesContent } from '../../defaults/git.js';
+import { renderAiFiles } from '../../renderers/ai-files.js';
 import {
   renderGitignore,
   renderEditorConfig,
@@ -10,36 +10,36 @@ import {
   renderTypescriptConfig,
   renderViteConfig,
   renderVscodeFiles,
-} from '../renderers/index.js';
-import { planBiome } from '../adapters/biome.js';
-import { planDrei } from '../adapters/drei.js';
-import { planEslint } from '../adapters/eslint.js';
-import { planFiber } from '../adapters/fiber.js';
-import { planGithubPages } from '../adapters/github-pages.js';
-import { planHandle } from '../adapters/handle.js';
-import { planKoota } from '../adapters/koota.js';
-import { planLeva } from '../adapters/leva.js';
-import { planOffscreen } from '../adapters/offscreen.js';
-import { planOxfmt } from '../adapters/oxfmt.js';
-import { planOxlint } from '../adapters/oxlint.js';
-import { planPostprocessing } from '../adapters/postprocessing.js';
-import { planPrettier } from '../adapters/prettier.js';
-import { planRapier } from '../adapters/rapier.js';
-import { planTriplex } from '../adapters/triplex.js';
-import { planTsdown } from '../adapters/tsdown.js';
-import { planUikit } from '../adapters/uikit.js';
-import { planUnbuild } from '../adapters/unbuild.js';
-import { planVitest } from '../adapters/vitest.js';
-import { planViverse } from '../adapters/viverse.js';
-import { planXr } from '../adapters/xr.js';
-import { planZustand } from '../adapters/zustand.js';
-import { merge } from '../utils/index.js';
+} from '../../renderers/index.js';
+import { planBiome } from '../../tools/biome.js';
+import { planDrei } from '../../features/drei.js';
+import { planEslint } from '../../tools/eslint.js';
+import { planFiber } from '../../features/fiber.js';
+import { planGithubPages } from '../../features/github-pages.js';
+import { planHandle } from '../../features/handle.js';
+import { planKoota } from '../../features/koota.js';
+import { planLeva } from '../../features/leva.js';
+import { planOffscreen } from '../../features/offscreen.js';
+import { planOxfmt } from '../../tools/oxfmt.js';
+import { planOxlint } from '../../tools/oxlint.js';
+import { planPostprocessing } from '../../features/postprocessing.js';
+import { planPrettier } from '../../tools/prettier.js';
+import { planRapier } from '../../features/rapier.js';
+import { planTriplex } from '../../features/triplex.js';
+import { planTsdown } from '../../tools/tsdown.js';
+import { planUikit } from '../../features/uikit.js';
+import { planUnbuild } from '../../tools/unbuild.js';
+import { planVitest } from '../../tools/vitest.js';
+import { planViverse } from '../../features/viverse.js';
+import { planXr } from '../../features/xr.js';
+import { planZustand } from '../../features/zustand.js';
+import { merge } from '../../utils/index.js';
 import {
   assignResolvedPackageVersion,
   formatResolvedPackageVersion,
-  getPackageManagerName,
   getResolvedPackageVersion,
-} from '../package-versions.js';
+} from '../resolve/package-versions.js';
+import { getPackageManagerName } from '../../package-managers/index.js';
 import {
   type CodeInjectionLocation,
   type DependencyVersionOptions,
@@ -50,10 +50,12 @@ import {
   getBaseTemplate,
   getLanguageFromTemplate,
   shouldEnableReactCompiler,
-} from '../types.js';
+} from '../../types.js';
 import { isProjectPlanInput, projectPlanInputToOptions, resolveProjectPlanInput } from './input.js';
 import { resolveProjectFacts } from './resolve.js';
 import type { ProjectPlan } from './types.js';
+import { materializeJobs } from './materialize.js';
+import type { PlanJob } from './types.js';
 
 /**
  * Main generation function that creates all project files.
@@ -405,8 +407,14 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
   }
   // TODO: execute prettier on ts(x), js(x), and json files
 
+  const jobs: PlanJob[] = Object.entries(files).map(([path, file]) => ({
+    type: 'write-file',
+    path,
+    file,
+  }));
+
   return {
-    files,
+    files: materializeJobs(jobs),
     dependencies,
     devDependencies,
     peerDependencies,

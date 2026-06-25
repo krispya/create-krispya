@@ -57,6 +57,7 @@ export async function createPackageInWorkspace(
     message: 'Package name?',
     initialValue: `@${scope}/`,
     validate: (value) => {
+      if (value == null) return 'Package name is required';
       const validationError = validatePackageName(value);
       if (validationError) return validationError;
 

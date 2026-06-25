@@ -10,10 +10,11 @@ import type {
   PackageVersions,
   ProjectType,
   Testing,
+  VirtualFile,
   VirtualFileMap,
   FormatterMetaConfig,
   LinterMetaConfig,
-} from '../types.js';
+} from '../../types.js';
 
 export type MetaConfig = {
   formatter: FormatterMetaConfig;
@@ -64,4 +65,20 @@ export type ProjectPlan = {
   injections: Array<{ location: CodeInjectionLocation; code: string }>;
   replacements: Array<{ search: string; replace: string }>;
   warnings: string[];
+};
+
+export type PlanJob =
+  | {
+      type: 'write-file';
+      path: string;
+      file: VirtualFile;
+    }
+  | {
+      type: 'merge-pnpm-workspace';
+      path: 'pnpm-workspace.yaml';
+      content: string;
+    };
+
+export type LinearPlan = {
+  jobs: PlanJob[];
 };

@@ -1,12 +1,13 @@
+import { formatNodeTypesVersion } from '../workflow/resolve/package-versions.js';
+import { getEngineName, getEngineSpec } from '../workflow/resolve/engine.js';
 import {
-  formatNodeTypesVersion,
   formatPackageManager,
-  getEngineName,
-  getEngineSpec,
+  getPackageManagerProfile,
   getPackageManagerSpec,
-} from '../package-versions.js';
+} from '../package-managers/index.js';
 import type { BaseTemplate, VirtualFile, ProjectOptions } from '../types.js';
 import { mergePackageJsonScripts, resolveDefaultPackageJsonScripts } from './package-json-scripts.js';
+import { renderPnpmWorkspaceConfig } from './pnpm-workspace.js';
 
 const DEFAULT_LIBRARY_VERSION = '0.1.0';
 
@@ -136,18 +137,12 @@ export function renderPackageJson(params: PackageJsonParams): PackageJsonResult 
 
   // Add pnpm-workspace.yaml when pnpm is selected (but not in a workspace package)
   if (isPnpm && !options.workspaceRoot) {
-    const manageVersions = options.pnpmManageVersions ?? true;
-    const workspaceLines: string[] = [];
-
-    if (manageVersions) {
-      workspaceLines.push('manage-package-manager-versions: true', '');
-    }
-
-    workspaceLines.push('onlyBuiltDependencies:', '  - esbuild');
-
     files['pnpm-workspace.yaml'] = {
       type: 'text',
-      content: workspaceLines.join('\n'),
+      content: renderPnpmWorkspaceConfig({
+        profile: getPackageManagerProfile(packageManager),
+        manageVersions: options.pnpmManageVersions ?? true,
+      }),
     };
   }
 

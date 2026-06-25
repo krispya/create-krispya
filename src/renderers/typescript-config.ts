@@ -1,8 +1,8 @@
 import {
   assignResolvedPackageVersion,
   formatNodeTypesVersion,
-  getEngineName,
-} from '../package-versions.js';
+} from '../workflow/resolve/package-versions.js';
+import { getEngineName } from '../workflow/resolve/engine.js';
 import type {
   BaseTemplate,
   ConfigStrategy,
