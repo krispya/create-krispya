@@ -1,12 +1,16 @@
 import type { PackageManagerSpec } from '../types.js';
 import { getSemverMajor } from '../utils/index.js';
-import type { PackageManagerCapabilities, PackageManagerProfile } from './types.js';
+import type {
+  PackageManagerCapabilities,
+  PackageManagerProfile,
+  PackageManagerRequirements,
+} from './types.js';
 
 export type PnpmWorkspaceConfigOptions = {
   profile: PackageManagerProfile;
   manageVersions?: boolean;
   packages?: string[];
-  builtDependencies?: string[];
+  buildDependencies?: Record<string, boolean>;
 };
 
 const pnpm10Capabilities: PackageManagerCapabilities = {
@@ -14,9 +18,17 @@ const pnpm10Capabilities: PackageManagerCapabilities = {
   pnpmBuildDependencyPolicy: 'onlyBuiltDependencies',
 };
 
+const pnpm10Requirements: PackageManagerRequirements = {
+  node: '18.12',
+};
+
 const pnpm11Capabilities: PackageManagerCapabilities = {
   pnpmWorkspaceVersionPolicy: 'pmOnFail',
   pnpmBuildDependencyPolicy: 'allowBuilds',
+};
+
+const pnpm11Requirements: PackageManagerRequirements = {
+  node: '22.13',
 };
 
 function getPnpmCapabilities(major?: number): PackageManagerCapabilities {
@@ -31,6 +43,18 @@ function getPnpmCapabilities(major?: number): PackageManagerCapabilities {
   }
 }
 
+function getPnpmRequirements(major?: number): PackageManagerRequirements {
+  switch (major) {
+    case 10:
+      return pnpm10Requirements;
+    case 11:
+      return pnpm11Requirements;
+    default:
+      if (major != null && major >= 12) return pnpm11Requirements;
+      else return pnpm10Requirements;
+  }
+}
+
 export function getPnpmProfile(spec: PackageManagerSpec): PackageManagerProfile {
   const major = getSemverMajor(spec.version);
 
@@ -38,11 +62,17 @@ export function getPnpmProfile(spec: PackageManagerSpec): PackageManagerProfile 
     ...spec,
     major,
     capabilities: getPnpmCapabilities(major),
+    requirements: getPnpmRequirements(major),
   };
 }
 
 export function renderPnpmWorkspaceConfig(options: PnpmWorkspaceConfigOptions): string {
-  const { profile, manageVersions = true, packages = [], builtDependencies = ['esbuild'] } = options;
+  const {
+    profile,
+    manageVersions = true,
+    packages = [],
+    buildDependencies = { esbuild: true },
+  } = options;
   const lines: string[] = [];
 
   if (manageVersions) {
@@ -59,12 +89,16 @@ export function renderPnpmWorkspaceConfig(options: PnpmWorkspaceConfigOptions): 
 
   if (profile.capabilities.pnpmBuildDependencyPolicy === 'allowBuilds') {
     lines.push('allowBuilds:');
-    for (const dependency of builtDependencies) {
-      lines.push(`  ${dependency}: true`);
+    for (const [dependency, allowed] of Object.entries(buildDependencies)) {
+      lines.push(`  ${dependency}: ${allowed ? 'true' : 'false'}`);
     }
   } else {
+    const allowedDependencies = Object.entries(buildDependencies)
+      .filter(([, allowed]) => allowed)
+      .map(([dependency]) => dependency);
+
     lines.push('onlyBuiltDependencies:');
-    for (const dependency of builtDependencies) {
+    for (const dependency of allowedDependencies) {
       lines.push(`  - ${dependency}`);
     }
   }

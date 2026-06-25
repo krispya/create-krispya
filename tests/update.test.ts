@@ -7,8 +7,15 @@ import {
   detectCurrentConfig,
   planExpectedFiles,
   getOxlintConfigReplacementUpdates,
+  getPackageManagerConfigUpdates,
   getPackageJsonScriptUpdates,
+  getWorkspaceConfigUpdates,
 } from '../src/cli/update-core.js';
+import {
+  getPackageUpdateCommand,
+  getPackageManagerMajorUpdateTarget,
+  getRequiredNodeUpdateTarget,
+} from '../src/cli/update.js';
 import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
 
 const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space';
@@ -79,6 +86,74 @@ describe('update helpers', () => {
     });
     expect(expected['config-packages']).toEqual({});
     expect(expected['workspace-config']).toEqual({});
+  });
+
+  it('detects package manager major updates', () => {
+    expect(
+      getPackageManagerMajorUpdateTarget(
+        { name: 'pnpm', version: '10.30.3' },
+        { name: 'pnpm', version: '11.2.0' }
+      )
+    ).toEqual({ name: 'pnpm', version: '11.2.0' });
+
+    expect(
+      getPackageManagerMajorUpdateTarget(
+        { name: 'pnpm', version: '11.1.0' },
+        { name: 'pnpm', version: '11.2.0' }
+      )
+    ).toBeUndefined();
+
+    expect(
+      getPackageManagerMajorUpdateTarget(
+        { name: 'pnpm', version: '11.1.0' },
+        { name: 'pnpm', version: '10.30.3' }
+      )
+    ).toBeUndefined();
+  });
+
+  it('detects node engine updates required by package managers', () => {
+    expect(getRequiredNodeUpdateTarget('20.0.0', '22.13')).toBe('22.13');
+    expect(getRequiredNodeUpdateTarget('22.13.0', '22.13')).toBeUndefined();
+    expect(getRequiredNodeUpdateTarget(undefined, '22.13')).toBe('22.13');
+    expect(getRequiredNodeUpdateTarget('22.13.0', undefined)).toBeUndefined();
+  });
+
+  it('updates packages when the pnpm major stays the same', () => {
+    expect(
+      getPackageUpdateCommand({
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        packageManagerSpec: { name: 'pnpm', version: '11.1.0' },
+        targetPackageManagerSpec: { name: 'pnpm', version: '11.2.0' },
+        isMonorepo: true,
+      })
+    ).toMatchObject({
+      command: 'pnpm',
+      args: ['update'],
+      displayCommand: 'pnpm update',
+      promptMessage: 'Update packages?',
+    });
+  });
+
+  it('installs dependencies after a pnpm major migration', () => {
+    expect(
+      getPackageUpdateCommand({
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        packageManagerSpec: { name: 'pnpm', version: '10.30.3' },
+        targetPackageManagerSpec: { name: 'pnpm', version: '11.2.0' },
+        isMonorepo: true,
+      })
+    ).toMatchObject({
+      command: 'pnpm',
+      args: ['install'],
+      displayCommand: 'pnpm install',
+      promptMessage: 'Install dependencies?',
+    });
   });
 
   it('includes Vite config in single-package app updates', async () => {
@@ -459,6 +534,197 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     const settings = readTextJson(expected.vscode['.vscode/settings.json']);
     expect(settings['oxc.configPath']).toBeUndefined();
     expect(settings['prettier.configPath']).toBeUndefined();
+  });
+
+  it('migrates package manager fields from pnpm 10 to pnpm 11', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-pnpm-11-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'workspace',
+            packageManager: 'pnpm@10.30.3',
+            engines: {
+              node: '>=20.0.0',
+              pnpm: '>=10.0.0',
+            },
+            scripts: {
+              build: "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
+              dev: "pnpm --filter './apps/*' run dev",
+              test: 'pnpm -r run test',
+              lint: 'oxlint -c .config/oxlint.json',
+              format:
+                'prettier --config .config/prettier.json --ignore-path .config/prettierignore --write .',
+            },
+          },
+          null,
+          2
+        )
+      );
+      await writeFile(
+        join(tempDir, 'pnpm-workspace.yaml'),
+        [
+          'manage-package-manager-versions: true',
+          '',
+          'packages:',
+          '  - ".config/*"',
+          '  - "apps/*"',
+          '  - "packages/*"',
+          '  - "examples/*"',
+          '',
+          'onlyBuiltDependencies:',
+          '  - esbuild',
+          '  - sharp',
+          '',
+        ].join('\n')
+      );
+
+      const config = {
+        name: 'workspace',
+        linter: 'oxlint' as const,
+        formatter: 'prettier' as const,
+        packageManager: 'pnpm',
+        packageManagerSpec: { name: 'pnpm' as const, version: '10.30.3' },
+        targetPackageManagerSpec: { name: 'pnpm' as const, version: '11.2.0' },
+        targetNodeVersion: '22.13',
+        isMonorepo: true,
+      };
+
+      const [packageJsonChange] = await getPackageManagerConfigUpdates(tempDir, config);
+      const packageJson = JSON.parse(packageJsonChange!.newContent);
+      expect(packageJson.packageManager).toBe('pnpm@11.2.0');
+      expect(packageJson.engines.node).toBe('>=22.13');
+      expect(packageJson.engines.pnpm).toBe('>=11.0.0');
+
+      const [workspaceChange] = await getWorkspaceConfigUpdates(tempDir, config);
+      expect(workspaceChange!.newContent).toContain('pmOnFail: download');
+      expect(workspaceChange!.newContent).toContain('allowBuilds:\n  esbuild: true');
+      expect(workspaceChange!.newContent).toContain('  sharp: true');
+      expect(workspaceChange!.newContent).toContain('  - "examples/*"');
+      expect(workspaceChange!.newContent).not.toContain('manage-package-manager-versions');
+      expect(workspaceChange!.newContent).not.toContain('onlyBuiltDependencies');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates package manager fields from pnpm 11 to pnpm 10', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-pnpm-10-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify(
+          {
+            name: 'workspace',
+            packageManager: 'pnpm@11.2.0',
+            engines: {
+              pnpm: '>=11.0.0',
+            },
+            scripts: {
+              build: "pnpm --filter './packages/*' run build && pnpm --filter './apps/*' run build",
+              dev: "pnpm --filter './apps/*' run dev",
+              test: 'pnpm -r run test',
+              lint: 'oxlint -c .config/oxlint.json',
+              format:
+                'prettier --config .config/prettier.json --ignore-path .config/prettierignore --write .',
+            },
+          },
+          null,
+          2
+        )
+      );
+      await writeFile(
+        join(tempDir, 'pnpm-workspace.yaml'),
+        [
+          'pmOnFail: download',
+          '',
+          'packages:',
+          '  - ".config/*"',
+          '  - "apps/*"',
+          '  - "packages/*"',
+          '  - "examples/*"',
+          '',
+          'allowBuilds:',
+          '  esbuild: true',
+          '  sharp: true',
+          '  untrusted-package: false',
+          '',
+        ].join('\n')
+      );
+
+      const config = {
+        name: 'workspace',
+        linter: 'oxlint' as const,
+        formatter: 'prettier' as const,
+        packageManager: 'pnpm',
+        packageManagerSpec: { name: 'pnpm' as const, version: '11.2.0' },
+        targetPackageManagerSpec: { name: 'pnpm' as const, version: '10.30.3' },
+        isMonorepo: true,
+      };
+
+      const [packageJsonChange] = await getPackageManagerConfigUpdates(tempDir, config);
+      const packageJson = JSON.parse(packageJsonChange!.newContent);
+      expect(packageJson.packageManager).toBe('pnpm@10.30.3');
+      expect(packageJson.engines.pnpm).toBe('>=10.0.0');
+
+      const [workspaceChange] = await getWorkspaceConfigUpdates(tempDir, config);
+      expect(workspaceChange!.newContent).toContain('manage-package-manager-versions: true');
+      expect(workspaceChange!.newContent).toContain('onlyBuiltDependencies:\n  - esbuild');
+      expect(workspaceChange!.newContent).toContain('  - sharp');
+      expect(workspaceChange!.newContent).toContain('  - "examples/*"');
+      expect(workspaceChange!.newContent).not.toContain('pmOnFail');
+      expect(workspaceChange!.newContent).not.toContain('allowBuilds');
+      expect(workspaceChange!.newContent).not.toContain('untrusted-package');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('repairs mixed pnpm workspace config when targeting pnpm 11', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-pnpm-11-workspace-'));
+    try {
+      await writeFile(
+        join(tempDir, 'pnpm-workspace.yaml'),
+        [
+          'allowBuilds:',
+          '  esbuild: set this to true or false',
+          '',
+          'manage-package-manager-versions: true',
+          '',
+          'packages:',
+          '  - "examples/*"',
+          '',
+          'onlyBuiltDependencies:',
+          '  - esbuild',
+          '  - sharp',
+          '',
+        ].join('\n')
+      );
+
+      const [workspaceChange] = await getWorkspaceConfigUpdates(tempDir, {
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        packageManagerSpec: { name: 'pnpm', version: '10.30.3' },
+        targetPackageManagerSpec: { name: 'pnpm', version: '11.2.0' },
+        isMonorepo: false,
+      });
+
+      expect(workspaceChange!.newContent).toContain('pmOnFail: download');
+      expect(workspaceChange!.newContent).toContain('allowBuilds:\n  esbuild: true');
+      expect(workspaceChange!.newContent).toContain('  sharp: true');
+      expect(workspaceChange!.newContent).toContain('  - "examples/*"');
+      expect(workspaceChange!.newContent).not.toContain('  - ".config/*"');
+      expect(workspaceChange!.newContent).not.toContain('  - "apps/*"');
+      expect(workspaceChange!.newContent).not.toContain('  - "packages/*"');
+      expect(workspaceChange!.newContent).not.toContain('set this to true or false');
+      expect(workspaceChange!.newContent).not.toContain('manage-package-manager-versions');
+      expect(workspaceChange!.newContent).not.toContain('onlyBuiltDependencies');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -5,9 +5,14 @@ export type PackageManagerCapabilities = {
   pnpmBuildDependencyPolicy?: 'onlyBuiltDependencies' | 'allowBuilds';
 };
 
+export type PackageManagerRequirements = {
+  node?: string;
+};
+
 export type PackageManagerProfile = PackageManagerSpec & {
   major?: number;
   capabilities: PackageManagerCapabilities;
+  requirements: PackageManagerRequirements;
 };
 
 export type PackageManagerIntent = {

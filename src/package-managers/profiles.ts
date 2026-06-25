@@ -14,5 +14,6 @@ export function getPackageManagerProfile(spec: PackageManagerSpec): PackageManag
     ...spec,
     major,
     capabilities: {},
+    requirements: {},
   };
 }

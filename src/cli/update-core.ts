@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import type {
   BaseTemplate,
   ConfigStrategy,
+  EngineSpec,
   Linter,
   Formatter,
   VirtualFile,
@@ -37,10 +38,13 @@ import { renderOxlintConfig } from '../renderers/oxlint-config.js';
 import { renderViteConfig } from '../renderers/vite-config.js';
 import { detectTooling } from '../utils/index.js';
 import {
+  formatPackageManager,
   getPackageManagerProfile,
   parsePackageManagerSpec,
   renderPnpmWorkspaceConfig,
 } from '../package-managers/index.js';
+import { getSemverMajorString } from '../utils/index.js';
+import { parseEngine } from '../workflow/resolve/engine.js';
 
 // =============================================================================
 // Types
@@ -81,6 +85,9 @@ export type WorkspaceConfig = {
   formatter: Formatter;
   packageManager: string;
   packageManagerSpec?: PackageManagerSpec;
+  targetPackageManagerSpec?: PackageManagerSpec;
+  targetNodeVersion?: string;
+  engine?: EngineSpec;
   isMonorepo: boolean;
   configStrategy?: ConfigStrategy;
   hasTypecheck?: boolean;
@@ -93,6 +100,7 @@ type PackageJsonForScripts = {
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   packageManager?: string;
+  engines?: Record<string, string>;
   exports?: unknown;
   main?: string;
   module?: string;
@@ -149,6 +157,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
   let name = root.split(/[/\\]/).pop() ?? 'workspace';
   let packageManager = 'pnpm';
   let packageManagerSpec: PackageManagerSpec | undefined = { name: 'pnpm' };
+  let engine: EngineSpec | undefined;
   let hasTypecheck = false;
   let viteTemplate: BaseTemplate | undefined;
   try {
@@ -165,6 +174,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
       packageManagerSpec = parsePackageManagerSpec(pkgJson.packageManager) ?? packageManagerSpec;
       packageManager = packageManagerSpec.name;
     }
+    engine = parseEngine(pkgJson.engines);
     hasTypecheck = pkgJson.scripts?.typecheck != null;
     viteTemplate = detectViteTemplate(pkgJson);
   } catch {
@@ -181,6 +191,7 @@ export async function detectCurrentConfig(root: string, isMonorepo = true): Prom
     formatter: tooling.formatter ?? 'prettier',
     packageManager,
     packageManagerSpec,
+    engine,
     isMonorepo,
     configStrategy,
     hasTypecheck,
@@ -684,6 +695,51 @@ function scriptsEqual(left: Record<string, string>, right: Record<string, string
   return leftEntries.every(([key, value]) => right[key] === value);
 }
 
+function packageManagerFieldsEqual(
+  pkg: PackageJsonForScripts,
+  packageManagerSpec: PackageManagerSpec | undefined,
+  targetNodeVersion: string | undefined
+): boolean {
+  if (packageManagerSpec == null || packageManagerSpec.version == null) {
+    return targetNodeVersion == null || pkg.engines?.node === `>=${targetNodeVersion}`;
+  }
+
+  const majorVersion = getSemverMajorString(packageManagerSpec.version);
+  return (
+    pkg.packageManager === formatPackageManager(packageManagerSpec) &&
+    pkg.engines?.[packageManagerSpec.name] === `>=${majorVersion}.0.0` &&
+    (targetNodeVersion == null || pkg.engines?.node === `>=${targetNodeVersion}`)
+  );
+}
+
+function applyPackageManagerFields(
+  pkg: PackageJsonForScripts,
+  packageManagerSpec: PackageManagerSpec | undefined,
+  targetNodeVersion: string | undefined
+): PackageJsonForScripts {
+  if (packageManagerSpec == null || packageManagerSpec.version == null) {
+    if (targetNodeVersion == null) return pkg;
+    return {
+      ...pkg,
+      engines: {
+        ...pkg.engines,
+        node: `>=${targetNodeVersion}`,
+      },
+    };
+  }
+
+  const majorVersion = getSemverMajorString(packageManagerSpec.version);
+  return {
+    ...pkg,
+    packageManager: formatPackageManager(packageManagerSpec),
+    engines: {
+      ...pkg.engines,
+      [packageManagerSpec.name]: `>=${majorVersion}.0.0`,
+      ...(targetNodeVersion == null ? {} : { node: `>=${targetNodeVersion}` }),
+    },
+  };
+}
+
 async function getExpectedPackageScripts(
   root: string,
   config: WorkspaceConfig,
@@ -762,10 +818,13 @@ export async function getPackageJsonScriptUpdates(
   const nextScripts = mergePackageJsonScripts(currentScripts, expectedScripts);
   const currentDevDependencies = pkg.devDependencies ?? {};
   const nextDevDependencies = await getExpectedPackageDevDependencies(root, config, pkg);
+  const targetPackageManagerSpec = config.targetPackageManagerSpec;
+  const targetNodeVersion = config.targetNodeVersion;
 
   if (
     scriptsEqual(currentScripts, nextScripts) &&
-    scriptsEqual(currentDevDependencies, nextDevDependencies)
+    scriptsEqual(currentDevDependencies, nextDevDependencies) &&
+    packageManagerFieldsEqual(pkg, targetPackageManagerSpec, targetNodeVersion)
   ) {
     return [
       {
@@ -777,10 +836,14 @@ export async function getPackageJsonScriptUpdates(
     ];
   }
 
-  const nextPackageJson: PackageJsonForScripts = {
-    ...pkg,
-    scripts: nextScripts,
-  };
+  const nextPackageJson: PackageJsonForScripts = applyPackageManagerFields(
+    {
+      ...pkg,
+      scripts: nextScripts,
+    },
+    targetPackageManagerSpec,
+    targetNodeVersion
+  );
   if (Object.keys(nextDevDependencies).length > 0 || pkg.devDependencies != null) {
     nextPackageJson.devDependencies = nextDevDependencies;
   }
@@ -792,6 +855,49 @@ export async function getPackageJsonScriptUpdates(
       status: 'modified',
       currentContent,
       newContent,
+    },
+  ];
+}
+
+export async function getPackageManagerConfigUpdates(
+  root: string,
+  config: WorkspaceConfig
+): Promise<FileChange[]> {
+  if (config.targetPackageManagerSpec == null && config.targetNodeVersion == null) return [];
+
+  const packageJsonPath = join(root, 'package.json');
+
+  let currentContent: string;
+  try {
+    currentContent = await readFile(packageJsonPath, 'utf-8');
+  } catch {
+    return [];
+  }
+
+  const pkg = JSON.parse(currentContent) as PackageJsonForScripts;
+  if (packageManagerFieldsEqual(pkg, config.targetPackageManagerSpec, config.targetNodeVersion)) {
+    return [
+      {
+        path: 'package.json',
+        status: 'unchanged',
+        currentContent,
+        newContent: currentContent,
+      },
+    ];
+  }
+
+  const nextPackageJson = applyPackageManagerFields(
+    pkg,
+    config.targetPackageManagerSpec,
+    config.targetNodeVersion
+  );
+
+  return [
+    {
+      path: 'package.json',
+      status: 'modified',
+      currentContent,
+      newContent: `${JSON.stringify(nextPackageJson, null, 2)}\n`,
     },
   ];
 }
@@ -860,49 +966,139 @@ export async function getOxlintConfigReplacementUpdates(
 // Workspace Config Merge
 // =============================================================================
 
-function extractPackagePatterns(content: string): string[] {
-  const patterns: string[] = [];
-  let inPackagesSection = false;
+function extractBuildDependencies(content: string): Record<string, boolean> {
+  const buildDependencies: Record<string, boolean> = {};
+  let section: 'onlyBuiltDependencies' | 'allowBuilds' | undefined;
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
 
-    if (trimmed === 'packages:') {
-      inPackagesSection = true;
+    if (trimmed === 'onlyBuiltDependencies:') {
+      section = 'onlyBuiltDependencies';
       continue;
     }
 
-    if (
-      inPackagesSection &&
-      trimmed &&
-      !line.startsWith(' ') &&
-      !line.startsWith('\t') &&
-      !trimmed.startsWith('-')
-    ) {
-      break;
+    if (trimmed === 'allowBuilds:') {
+      section = 'allowBuilds';
+      continue;
     }
 
-    if (inPackagesSection && trimmed.startsWith('-')) {
-      const pattern = trimmed
+    if (section != null && trimmed && !line.startsWith(' ') && !line.startsWith('\t')) {
+      section = undefined;
+    }
+
+    if (section === 'onlyBuiltDependencies' && trimmed.startsWith('-')) {
+      const dependency = trimmed
         .slice(1)
         .trim()
         .replace(/^["']|["']$/g, '');
-      if (pattern.length > 0) {
-        patterns.push(pattern);
+      if (dependency.length > 0) {
+        buildDependencies[dependency] = true;
+      }
+    }
+
+    if (section === 'allowBuilds') {
+      const match = trimmed.match(/^([^:]+):\s*(true|false)$/);
+      if (match == null) continue;
+
+      const dependency = match[1].trim().replace(/^["']|["']$/g, '');
+      if (dependency.length > 0) {
+        buildDependencies[dependency] = match[2] === 'true';
       }
     }
   }
 
-  return patterns;
+  return buildDependencies;
 }
 
-function uniqPackagePatterns(patterns: string[]): string[] {
-  return [...new Set(patterns)];
+function withDefaultBuildDependencies(
+  buildDependencies: Record<string, boolean>
+): Record<string, boolean> {
+  return Object.keys(buildDependencies).length > 0 ? buildDependencies : { esbuild: true };
+}
+
+function isPnpmWorkspaceManagedScalarKey(trimmed: string): boolean {
+  return trimmed.startsWith('manage-package-manager-versions:') || trimmed.startsWith('pmOnFail:');
+}
+
+function isPnpmWorkspaceManagedBlockKey(trimmed: string): boolean {
+  return trimmed === 'onlyBuiltDependencies:' || trimmed === 'allowBuilds:';
+}
+
+function isIndentedWorkspaceLine(line: string): boolean {
+  return line.startsWith(' ') || line.startsWith('\t');
+}
+
+function removePnpmWorkspaceManagedKeys(content: string): {
+  content: string;
+  insertionIndex: number;
+} {
+  const sourceLines = content.split('\n');
+  const lines: string[] = [];
+  let insertionIndex = 0;
+  let foundManagedKey = false;
+
+  for (let index = 0; index < sourceLines.length; index++) {
+    const line = sourceLines[index];
+    const trimmed = line.trim();
+
+    if (isPnpmWorkspaceManagedScalarKey(trimmed)) {
+      if (!foundManagedKey) {
+        insertionIndex = lines.length;
+        foundManagedKey = true;
+      }
+      continue;
+    }
+
+    if (isPnpmWorkspaceManagedBlockKey(trimmed)) {
+      if (!foundManagedKey) {
+        insertionIndex = lines.length;
+        foundManagedKey = true;
+      }
+
+      while (index + 1 < sourceLines.length) {
+        const nextLine = sourceLines[index + 1];
+        const nextTrimmed = nextLine.trim();
+        if (nextTrimmed !== '' && !isIndentedWorkspaceLine(nextLine)) break;
+        index++;
+      }
+      continue;
+    }
+
+    lines.push(line);
+  }
+
+  return {
+    content: lines.join('\n').trim(),
+    insertionIndex,
+  };
+}
+
+function patchPnpmWorkspaceManagedKeys(
+  content: string,
+  profile: ReturnType<typeof getPackageManagerProfile>,
+  buildDependencies: Record<string, boolean>
+): string {
+  const managedContent = renderPnpmWorkspaceConfig({
+    profile,
+    manageVersions: true,
+    buildDependencies,
+  });
+  const existing = removePnpmWorkspaceManagedKeys(content);
+  const preservedLines = existing.content.length > 0 ? existing.content.split('\n') : [];
+  const insertionIndex = Math.min(existing.insertionIndex, preservedLines.length);
+  const managedLines = managedContent.split('\n');
+
+  preservedLines.splice(insertionIndex, 0, ...managedLines);
+  return preservedLines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
  * Generates workspace config updates using a package-manager-profile-aware strategy.
- * Re-renders managed pnpm settings while preserving user's package paths.
+ * Patches managed pnpm settings while preserving the rest of the workspace file.
  */
 export async function getWorkspaceConfigUpdates(
   root: string,
@@ -910,7 +1106,8 @@ export async function getWorkspaceConfigUpdates(
 ): Promise<FileChange[]> {
   const workspacePath = join(root, 'pnpm-workspace.yaml');
   const changes: FileChange[] = [];
-  const packageManagerSpec = config?.packageManagerSpec ?? { name: 'pnpm' as const };
+  const packageManagerSpec = config?.targetPackageManagerSpec ??
+    config?.packageManagerSpec ?? { name: 'pnpm' as const };
   const profile = getPackageManagerProfile(packageManagerSpec);
   const defaultPackages = ['.config/*', 'apps/*', 'packages/*'];
 
@@ -939,15 +1136,12 @@ export async function getWorkspaceConfigUpdates(
     return changes;
   }
 
-  const packages = uniqPackagePatterns([
-    ...defaultPackages,
-    ...extractPackagePatterns(currentContent),
-  ]);
-  const updatedContent = `${renderPnpmWorkspaceConfig({
+  const buildDependencies = withDefaultBuildDependencies(extractBuildDependencies(currentContent));
+  const updatedContent = `${patchPnpmWorkspaceManagedKeys(
+    currentContent,
     profile,
-    manageVersions: true,
-    packages,
-  })}\n`;
+    buildDependencies
+  )}\n`;
 
   if (updatedContent !== currentContent) {
     changes.push({

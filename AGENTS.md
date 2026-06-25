@@ -44,3 +44,7 @@ Decide what should exist: project files, workspace config, scripts, dependencies
 
 **Apply**
 Execute the plan and create the workspace on disk.
+
+### Updating and Migration
+
+When migrating from one version of a tool to another we want to preserve intent. This means we want to patch instead of rewrite files where possible.

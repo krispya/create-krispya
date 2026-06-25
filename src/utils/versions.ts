@@ -21,7 +21,7 @@ export function getSemverMajorString(version: string): string {
   return String(getSemverMajor(version) ?? version.split('.')[0]);
 }
 
-function compareNumericSemver(a: string, b: string): number {
+export function compareNumericSemver(a: string, b: string): number {
   const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
   const bParts = b.split('.').map((part) => Number.parseInt(part, 10) || 0);
   const maxLength = Math.max(aParts.length, bParts.length);

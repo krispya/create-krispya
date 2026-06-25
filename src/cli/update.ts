@@ -7,6 +7,7 @@ import {
   compareWithDisk,
   detectCurrentConfig,
   formatFileChange,
+  getPackageManagerConfigUpdates,
   getOxlintConfigReplacementUpdates,
   getPackageJsonScriptUpdates,
   planExpectedFiles,
@@ -19,12 +20,23 @@ import {
 import { validateWorkspace } from '../validation/index.js';
 import type { CliOptions } from '../cli.js';
 import { detectMonorepoRoot, detectPackageRoot } from './workspace-utils.js';
+import {
+  formatPackageManager,
+  getPackageManagerProfile,
+  parsePackageManagerSpec,
+  resolvePackageManager,
+} from '../package-managers/index.js';
+import type { PackageManagerSpec } from '../types.js';
+import { compareNumericSemver, getSemverMajor } from '../utils/index.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 type PackageUpdateCommand = {
   command: string;
   args: string[];
   displayCommand: string;
+  promptMessage: string;
+  successMessage: string;
+  failureLabel: string;
 };
 
 const UPDATE_CATEGORY_ORDER = [
@@ -114,13 +126,39 @@ function orderUpdateCategories(categories: CategoryUpdate[]): CategoryUpdate[] {
   );
 }
 
-export function getPackageUpdateCommand(packageManager: string): PackageUpdateCommand | undefined {
-  const packageManagerName = packageManager.split('@')[0] ?? packageManager;
+function isPnpmMajorMigration(config: WorkspaceConfig): boolean {
+  const currentPackageManager = config.packageManagerSpec;
+  const targetPackageManager = config.targetPackageManagerSpec;
+  if (currentPackageManager?.name !== 'pnpm' || targetPackageManager?.name !== 'pnpm') {
+    return false;
+  }
+
+  const currentMajor = getSemverMajor(currentPackageManager.version);
+  const targetMajor = getSemverMajor(targetPackageManager.version);
+  return currentMajor != null && targetMajor != null && currentMajor !== targetMajor;
+}
+
+export function getPackageUpdateCommand(config: WorkspaceConfig): PackageUpdateCommand | undefined {
+  const packageManagerName = config.packageManager.split('@')[0] ?? config.packageManager;
   if (packageManagerName === 'pnpm') {
+    if (isPnpmMajorMigration(config)) {
+      return {
+        command: 'pnpm',
+        args: ['install'],
+        displayCommand: 'pnpm install',
+        promptMessage: 'Install dependencies?',
+        successMessage: 'Dependencies installed',
+        failureLabel: 'Dependency install',
+      };
+    }
+
     return {
       command: 'pnpm',
       args: ['update'],
       displayCommand: 'pnpm update',
+      promptMessage: 'Update packages?',
+      successMessage: 'Packages updated',
+      failureLabel: 'Package update',
     };
   }
 
@@ -129,6 +167,9 @@ export function getPackageUpdateCommand(packageManager: string): PackageUpdateCo
       command: 'npm',
       args: ['update'],
       displayCommand: 'npm update',
+      promptMessage: 'Update packages?',
+      successMessage: 'Packages updated',
+      failureLabel: 'Package update',
     };
   }
 
@@ -163,7 +204,7 @@ async function promptForPackageUpdate(
   config: WorkspaceConfig,
   options: CliOptions
 ): Promise<void> {
-  const updateCommand = getPackageUpdateCommand(config.packageManager);
+  const updateCommand = getPackageUpdateCommand(config);
   if (!updateCommand) {
     console.log(color.dim(`  Package updates are not supported for ${config.packageManager}`));
     return;
@@ -172,7 +213,7 @@ async function promptForPackageUpdate(
   const shouldUpdatePackages =
     options.yes ||
     (await p.confirm({
-      message: 'Update packages?',
+      message: updateCommand.promptMessage,
       initialValue: true,
     }));
 
@@ -190,10 +231,10 @@ async function promptForPackageUpdate(
   console.log(color.cyan(`Running ${updateCommand.displayCommand}...`));
   try {
     await runPackageUpdate(projectRoot, updateCommand);
-    console.log(color.green('✓') + ' Packages updated');
+    console.log(color.green('✓') + ` ${updateCommand.successMessage}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(color.red('✗') + ` Package update failed: ${message}`);
+    console.log(color.red('✗') + ` ${updateCommand.failureLabel} failed: ${message}`);
     process.exit(1);
   }
 }
@@ -240,6 +281,169 @@ async function collectUpdateCategories(
   }
 
   return orderUpdateCategories(allCategories);
+}
+
+async function resolveTargetPackageManagerSpec(
+  options: CliOptions,
+  config: WorkspaceConfig
+): Promise<PackageManagerSpec | undefined> {
+  if (options.packageManager == null) return undefined;
+
+  const packageManager = parsePackageManagerSpec(options.packageManager);
+  if (packageManager == null) {
+    console.log(color.red('✗') + ` Unsupported package manager: ${options.packageManager}`);
+    process.exit(1);
+  }
+
+  return resolvePackageManager({
+    name: config.name,
+    packageManager,
+  });
+}
+
+export function getPackageManagerMajorUpdateTarget(
+  currentPackageManager: PackageManagerSpec | undefined,
+  latestPackageManager: PackageManagerSpec
+): PackageManagerSpec | undefined {
+  if (currentPackageManager?.version == null) return undefined;
+
+  const currentMajor = getSemverMajor(currentPackageManager.version);
+  const latestMajor = getSemverMajor(latestPackageManager.version);
+  if (currentMajor == null || latestMajor == null || latestMajor <= currentMajor) {
+    return undefined;
+  }
+
+  return latestPackageManager;
+}
+
+export function getRequiredNodeUpdateTarget(
+  currentNodeVersion: string | undefined,
+  requiredNodeVersion: string | undefined
+): string | undefined {
+  if (requiredNodeVersion == null) return undefined;
+  if (currentNodeVersion == null) return requiredNodeVersion;
+  return compareNumericSemver(currentNodeVersion, requiredNodeVersion) < 0
+    ? requiredNodeVersion
+    : undefined;
+}
+
+function formatPackageManagerMajor(packageManager: PackageManagerSpec): string {
+  const major = getSemverMajor(packageManager.version);
+  return major == null ? packageManager.name : `${packageManager.name}@${major}`;
+}
+
+async function promptForNodeRequirementUpdate(
+  options: CliOptions,
+  config: WorkspaceConfig,
+  targetPackageManagerSpec: PackageManagerSpec | undefined
+): Promise<string | undefined> {
+  if (targetPackageManagerSpec == null) return undefined;
+
+  const profile = getPackageManagerProfile(targetPackageManagerSpec);
+  const requiredNodeVersion = profile.requirements.node;
+  const currentNodeVersion = config.engine?.version;
+  const targetNodeVersion = getRequiredNodeUpdateTarget(currentNodeVersion, requiredNodeVersion);
+  if (targetNodeVersion == null) return undefined;
+
+  const currentNodeLabel = currentNodeVersion == null ? 'not set' : `>=${currentNodeVersion}`;
+  p.log.warn(
+    `${formatPackageManager(targetPackageManagerSpec)} requires Node >=${targetNodeVersion}; current engines.node is ${currentNodeLabel}.`
+  );
+
+  const shouldUpdate =
+    options.yes ||
+    (await p.confirm({
+      message: `Update engines.node to >=${targetNodeVersion} too?`,
+      initialValue: true,
+    }));
+
+  if (p.isCancel(shouldUpdate)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return shouldUpdate ? targetNodeVersion : undefined;
+}
+
+async function promptForPackageManagerMajorUpdate(
+  options: CliOptions,
+  config: WorkspaceConfig
+): Promise<PackageManagerSpec | undefined> {
+  if (options.packageManager != null || config.packageManagerSpec == null) return undefined;
+
+  const currentPackageManager = config.packageManagerSpec;
+  if (currentPackageManager.version == null) return undefined;
+
+  const latestPackageManager = await resolvePackageManager({
+    name: config.name,
+    packageManager: { name: currentPackageManager.name },
+  });
+
+  const updateTarget = getPackageManagerMajorUpdateTarget(
+    currentPackageManager,
+    latestPackageManager
+  );
+  if (updateTarget == null) return undefined;
+
+  const shouldUpdate =
+    options.yes ||
+    (await p.confirm({
+      message: `Update ${currentPackageManager.name} from ${formatPackageManagerMajor(
+        currentPackageManager
+      )} to ${formatPackageManagerMajor(latestPackageManager)}?`,
+      initialValue: true,
+    }));
+
+  if (p.isCancel(shouldUpdate)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  return shouldUpdate ? updateTarget : undefined;
+}
+
+async function applyPackageManagerMigration(
+  projectRoot: string,
+  isMonorepo: boolean,
+  options: CliOptions,
+  detectedConfig: WorkspaceConfig
+): Promise<WorkspaceConfig> {
+  const targetPackageManagerSpec =
+    (await resolveTargetPackageManagerSpec(options, detectedConfig)) ??
+    (await promptForPackageManagerMajorUpdate(options, detectedConfig));
+  if (targetPackageManagerSpec == null) return detectedConfig;
+
+  const targetNodeVersion = await promptForNodeRequirementUpdate(
+    options,
+    detectedConfig,
+    targetPackageManagerSpec
+  );
+  const migrationConfig: WorkspaceConfig = {
+    ...detectedConfig,
+    packageManager: targetPackageManagerSpec.name,
+    targetPackageManagerSpec,
+    targetNodeVersion,
+  };
+
+  const changes = [
+    ...(await getPackageManagerConfigUpdates(projectRoot, migrationConfig)),
+    ...(isMonorepo || targetPackageManagerSpec.name === 'pnpm'
+      ? await getWorkspaceConfigUpdates(projectRoot, migrationConfig)
+      : []),
+  ].filter((change) => change.status === 'added' || change.status === 'modified');
+
+  if (changes.length === 0) return migrationConfig;
+
+  console.log();
+  console.log(color.cyan('Package Manager:'));
+  for (const change of changes) {
+    console.log(formatFileChange(change));
+  }
+
+  await applyUpdates(changes, projectRoot);
+  console.log(color.green('✓') + ` Package Manager: updated ${changes.length}`);
+
+  return migrationConfig;
 }
 
 async function processUpdateCategory(
@@ -378,7 +582,9 @@ export async function handleUpdateCommand(
     }
   }
 
-  await promptForPackageUpdate(projectRoot, config, options);
+  const finalConfig = await applyPackageManagerMigration(projectRoot, isMonorepo, options, config);
+
+  await promptForPackageUpdate(projectRoot, finalConfig, options);
 
   process.exit(0);
 }

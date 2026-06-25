@@ -17,17 +17,32 @@ describe('package manager specs', () => {
   });
 
   it('profiles pnpm workspace capabilities by major version', () => {
-    expect(getPackageManagerProfile({ name: 'pnpm', version: '10.30.3' }).capabilities).toEqual({
-      pnpmWorkspaceVersionPolicy: 'manage-package-manager-versions',
-      pnpmBuildDependencyPolicy: 'onlyBuiltDependencies',
+    expect(getPackageManagerProfile({ name: 'pnpm', version: '10.30.3' })).toMatchObject({
+      requirements: {
+        node: '18.12',
+      },
+      capabilities: {
+        pnpmWorkspaceVersionPolicy: 'manage-package-manager-versions',
+        pnpmBuildDependencyPolicy: 'onlyBuiltDependencies',
+      },
     });
-    expect(getPackageManagerProfile({ name: 'pnpm', version: '11.0.0' }).capabilities).toEqual({
-      pnpmWorkspaceVersionPolicy: 'pmOnFail',
-      pnpmBuildDependencyPolicy: 'allowBuilds',
+    expect(getPackageManagerProfile({ name: 'pnpm', version: '11.0.0' })).toMatchObject({
+      requirements: {
+        node: '22.13',
+      },
+      capabilities: {
+        pnpmWorkspaceVersionPolicy: 'pmOnFail',
+        pnpmBuildDependencyPolicy: 'allowBuilds',
+      },
     });
-    expect(getPackageManagerProfile({ name: 'pnpm', version: '12.0.0' }).capabilities).toEqual({
-      pnpmWorkspaceVersionPolicy: 'pmOnFail',
-      pnpmBuildDependencyPolicy: 'allowBuilds',
+    expect(getPackageManagerProfile({ name: 'pnpm', version: '12.0.0' })).toMatchObject({
+      requirements: {
+        node: '22.13',
+      },
+      capabilities: {
+        pnpmWorkspaceVersionPolicy: 'pmOnFail',
+        pnpmBuildDependencyPolicy: 'allowBuilds',
+      },
     });
   });
 });
@@ -55,6 +70,10 @@ onlyBuiltDependencies:
       renderPnpmWorkspaceConfig({
         profile: getPackageManagerProfile({ name: 'pnpm', version: '11.0.0' }),
         packages: ['.config/*', 'apps/*', 'packages/*'],
+        buildDependencies: {
+          esbuild: true,
+          'untrusted-package': false,
+        },
       })
     ).toBe(`pmOnFail: download
 
@@ -64,6 +83,7 @@ packages:
   - "packages/*"
 
 allowBuilds:
-  esbuild: true`);
+  esbuild: true
+  untrusted-package: false`);
   });
 });

@@ -7,4 +7,5 @@ export type {
   PackageManagerCapabilities,
   PackageManagerIntent,
   PackageManagerProfile,
+  PackageManagerRequirements,
 } from './types.js';
