@@ -3,6 +3,7 @@ import {
   formatNodeTypesVersion,
 } from '../workflow/resolve/package-versions.js';
 import { getEngineName } from '../workflow/resolve/engine.js';
+import { renderJson } from './json.js';
 import type {
   BaseTemplate,
   ConfigStrategy,
@@ -85,15 +86,11 @@ export function renderTypescriptConfig(
 
     files['tsconfig.json'] = {
       type: 'text',
-      content: JSON.stringify(
-        {
-          $schema: 'https://json.schemastore.org/tsconfig',
-          extends: baseConfig,
-          include: ['src/**/*', 'tests/**/*'],
-        },
-        null,
-        2
-      ),
+      content: renderJson({
+        $schema: 'https://json.schemastore.org/tsconfig',
+        extends: baseConfig,
+        include: ['src/**/*', 'tests/**/*'],
+      }),
     };
 
     return { files, devDependencies };
@@ -109,7 +106,7 @@ export function renderTypescriptConfig(
 
     files['tsconfig.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfig, null, 2),
+      content: renderJson(tsConfig),
     };
 
     // App config - browser environment for src/tests
@@ -135,7 +132,7 @@ export function renderTypescriptConfig(
 
     files['.config/tsconfig.app.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfigApp, null, 2),
+      content: renderJson(tsConfigApp),
     };
 
     // Node config - Node environment for config files
@@ -160,7 +157,7 @@ export function renderTypescriptConfig(
 
     files['.config/tsconfig.node.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfigNode, null, 2),
+      content: renderJson(tsConfigNode),
     };
   } else {
     // Single-package root - solution-style tsconfig with files at root
@@ -172,7 +169,7 @@ export function renderTypescriptConfig(
 
     files['tsconfig.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfig, null, 2),
+      content: renderJson(tsConfig),
     };
 
     // App config - browser environment for src/tests
@@ -198,7 +195,7 @@ export function renderTypescriptConfig(
 
     files['tsconfig.app.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfigApp, null, 2),
+      content: renderJson(tsConfigApp),
     };
 
     // Node config - Node environment for config files
@@ -223,7 +220,7 @@ export function renderTypescriptConfig(
 
     files['tsconfig.node.json'] = {
       type: 'text',
-      content: JSON.stringify(tsConfigNode, null, 2),
+      content: renderJson(tsConfigNode),
     };
   }
 

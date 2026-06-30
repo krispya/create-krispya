@@ -8,6 +8,7 @@ import {
   renderPnpmWorkspaceConfig,
 } from '../package-managers/index.js';
 import type { BaseTemplate, VirtualFile, ProjectOptions } from '../types.js';
+import { renderJson } from './json.js';
 import { mergePackageJsonScripts, resolveDefaultPackageJsonScripts } from './package-json-scripts.js';
 
 const DEFAULT_LIBRARY_VERSION = '0.1.0';
@@ -133,7 +134,7 @@ export function renderPackageJson(params: PackageJsonParams): PackageJsonResult 
 
   files['package.json'] = {
     type: 'text',
-    content: JSON.stringify(packageJson, null, 2),
+    content: renderJson(packageJson, { inlineArrays: false }),
   };
 
   // Add pnpm-workspace.yaml when pnpm is selected (but not in a workspace package)

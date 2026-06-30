@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { format as formatPrettier } from 'prettier';
 import { planProject, planWorkspace } from '../src/index.js';
 import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
 
@@ -8,6 +9,16 @@ const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space
 const formatterIndentSize = defaultFormatterMetaConfig.useTabs
   ? 'tab'
   : String(defaultFormatterMetaConfig.tabWidth);
+const prettierOptions = {
+  printWidth: defaultFormatterMetaConfig.printWidth,
+  tabWidth: defaultFormatterMetaConfig.tabWidth,
+  useTabs: defaultFormatterMetaConfig.useTabs,
+  semi: defaultFormatterMetaConfig.semi,
+  singleQuote: defaultFormatterMetaConfig.singleQuote,
+  trailingComma: defaultFormatterMetaConfig.trailingComma,
+  bracketSpacing: defaultFormatterMetaConfig.bracketSpacing,
+  arrowParens: defaultFormatterMetaConfig.arrowParens,
+};
 
 function readPackageJsonContent(
   file: { type: 'text'; content: string } | { type: 'remote'; url: string }
@@ -25,6 +36,24 @@ function readTextFile(file: { type: 'text'; content: string } | { type: 'remote'
   }
 
   return file.content;
+}
+
+async function expectPreformattedFiles(
+  files: Record<string, { type: 'text'; content: string } | { type: 'remote'; url: string }>,
+  predicate: (path: string) => boolean
+) {
+  for (const [path, file] of Object.entries(files)) {
+    if (!predicate(path) || file.type !== 'text') {
+      continue;
+    }
+
+    await expect(
+      formatPrettier(file.content, {
+        ...prettierOptions,
+        filepath: path,
+      })
+    ).resolves.toBe(file.content);
+  }
 }
 
 describe('renderPackageJson', () => {
@@ -367,6 +396,60 @@ allowBuilds:
       lint: 'oxlint .',
       test: 'pnpm -r run test',
     });
+  });
+
+  it('preformats monorepo config package json and js files', async () => {
+    const workspaces = await Promise.all([
+      planWorkspace({
+        name: 'eslint-workspace',
+        linter: 'eslint',
+        formatter: 'prettier',
+        packageManager: { name: 'pnpm', version: '10.0.0' },
+      }),
+      planWorkspace({
+        name: 'oxlint-workspace',
+        linter: 'oxlint',
+        formatter: 'oxfmt',
+        packageManager: { name: 'pnpm', version: '10.0.0' },
+      }),
+    ]);
+
+    for (const { files } of workspaces) {
+      await expectPreformattedFiles(
+        files,
+        (path) => path.startsWith('.config/') && /\.(json|js)$/.test(path)
+      );
+    }
+  });
+
+  it('preformats single-package json config files', async () => {
+    const projects = await Promise.all([
+      planProject({
+        name: 'prettier-app',
+        template: 'react',
+        linter: 'oxlint',
+        formatter: 'prettier',
+      }),
+      planProject({
+        name: 'oxfmt-app',
+        template: 'vanilla',
+        linter: 'oxlint',
+        formatter: 'oxfmt',
+      }),
+      planProject({
+        name: 'biome-app',
+        template: 'vanilla',
+        linter: 'biome',
+        formatter: 'biome',
+      }),
+    ]);
+
+    const configPathPattern =
+      /^(?:\.config\/.*\.json|\.vscode\/.*\.json|tsconfig.*\.json|package\.json|oxlint\.json|oxfmt\.json|biome\.json)$/;
+
+    for (const { files } of projects) {
+      await expectPreformattedFiles(files, (path) => configPathPattern.test(path));
+    }
   });
 
   it('generates prettier ignore files for lock files', async () => {

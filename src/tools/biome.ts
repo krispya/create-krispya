@@ -1,4 +1,5 @@
 import { packageJsonScripts } from '../renderers/package-json-scripts.js';
+import { renderJson } from '../renderers/json.js';
 import type { FormatterMetaConfig, LinterMetaConfig, PlanBuilder, ToolConfig } from '../types.js';
 
 export type PlanBiomeOptions = {
@@ -79,7 +80,7 @@ export function planBiome(builder: PlanBuilder, options: PlanBiomeOptions | unde
   if (isStealth) {
     builder.addFile('.config/biome.json', {
       type: 'text',
-      content: JSON.stringify(biomeConfig, null, 2),
+      content: renderJson(biomeConfig),
     });
     if (options.linter) {
       builder.addScripts(packageJsonScripts.lint.biome('.config'));
@@ -90,7 +91,7 @@ export function planBiome(builder: PlanBuilder, options: PlanBiomeOptions | unde
   } else {
     builder.addFile('biome.json', {
       type: 'text',
-      content: JSON.stringify(biomeConfig, null, 2),
+      content: renderJson(biomeConfig),
     });
     if (options.linter) {
       builder.addScripts(packageJsonScripts.lint.biome());

@@ -1,4 +1,5 @@
 import { renderOxlintConfig } from '../renderers/oxlint-config.js';
+import { renderJson } from '../renderers/json.js';
 import { packageJsonScripts } from '../renderers/package-json-scripts.js';
 import {
   getBaseTemplate,
@@ -60,13 +61,13 @@ export function planOxlint(builder: PlanBuilder, options: PlanOxlintOptions | un
     if (isStealth) {
       builder.addFile('.config/oxlint.json', {
         type: 'text',
-        content: JSON.stringify(oxlintConfig, null, 2),
+        content: renderJson(oxlintConfig),
       });
       builder.addScripts(packageJsonScripts.lint.oxlint('.config/oxlint.json'));
     } else {
       builder.addFile('oxlint.json', {
         type: 'text',
-        content: JSON.stringify(oxlintConfig, null, 2),
+        content: renderJson(oxlintConfig),
       });
       builder.addScripts(packageJsonScripts.lint.oxlint());
     }

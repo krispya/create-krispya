@@ -1,4 +1,5 @@
 <!-- managed:start -->
+
 ## Workspace Tools
 
 - **Package Manager:** pnpm
@@ -23,6 +24,7 @@ pnpm lint -- src/App.tsx src/core/systems/move-entity.ts
 pnpm format
 pnpm lint
 ```
+
 <!-- managed:end -->
 
 ## Architecture

@@ -4,6 +4,7 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { renderAiFiles } from '../renderers/ai-files.js';
+import { renderJson } from '../renderers/json.js';
 import {
   renderEslintConfigPackage,
   renderOxfmtConfigPackage,
@@ -341,7 +342,7 @@ export async function handleFixCommand(options: CliOptions): Promise<void> {
       };
       files['biome.json'] = {
         type: 'text',
-        content: JSON.stringify(biomeConfig, null, 2),
+        content: renderJson(biomeConfig),
       };
     }
 

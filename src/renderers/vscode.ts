@@ -7,6 +7,7 @@ import type {
   PackageManagerName,
 } from '../types.js';
 import { renderVscodeEditorSettings } from './editorconfig.js';
+import { renderJson } from './json.js';
 
 export type VscodeParams = {
   codeSnippets?: Partial<Record<CodeInjectionLocation, string[]>>;
@@ -166,13 +167,9 @@ export function renderVscodeFiles(params: VscodeParams): Record<string, VirtualF
     const uniqueRecommendations = [...new Set(recommendations)];
     files['.vscode/extensions.json'] = {
       type: 'text',
-      content: JSON.stringify(
-        {
-          recommendations: uniqueRecommendations,
-        },
-        null,
-        2
-      ),
+      content: renderJson({
+        recommendations: uniqueRecommendations,
+      }),
     };
   }
 
@@ -188,7 +185,7 @@ export function renderVscodeFiles(params: VscodeParams): Record<string, VirtualF
     );
     files['.vscode/settings.json'] = {
       type: 'text',
-      content: JSON.stringify(sortedSettings, null, 2),
+      content: renderJson(sortedSettings),
     };
   }
 

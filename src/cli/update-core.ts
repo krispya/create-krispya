@@ -45,6 +45,7 @@ import {
 import { toPrettierIgnoreContent } from '../tools/formatter-config.js';
 import { renderOxlintConfig } from '../renderers/oxlint-config.js';
 import { renderViteConfig } from '../renderers/vite-config.js';
+import { renderJson } from '../renderers/json.js';
 import { detectTooling } from '../utils/index.js';
 import {
   formatPackageManager,
@@ -324,7 +325,7 @@ export async function planExpectedFiles(
     };
     rootConfig['biome.json'] = {
       type: 'text',
-      content: JSON.stringify(biomeConfig, null, 2),
+      content: renderJson(biomeConfig),
     };
   }
 
@@ -907,7 +908,7 @@ export async function getPackageJsonScriptUpdates(
   if (Object.keys(nextDevDependencies).length > 0 || pkg.devDependencies != null) {
     nextPackageJson.devDependencies = nextDevDependencies;
   }
-  const newContent = `${JSON.stringify(nextPackageJson, null, 2)}\n`;
+  const newContent = renderJson(nextPackageJson, { inlineArrays: false });
 
   return [
     {
@@ -957,7 +958,7 @@ export async function getPackageManagerConfigUpdates(
       path: 'package.json',
       status: 'modified',
       currentContent,
-      newContent: `${JSON.stringify(nextPackageJson, null, 2)}\n`,
+      newContent: renderJson(nextPackageJson, { inlineArrays: false }),
     },
   ];
 }
@@ -983,7 +984,7 @@ function planSinglePackageOxlintConfig(config: WorkspaceConfig): FileChange | un
   return {
     path,
     status: 'added',
-    newContent: `${JSON.stringify(oxlintConfig, null, 2)}\n`,
+    newContent: renderJson(oxlintConfig),
   };
 }
 

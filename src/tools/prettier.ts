@@ -1,4 +1,5 @@
 import { toPrettierConfig, toPrettierIgnoreContent } from './formatter-config.js';
+import { renderJson } from '../renderers/json.js';
 import { packageJsonScripts } from '../renderers/package-json-scripts.js';
 import type { FormatterMetaConfig, PlanBuilder, ToolConfig } from '../types.js';
 
@@ -16,7 +17,7 @@ export function planPrettier(builder: PlanBuilder, options: PlanPrettierOptions 
   if (isStealth) {
     builder.addFile('.config/prettier.json', {
       type: 'text',
-      content: JSON.stringify(toPrettierConfig(options.config), null, 2),
+      content: renderJson(toPrettierConfig(options.config)),
     });
     builder.addFile('.config/prettierignore', {
       type: 'text',
@@ -28,7 +29,7 @@ export function planPrettier(builder: PlanBuilder, options: PlanPrettierOptions 
   } else {
     builder.addFile('.prettierrc', {
       type: 'text',
-      content: JSON.stringify(toPrettierConfig(options.config), null, 2),
+      content: renderJson(toPrettierConfig(options.config)),
     });
     builder.addFile('.prettierignore', {
       type: 'text',

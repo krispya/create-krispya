@@ -4,6 +4,7 @@ import {
   toPrettierIgnoreContent,
 } from '../tools/formatter-config.js';
 import type { VirtualFile } from '../types.js';
+import { renderJson } from './json.js';
 import { renderOxlintConfig } from './oxlint-config.js';
 
 /**
@@ -15,15 +16,14 @@ export function renderTypescriptConfigPackage(files: Record<string, VirtualFile>
   // package.json
   files[`${basePath}/package.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       {
         name: '@config/typescript',
         version: '0.1.0',
         private: true,
         files: ['base.json', 'app.json', 'node.json', 'react.json'],
       },
-      null,
-      2
+      { inlineArrays: false }
     ),
   };
 
@@ -57,73 +57,57 @@ In your package's \`tsconfig.json\`:
   // base.json - Common compiler options
   files[`${basePath}/base.json`] = {
     type: 'text',
-    content: JSON.stringify(
-      {
-        $schema: 'https://json.schemastore.org/tsconfig',
-        compilerOptions: {
-          target: 'ESNext',
-          module: 'ESNext',
-          moduleResolution: 'bundler',
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          strict: true,
-          skipLibCheck: true,
-          composite: true,
-          rewriteRelativeImportExtensions: true,
-          erasableSyntaxOnly: true,
-        },
+    content: renderJson({
+      $schema: 'https://json.schemastore.org/tsconfig',
+      compilerOptions: {
+        target: 'ESNext',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+        strict: true,
+        skipLibCheck: true,
+        composite: true,
+        rewriteRelativeImportExtensions: true,
+        erasableSyntaxOnly: true,
       },
-      null,
-      2
-    ),
+    }),
   };
 
   // app.json - Browser/DOM environment
   files[`${basePath}/app.json`] = {
     type: 'text',
-    content: JSON.stringify(
-      {
-        $schema: 'https://json.schemastore.org/tsconfig',
-        extends: './base.json',
-        compilerOptions: {
-          lib: ['DOM', 'DOM.Iterable', 'ESNext'],
-        },
+    content: renderJson({
+      $schema: 'https://json.schemastore.org/tsconfig',
+      extends: './base.json',
+      compilerOptions: {
+        lib: ['DOM', 'DOM.Iterable', 'ESNext'],
       },
-      null,
-      2
-    ),
+    }),
   };
 
   // node.json - Node.js environment
   files[`${basePath}/node.json`] = {
     type: 'text',
-    content: JSON.stringify(
-      {
-        $schema: 'https://json.schemastore.org/tsconfig',
-        extends: './base.json',
-        compilerOptions: {
-          lib: ['ESNext'],
-        },
+    content: renderJson({
+      $schema: 'https://json.schemastore.org/tsconfig',
+      extends: './base.json',
+      compilerOptions: {
+        lib: ['ESNext'],
       },
-      null,
-      2
-    ),
+    }),
   };
 
   // react.json - React with JSX
   files[`${basePath}/react.json`] = {
     type: 'text',
-    content: JSON.stringify(
-      {
-        $schema: 'https://json.schemastore.org/tsconfig',
-        extends: './app.json',
-        compilerOptions: {
-          jsx: 'react-jsx',
-        },
+    content: renderJson({
+      $schema: 'https://json.schemastore.org/tsconfig',
+      extends: './app.json',
+      compilerOptions: {
+        jsx: 'react-jsx',
       },
-      null,
-      2
-    ),
+    }),
   };
 }
 
@@ -136,15 +120,14 @@ export function renderOxlintConfigPackage(files: Record<string, VirtualFile>): v
   // package.json
   files[`${basePath}/package.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       {
         name: '@config/oxlint',
         version: '0.1.0',
         private: true,
         files: ['base.json', 'react.json'],
       },
-      null,
-      2
+      { inlineArrays: false }
     ),
   };
 
@@ -173,27 +156,23 @@ oxlint -c node_modules/@config/oxlint/base.json
   // base.json - Base oxlint config
   files[`${basePath}/base.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       renderOxlintConfig({
         schemaPath: './node_modules/oxlint/configuration_schema.json',
         typescript: true,
-      }),
-      null,
-      2
+      })
     ),
   };
 
   // react.json - React-specific oxlint config
   files[`${basePath}/react.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       renderOxlintConfig({
         schemaPath: './node_modules/oxlint/configuration_schema.json',
         react: true,
         typescript: true,
-      }),
-      null,
-      2
+      })
     ),
   };
 }
@@ -207,7 +186,7 @@ export function renderEslintConfigPackage(files: Record<string, VirtualFile>): v
   // package.json
   files[`${basePath}/package.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       {
         name: '@config/eslint',
         version: '0.1.0',
@@ -223,8 +202,7 @@ export function renderEslintConfigPackage(files: Record<string, VirtualFile>): v
           'typescript-eslint': '^8.18.0',
         },
       },
-      null,
-      2
+      { inlineArrays: false }
     ),
   };
 
@@ -263,26 +241,26 @@ export default [...react];
   // base.js - Base ESLint config
   files[`${basePath}/base.js`] = {
     type: 'text',
-    content: `import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+    content: `import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     rules: {
-      "@typescript-eslint/no-unused-vars": [
-        "error",
+      '@typescript-eslint/no-unused-vars': [
+        'error',
         {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ['dist/**', 'node_modules/**'],
   }
 );
 `,
@@ -291,26 +269,26 @@ export default tseslint.config(
   // react.js - React ESLint config
   files[`${basePath}/react.js`] = {
     type: 'text',
-    content: `import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+    content: `import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     rules: {
-      "@typescript-eslint/no-unused-vars": [
-        "error",
+      '@typescript-eslint/no-unused-vars': [
+        'error',
         {
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
         },
       ],
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ['dist/**', 'node_modules/**'],
   }
 );
 `,
@@ -326,7 +304,7 @@ export function renderPrettierConfigPackage(files: Record<string, VirtualFile>):
   // package.json
   files[`${basePath}/package.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       {
         name: '@config/prettier',
         version: '0.1.0',
@@ -337,8 +315,7 @@ export function renderPrettierConfigPackage(files: Record<string, VirtualFile>):
         },
         files: ['base.json', 'prettierignore'],
       },
-      null,
-      2
+      { inlineArrays: false }
     ),
   };
 
@@ -374,7 +351,7 @@ Or in \`.prettierrc.json\`:
   // base.json - Base Prettier config
   files[`${basePath}/base.json`] = {
     type: 'text',
-    content: JSON.stringify(toPrettierConfig(), null, 2),
+    content: renderJson(toPrettierConfig()),
   };
 
   files[`${basePath}/prettierignore`] = {
@@ -392,15 +369,14 @@ export function renderOxfmtConfigPackage(files: Record<string, VirtualFile>): vo
   // package.json
   files[`${basePath}/package.json`] = {
     type: 'text',
-    content: JSON.stringify(
+    content: renderJson(
       {
         name: '@config/oxfmt',
         version: '0.1.0',
         private: true,
         files: ['base.json'],
       },
-      null,
-      2
+      { inlineArrays: false }
     ),
   };
 
@@ -428,6 +404,6 @@ oxfmt -c node_modules/@config/oxfmt/base.json --write .
   // base.json - Base oxfmt config
   files[`${basePath}/base.json`] = {
     type: 'text',
-    content: JSON.stringify(toOxfmtConfig(), null, 2),
+    content: renderJson(toOxfmtConfig()),
   };
 }

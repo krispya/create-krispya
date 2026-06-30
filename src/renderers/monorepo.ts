@@ -29,6 +29,7 @@ import {
 } from './config-packages.js';
 import { renderEditorConfig } from './editorconfig.js';
 import { renderGitignore } from './gitignore.js';
+import { renderJson } from './json.js';
 import { packageJsonScripts } from './package-json-scripts.js';
 import { renderVscodeFiles as renderSharedVscodeFiles } from './vscode.js';
 
@@ -136,7 +137,7 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
 
   files['package.json'] = {
     type: 'text',
-    content: JSON.stringify(rootPackageJson, null, 2),
+    content: renderJson(rootPackageJson, { inlineArrays: false }),
   };
 
   // pnpm-workspace.yaml - includes .config/* for config packages
@@ -217,7 +218,7 @@ export default [...base];
     };
     files['biome.json'] = {
       type: 'text',
-      content: JSON.stringify(biomeConfig, null, 2),
+      content: renderJson(biomeConfig),
     };
   }
 

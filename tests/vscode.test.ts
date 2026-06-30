@@ -84,6 +84,13 @@ describe('renderVscodeFiles', () => {
     expect(settings['prettier.configPath']).toBe('.config/prettier.json');
     expect(settings['prettier.ignorePath']).toBe('.config/prettierignore');
     expect(extensions.recommendations).toEqual(['oxc.oxc-vscode', 'esbenp.prettier-vscode']);
+    expect(files['.vscode/extensions.json']).toEqual({
+      type: 'text',
+      content: `{
+  "recommendations": ["oxc.oxc-vscode", "esbenp.prettier-vscode"]
+}
+`,
+    });
   });
 
   it('lets biome formatter override lint extension toggles', () => {

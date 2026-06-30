@@ -1,4 +1,5 @@
 import { packageJsonScripts } from '../renderers/package-json-scripts.js';
+import { renderJson } from '../renderers/json.js';
 import type { FormatterMetaConfig, PlanBuilder, ToolConfig } from '../types.js';
 import { toOxfmtConfig } from './formatter-config.js';
 
@@ -28,13 +29,13 @@ export function planOxfmt(builder: PlanBuilder, options: PlanOxfmtOptions | unde
     if (isStealth) {
       builder.addFile('.config/oxfmt.json', {
         type: 'text',
-        content: JSON.stringify(toOxfmtConfig(options.config), null, 2),
+        content: renderJson(toOxfmtConfig(options.config)),
       });
       builder.addScripts(packageJsonScripts.format.oxfmt('.config/oxfmt.json'));
     } else {
       builder.addFile('oxfmt.json', {
         type: 'text',
-        content: JSON.stringify(toOxfmtConfig(options.config), null, 2),
+        content: renderJson(toOxfmtConfig(options.config)),
       });
       builder.addScripts(packageJsonScripts.format.oxfmt('oxfmt.json'));
     }
