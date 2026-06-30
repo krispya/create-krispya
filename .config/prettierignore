@@ -1,3 +1,5 @@
+dist/
+**/dist/
 package-lock.json
 npm-shrinkwrap.json
 pnpm-lock.yaml

@@ -10,6 +10,8 @@ export const defaultFormatterMetaConfig: FormatterMetaConfig = {
   bracketSpacing: true,
   arrowParens: 'always',
   ignorePatterns: [
+    'dist/',
+    '**/dist/',
     'package-lock.json',
     'npm-shrinkwrap.json',
     'pnpm-lock.yaml',

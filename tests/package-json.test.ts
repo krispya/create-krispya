@@ -385,6 +385,8 @@ allowBuilds:
     expect(singlePackageFiles['.config/prettierignore']).toEqual({
       type: 'text',
       content: [
+        'dist/',
+        '**/dist/',
         'package-lock.json',
         'npm-shrinkwrap.json',
         'pnpm-lock.yaml',
@@ -413,6 +415,8 @@ allowBuilds:
     });
 
     const expectedIgnorePatterns = [
+      'dist/',
+      '**/dist/',
       'package-lock.json',
       'npm-shrinkwrap.json',
       'pnpm-lock.yaml',

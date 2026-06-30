@@ -75,6 +75,8 @@ describe('update helpers', () => {
     expect(expected['root-config']['.config/prettierignore']).toEqual({
       type: 'text',
       content: [
+        'dist/',
+        '**/dist/',
         'package-lock.json',
         'npm-shrinkwrap.json',
         'pnpm-lock.yaml',
@@ -530,6 +532,20 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
       ].join('\n'),
     });
     expect(expected['config-packages']['.config/typescript/package.json']).toBeDefined();
+    expect(expected['config-packages']['.config/prettier/prettierignore']).toEqual({
+      type: 'text',
+      content: [
+        'dist/',
+        '**/dist/',
+        'package-lock.json',
+        'npm-shrinkwrap.json',
+        'pnpm-lock.yaml',
+        'pnpm-lock.json',
+        'yarn.lock',
+        'bun.lock',
+        'bun.lockb',
+      ].join('\n'),
+    });
 
     const settings = readTextJson(expected.vscode['.vscode/settings.json']);
     expect(settings['oxc.configPath']).toBeUndefined();
