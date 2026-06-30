@@ -109,7 +109,9 @@ describe('getLatestNpmMajorVersion', () => {
       },
     });
 
-    await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe('25.3.5');
+    await expect(
+      getLatestNpmMajorVersion('@types/node', '25', '25.0.0', { minimumReleaseAgeMinutes: 0 })
+    ).resolves.toBe('25.3.5');
   });
 
   it('falls back when no version matches the requested major', async () => {
@@ -119,7 +121,9 @@ describe('getLatestNpmMajorVersion', () => {
       },
     });
 
-    await expect(getLatestNpmMajorVersion('@types/node', '25', '25.0.0')).resolves.toBe('25.0.0');
+    await expect(
+      getLatestNpmMajorVersion('@types/node', '25', '25.0.0', { minimumReleaseAgeMinutes: 0 })
+    ).resolves.toBe('25.0.0');
   });
 });
 
@@ -137,9 +141,11 @@ describe('getLatestNpmMajorVersionAtOrBelow', () => {
       },
     });
 
-    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
-      '26.1.0'
-    );
+    await expect(
+      getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0', {
+        minimumReleaseAgeMinutes: 0,
+      })
+    ).resolves.toBe('26.1.0');
   });
 
   it('falls back to the newest lower major when the requested major is missing', async () => {
@@ -151,9 +157,11 @@ describe('getLatestNpmMajorVersionAtOrBelow', () => {
       },
     });
 
-    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
-      '25.7.0'
-    );
+    await expect(
+      getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0', {
+        minimumReleaseAgeMinutes: 0,
+      })
+    ).resolves.toBe('25.7.0');
   });
 
   it('uses the fallback when no lower matching major exists', async () => {
@@ -161,9 +169,11 @@ describe('getLatestNpmMajorVersionAtOrBelow', () => {
       versions: {},
     });
 
-    await expect(getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0')).resolves.toBe(
-      '25.0.0'
-    );
+    await expect(
+      getLatestNpmMajorVersionAtOrBelow('@types/node', '26', '25.0.0', {
+        minimumReleaseAgeMinutes: 0,
+      })
+    ).resolves.toBe('25.0.0');
   });
 
   it('skips too-new versions while falling back across majors', async () => {

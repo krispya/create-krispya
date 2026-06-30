@@ -13,6 +13,7 @@ import {
   getLatestNpmVersion,
   getSemverMajorString,
 } from '../../utils/index.js';
+import { getPackageManagerName } from '../../package-managers/index.js';
 import { getEngineName, getEngineSpec } from './engine.js';
 
 type PackageVersionDefinition = {
