@@ -19,6 +19,7 @@ import {
 } from '../src/cli/update.js';
 import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
 import { renderManagedGitignoreBlock } from '../src/renderers/gitignore.js';
+import { generateWorkspace, renderManagedAiFileContent } from '../src/renderers/ai-files.js';
 
 const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space';
 const formatterIndentSize = defaultFormatterMetaConfig.useTabs
@@ -263,6 +264,127 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     }
   });
 
+  it('ignores user content outside the managed AI file block', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-ai-managed-current-'));
+    try {
+      const expected = await planExpectedFiles({
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+      const agentsFile = expected['ai-files']['AGENTS.md'];
+      if (agentsFile?.type !== 'text') throw new Error('Expected AGENTS.md to be text');
+
+      await writeFile(
+        join(tempDir, 'AGENTS.md'),
+        `${agentsFile.content}\n## Project Notes\n\nKeep these notes.\n`
+      );
+
+      const categories = await compareWithDisk(expected, tempDir);
+      const updateCategory = categories.find((category) => category.category === 'ai-files-update');
+
+      expect(updateCategory?.changes.some((change) => change.path === 'AGENTS.md') ?? false).toBe(
+        false
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('updates only the managed AI file block', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-ai-managed-block-'));
+    try {
+      await writeFile(
+        join(tempDir, 'AGENTS.md'),
+        [
+          '# Header owned by the user',
+          '',
+          renderManagedAiFileContent('# Old managed instructions'),
+          '## Project Notes',
+          '',
+          'Keep these notes.',
+          '',
+        ].join('\n')
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+      const agentsFile = expected['ai-files']['AGENTS.md'];
+      if (agentsFile?.type !== 'text') throw new Error('Expected AGENTS.md to be text');
+
+      const categories = await compareWithDisk(expected, tempDir);
+      const updateCategory = categories.find((category) => category.category === 'ai-files-update');
+      const agentsChange = updateCategory?.changes.find((change) => change.path === 'AGENTS.md');
+
+      expect(agentsChange?.status).toBe('modified');
+      expect(agentsChange?.mergeSafe).toBe(true);
+      expect(agentsChange?.newContent).toBe(
+        [
+          '# Header owned by the user',
+          '',
+          agentsFile.content.trimEnd(),
+          '',
+          '## Project Notes',
+          '',
+          'Keep these notes.',
+          '',
+        ].join('\n')
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates legacy AI file content into a managed block', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-ai-managed-legacy-'));
+    try {
+      const legacyContent = generateWorkspace({
+        packageManager: 'pnpm',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+        hasTypecheck: false,
+      });
+      await writeFile(
+        join(tempDir, 'AGENTS.md'),
+        `${legacyContent}\n## Project Notes\n\nKeep these notes.\n`
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+      const agentsFile = expected['ai-files']['AGENTS.md'];
+      if (agentsFile?.type !== 'text') throw new Error('Expected AGENTS.md to be text');
+
+      const categories = await compareWithDisk(expected, tempDir);
+      const updateCategory = categories.find((category) => category.category === 'ai-files-update');
+      const agentsChange = updateCategory?.changes.find((change) => change.path === 'AGENTS.md');
+
+      expect(agentsChange?.status).toBe('modified');
+      expect(agentsChange?.mergeSafe).toBe(true);
+      expect(agentsChange?.newContent).toBe(
+        `${agentsFile.content.trimEnd()}\n\n## Project Notes\n\nKeep these notes.\n`
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('migrates legacy gitignore content into a managed block', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-gitignore-'));
     try {
@@ -321,10 +443,10 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         [
           '# Keep this header',
           '',
-          '# create-krispya managed ignores: begin',
+          '# managed:start',
           'node_modules',
           'dist',
-          '# create-krispya managed ignores: end',
+          '# managed:end',
           '',
           '# Project artifacts',
           'coverage',
@@ -364,14 +486,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     try {
       await writeFile(
         join(tempDir, '.gitignore'),
-        [
-          '# create-krispya managed ignores: begin',
-          'node_modules',
-          'dist',
-          '',
-          '# Project artifacts',
-          'coverage',
-        ].join('\n')
+        ['# managed:start', 'node_modules', 'dist', '', '# Project artifacts', 'coverage'].join('\n')
       );
 
       const expected = await planExpectedFiles({

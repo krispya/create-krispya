@@ -1,10 +1,11 @@
-# Workspace Tools
+<!-- managed:start -->
+## Workspace Tools
 
 - **Package Manager:** pnpm
 - **Linter:** oxlint
 - **Formatter:** prettier
 
-## After Editing
+### After Editing
 
 ✅ After editing files, check the types for errors and then format and lint only the files changed for the current task.
 
@@ -22,6 +23,7 @@ pnpm lint -- src/App.tsx src/core/systems/move-entity.ts
 pnpm format
 pnpm lint
 ```
+<!-- managed:end -->
 
 ## Architecture
 

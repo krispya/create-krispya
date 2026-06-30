@@ -4,6 +4,9 @@ export type { AiPlatform };
 
 export const ALL_AI_PLATFORMS: AiPlatform[] = ['agents', 'claude'];
 
+export const AI_FILE_MANAGED_BEGIN = '<!-- managed:start -->';
+export const AI_FILE_MANAGED_END = '<!-- managed:end -->';
+
 export const AI_PLATFORM_LABELS: Record<AiPlatform, string> = {
   agents: 'AGENTS.md',
   claude: 'CLAUDE.md',
@@ -25,6 +28,11 @@ export type AiFilesParams = {
   platforms: AiPlatform[];
 };
 
+export type AiFileMergeResult = {
+  content: string;
+  mergeSafe: boolean;
+};
+
 /**
  * Generates AI rule
  */
@@ -33,13 +41,14 @@ export function renderAiFiles(files: Record<string, VirtualFile>, params: AiFile
 
   if (platforms.length === 0) return;
 
-  // Generate agents content
-  const content = generateWorkspace({
-    ...rest,
-    isMonorepo: !!isMonorepo,
-    configStrategy: configStrategy ?? 'stealth',
-    hasTypecheck: hasTypecheck ?? false,
-  });
+  const content = renderManagedAiFileContent(
+    generateWorkspace({
+      ...rest,
+      isMonorepo: !!isMonorepo,
+      configStrategy: configStrategy ?? 'stealth',
+      hasTypecheck: hasTypecheck ?? false,
+    })
+  );
   const pointer = 'See [`AGENTS.md`](./Agents.md) for agent context.\n';
 
   const hasAgents = platforms.includes('agents');
@@ -59,6 +68,100 @@ export function renderAiFiles(files: Record<string, VirtualFile>, params: AiFile
   }
 }
 
+export function renderManagedAiFileContent(content: string): string {
+  return [AI_FILE_MANAGED_BEGIN, content.trimEnd(), AI_FILE_MANAGED_END, ''].join('\n');
+}
+
+function getManagedBlockRange(content: string) {
+  const beginIndex = content.indexOf(AI_FILE_MANAGED_BEGIN);
+  const endIndex = content.indexOf(AI_FILE_MANAGED_END);
+
+  if (beginIndex === -1 && endIndex === -1) {
+    return { status: 'missing' as const };
+  }
+
+  if (beginIndex === -1 || endIndex === -1 || endIndex < beginIndex) {
+    return { status: 'conflicted' as const };
+  }
+
+  return {
+    status: 'found' as const,
+    beginIndex,
+    endIndex: endIndex + AI_FILE_MANAGED_END.length,
+  };
+}
+
+function getManagedInnerContent(content: string): string | undefined {
+  const range = getManagedBlockRange(content);
+  if (range.status !== 'found') return undefined;
+
+  return content
+    .slice(
+      range.beginIndex + AI_FILE_MANAGED_BEGIN.length,
+      range.endIndex - AI_FILE_MANAGED_END.length
+    )
+    .replace(/^\r?\n/, '')
+    .replace(/\r?\n$/, '');
+}
+
+function mergeMissingManagedAiBlock(
+  currentContent: string,
+  expectedContent: string,
+  legacyContent: string | undefined
+): string {
+  if (currentContent.trim() === '') return expectedContent;
+
+  if (legacyContent != null && currentContent.startsWith(legacyContent)) {
+    const suffix = currentContent.slice(legacyContent.length);
+    return suffix === '' ? expectedContent : `${expectedContent.trimEnd()}${suffix}`;
+  }
+
+  return `${expectedContent.trimEnd()}\n\n${currentContent.trim()}\n`;
+}
+
+export function isManagedAiFilePath(path: string): boolean {
+  return path === 'AGENTS.md' || path === 'CLAUDE.md';
+}
+
+export function mergeAiFileContent(
+  currentContent: string,
+  expectedContent: string
+): AiFileMergeResult {
+  if (!expectedContent.includes(AI_FILE_MANAGED_BEGIN)) {
+    return {
+      content: expectedContent,
+      mergeSafe: false,
+    };
+  }
+
+  const range = getManagedBlockRange(currentContent);
+
+  if (range.status === 'found') {
+    return {
+      content: `${currentContent.slice(0, range.beginIndex)}${expectedContent.trimEnd()}${currentContent.slice(
+        range.endIndex
+      )}`,
+      mergeSafe: true,
+    };
+  }
+
+  if (range.status === 'conflicted') {
+    return {
+      content: expectedContent,
+      mergeSafe: false,
+    };
+  }
+
+  return {
+    content: mergeMissingManagedAiBlock(
+      currentContent,
+      expectedContent,
+      getManagedInnerContent(expectedContent)
+    ),
+    mergeSafe: true,
+  };
+}
+
 type WorkspaceContext = {
   packageManager: string;
   linter: Linter;
@@ -68,19 +171,19 @@ type WorkspaceContext = {
   hasTypecheck: boolean;
 };
 
-function generateWorkspace(ctx: WorkspaceContext): string {
+export function generateWorkspace(ctx: WorkspaceContext): string {
   const { packageManager, linter, formatter, hasTypecheck } = ctx;
   const exampleFiles = 'src/App.tsx src/core/systems/move-entity.ts';
   const commands = getAfterEditingCommands(ctx, exampleFiles);
 
   const sections: string[] = [
-    '# Workspace Tools',
+    '## Workspace Tools',
     '',
     `- **Package Manager:** ${packageManager}`,
     `- **Linter:** ${linter}`,
     `- **Formatter:** ${formatter}`,
     '',
-    '## After Editing',
+    '### After Editing',
     '',
   ];
 

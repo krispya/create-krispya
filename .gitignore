@@ -1,4 +1,4 @@
-# create-krispya managed ignores: begin
+# managed:start
 node_modules
 dist
 *.tsbuildinfo
@@ -6,4 +6,4 @@ dist
 .env.*
 !.env.example
 .pnpm-store
-# create-krispya managed ignores: end
+# managed:end

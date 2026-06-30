@@ -2,8 +2,8 @@ import type { VirtualFile } from '../types.js';
 
 export type GitignoreVariant = 'standalone' | 'workspace-root';
 
-export const GITIGNORE_MANAGED_BEGIN = '# create-krispya managed ignores: begin';
-export const GITIGNORE_MANAGED_END = '# create-krispya managed ignores: end';
+export const GITIGNORE_MANAGED_BEGIN = '# managed:start';
+export const GITIGNORE_MANAGED_END = '# managed:end';
 
 const COMMON_GITIGNORE_LINES = [
   'node_modules',
@@ -27,11 +27,9 @@ export function getCoreGitignoreLines(variant: GitignoreVariant): string[] {
 }
 
 export function renderManagedGitignoreBlock(variant: GitignoreVariant): string {
-  return [
-    GITIGNORE_MANAGED_BEGIN,
-    ...getCoreGitignoreLines(variant),
-    GITIGNORE_MANAGED_END,
-  ].join('\n');
+  return [GITIGNORE_MANAGED_BEGIN, ...getCoreGitignoreLines(variant), GITIGNORE_MANAGED_END].join(
+    '\n'
+  );
 }
 
 export function renderGitignore(variant: GitignoreVariant): VirtualFile {

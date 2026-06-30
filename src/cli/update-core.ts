@@ -19,9 +19,18 @@ import {
   renderPrettierConfigPackage,
   renderOxfmtConfigPackage,
 } from '../renderers/monorepo.js';
-import { renderAiFiles, ALL_AI_PLATFORMS } from '../renderers/ai-files.js';
+import {
+  renderAiFiles,
+  ALL_AI_PLATFORMS,
+  isManagedAiFilePath,
+  mergeAiFileContent,
+} from '../renderers/ai-files.js';
 import { renderEditorConfig } from '../renderers/editorconfig.js';
-import { detectGitignoreVariant, mergeGitignoreContent, renderGitignore } from '../renderers/gitignore.js';
+import {
+  detectGitignoreVariant,
+  mergeGitignoreContent,
+  renderGitignore,
+} from '../renderers/gitignore.js';
 import { renderVscodeFiles } from '../renderers/vscode.js';
 import {
   formatResolvedPackageVersion,
@@ -518,6 +527,27 @@ function compareTextFileWithDisk(
     };
   }
 
+  if (isManagedAiFilePath(filePath)) {
+    const merged = mergeAiFileContent(currentContent, expectedContent);
+    if (fileContentsEqual(filePath, currentContent, merged.content)) {
+      return {
+        path: filePath,
+        status: 'unchanged',
+        currentContent,
+        newContent: currentContent,
+        mergeSafe: merged.mergeSafe,
+      };
+    }
+
+    return {
+      path: filePath,
+      status: 'modified',
+      currentContent,
+      newContent: merged.content,
+      mergeSafe: merged.mergeSafe,
+    };
+  }
+
   if (fileContentsEqual(filePath, currentContent, expectedContent)) {
     return {
       path: filePath,
@@ -599,7 +629,7 @@ export async function compareWithDisk(
           category: 'ai-files-update',
           label: categoryLabels['ai-files-update'],
           changes: modifiedAiFiles,
-          hasUserModifications: true,
+          hasUserModifications: modifiedAiFiles.some((change) => !change.mergeSafe),
         });
       }
 
