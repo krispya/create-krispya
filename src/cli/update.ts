@@ -55,10 +55,13 @@ function isMergeUpdateCategory(category: CategoryUpdate['category']): boolean {
   return category === 'workspace-config' || category === 'package-json';
 }
 
-function getUpdateHint(category: CategoryUpdate['category'], status: 'added' | 'modified'): string {
-  if (status === 'added') return 'new file';
-  if (category === 'package-json') return 'merge update';
-  if (category === 'workspace-config') return 'merge update';
+function isMergeSafeChange(category: CategoryUpdate['category'], change: FileChange): boolean {
+  return isMergeUpdateCategory(category) || change.mergeSafe === true;
+}
+
+function getUpdateHint(category: CategoryUpdate['category'], change: SelectableFileChange): string {
+  if (change.status === 'added') return 'new file';
+  if (isMergeSafeChange(category, change)) return 'merge update';
   return 'changed; overwrites if selected';
 }
 
@@ -73,7 +76,7 @@ function getInitialUpdateSelections(category: CategoryUpdate): string[] {
     .filter(
       (change) =>
         change.status === 'added' ||
-        (change.status === 'modified' && isMergeUpdateCategory(category.category))
+        (change.status === 'modified' && isMergeSafeChange(category.category, change))
     )
     .map((change) => change.path);
 }
@@ -85,7 +88,7 @@ async function promptForUpdateSelections(category: CategoryUpdate) {
     options: selectableChanges.map((change) => ({
       value: change.path,
       label: change.path,
-      hint: getUpdateHint(category.category, change.status),
+      hint: getUpdateHint(category.category, change),
     })),
     initialValues: getInitialUpdateSelections(category),
     required: false,
@@ -471,8 +474,12 @@ async function processUpdateCategory(
     }
     console.log();
 
-    if (isMergeUpdateCategory(category.category)) {
-      changesToApply = [...newChanges, ...modifiedChanges];
+    const mergeSafeModifiedChanges = modifiedChanges.filter((change) =>
+      isMergeSafeChange(category.category, change)
+    );
+
+    if (mergeSafeModifiedChanges.length > 0) {
+      changesToApply = [...newChanges, ...mergeSafeModifiedChanges];
       if (changesToApply.length > 0) {
         console.log(color.dim('  (--yes mode: applying merge updates)'));
       }

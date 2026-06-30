@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   compareWithDisk,
+  applyUpdates,
   detectCurrentConfig,
   planExpectedFiles,
   getOxlintConfigReplacementUpdates,
@@ -17,6 +18,7 @@ import {
   getRequiredNodeUpdateTarget,
 } from '../src/cli/update.js';
 import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
+import { renderManagedGitignoreBlock } from '../src/renderers/gitignore.js';
 
 const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space';
 const formatterIndentSize = defaultFormatterMetaConfig.useTabs
@@ -62,15 +64,7 @@ describe('update helpers', () => {
     });
     expect(expected['root-config']['.gitignore']).toEqual({
       type: 'text',
-      content: [
-        'node_modules',
-        'dist',
-        '*.tsbuildinfo',
-        '.env',
-        '.env.*',
-        '!.env.example',
-        '.pnpm-store',
-      ].join('\n'),
+      content: renderManagedGitignoreBlock('standalone'),
     });
     expect(expected['root-config']['.config/prettierignore']).toEqual({
       type: 'text',
@@ -264,6 +258,137 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
       expect(updateCategory?.changes).toEqual([
         expect.objectContaining({ path: 'AGENTS.md', status: 'modified' }),
       ]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates legacy gitignore content into a managed block', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-gitignore-'));
+    try {
+      await writeFile(
+        join(tempDir, '.gitignore'),
+        [
+          'node_modules',
+          'dist',
+          '*.tsbuildinfo',
+          '',
+          '# Project artifacts',
+          'coverage',
+          'storybook-static',
+        ].join('\n')
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+      const categories = await compareWithDisk(expected, tempDir);
+      const rootConfig = categories.find((category) => category.category === 'root-config');
+      const gitignoreChange = rootConfig?.changes.find((change) => change.path === '.gitignore');
+
+      expect(gitignoreChange?.status).toBe('modified');
+      expect(gitignoreChange?.mergeSafe).toBe(true);
+      expect(gitignoreChange?.newContent).toBe(
+        [
+          renderManagedGitignoreBlock('standalone'),
+          '',
+          '# Project artifacts',
+          'coverage',
+          'storybook-static',
+        ].join('\n')
+      );
+
+      await applyUpdates([gitignoreChange!], tempDir);
+
+      await expect(readFile(join(tempDir, '.gitignore'), 'utf-8')).resolves.toBe(
+        gitignoreChange?.newContent
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('updates only the managed gitignore block when custom content exists', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-gitignore-block-'));
+    try {
+      await writeFile(
+        join(tempDir, '.gitignore'),
+        [
+          '# Keep this header',
+          '',
+          '# create-krispya managed ignores: begin',
+          'node_modules',
+          'dist',
+          '# create-krispya managed ignores: end',
+          '',
+          '# Project artifacts',
+          'coverage',
+        ].join('\n')
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: true,
+      });
+      const categories = await compareWithDisk(expected, tempDir);
+      const rootConfig = categories.find((category) => category.category === 'root-config');
+      const gitignoreChange = rootConfig?.changes.find((change) => change.path === '.gitignore');
+
+      expect(gitignoreChange?.status).toBe('modified');
+      expect(gitignoreChange?.mergeSafe).toBe(true);
+      expect(gitignoreChange?.newContent).toBe(
+        [
+          '# Keep this header',
+          '',
+          renderManagedGitignoreBlock('workspace-root'),
+          '',
+          '# Project artifacts',
+          'coverage',
+        ].join('\n')
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not mark conflicted gitignore markers as merge-safe', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-gitignore-conflict-'));
+    try {
+      await writeFile(
+        join(tempDir, '.gitignore'),
+        [
+          '# create-krispya managed ignores: begin',
+          'node_modules',
+          'dist',
+          '',
+          '# Project artifacts',
+          'coverage',
+        ].join('\n')
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'my-app',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+      const categories = await compareWithDisk(expected, tempDir);
+      const rootConfig = categories.find((category) => category.category === 'root-config');
+      const gitignoreChange = rootConfig?.changes.find((change) => change.path === '.gitignore');
+
+      expect(gitignoreChange?.status).toBe('modified');
+      expect(gitignoreChange?.mergeSafe).toBe(false);
+      expect(gitignoreChange?.newContent).toBe(renderManagedGitignoreBlock('standalone'));
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
@@ -520,16 +645,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
 
     expect(expected['root-config']['.gitignore']).toEqual({
       type: 'text',
-      content: [
-        'node_modules',
-        'dist',
-        '*.tsbuildinfo',
-        '.env',
-        '.env.*',
-        '!.env.example',
-        '.pnpm-store',
-        '.DS_Store',
-      ].join('\n'),
+      content: renderManagedGitignoreBlock('workspace-root'),
     });
     expect(expected['config-packages']['.config/typescript/package.json']).toBeDefined();
     expect(expected['config-packages']['.config/prettier/prettierignore']).toEqual({
@@ -550,6 +666,61 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     const settings = readTextJson(expected.vscode['.vscode/settings.json']);
     expect(settings['oxc.configPath']).toBeUndefined();
     expect(settings['prettier.configPath']).toBeUndefined();
+  });
+
+  it('updates monorepo .config prettierignore with dist patterns', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-monorepo-prettierignore-'));
+    try {
+      await mkdir(join(tempDir, '.config/prettier'), { recursive: true });
+      await writeFile(
+        join(tempDir, '.config/prettier/prettierignore'),
+        [
+          'package-lock.json',
+          'npm-shrinkwrap.json',
+          'pnpm-lock.yaml',
+          'pnpm-lock.json',
+          'yarn.lock',
+          'bun.lock',
+          'bun.lockb',
+        ].join('\n')
+      );
+
+      const expected = await planExpectedFiles({
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: true,
+      });
+      const categories = await compareWithDisk(expected, tempDir);
+      const configPackages = categories.find((category) => category.category === 'config-packages');
+      const prettierIgnoreChange = configPackages?.changes.find(
+        (change) => change.path === '.config/prettier/prettierignore'
+      );
+
+      expect(prettierIgnoreChange?.status).toBe('modified');
+      expect(prettierIgnoreChange?.newContent).toBe(
+        [
+          'dist/',
+          '**/dist/',
+          'package-lock.json',
+          'npm-shrinkwrap.json',
+          'pnpm-lock.yaml',
+          'pnpm-lock.json',
+          'yarn.lock',
+          'bun.lock',
+          'bun.lockb',
+        ].join('\n')
+      );
+
+      await applyUpdates([prettierIgnoreChange!], tempDir);
+
+      await expect(readFile(join(tempDir, '.config/prettier/prettierignore'), 'utf-8')).resolves.toBe(
+        prettierIgnoreChange?.newContent
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('migrates package manager fields from pnpm 10 to pnpm 11', async () => {

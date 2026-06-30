@@ -21,7 +21,7 @@ import {
 } from '../renderers/monorepo.js';
 import { renderAiFiles, ALL_AI_PLATFORMS } from '../renderers/ai-files.js';
 import { renderEditorConfig } from '../renderers/editorconfig.js';
-import { renderGitignore } from '../renderers/gitignore.js';
+import { detectGitignoreVariant, mergeGitignoreContent, renderGitignore } from '../renderers/gitignore.js';
 import { renderVscodeFiles } from '../renderers/vscode.js';
 import {
   formatResolvedPackageVersion,
@@ -70,6 +70,7 @@ export type FileChange = {
   status: FileChangeStatus;
   currentContent?: string;
   newContent: string;
+  mergeSafe?: boolean;
 };
 
 export type CategoryUpdate = {
@@ -491,6 +492,49 @@ function fileContentsEqual(filePath: string, currentContent: string, newContent:
   return currentContent === newContent;
 }
 
+function compareTextFileWithDisk(
+  filePath: string,
+  currentContent: string,
+  expectedContent: string
+): FileChange {
+  if (filePath === '.gitignore') {
+    const merged = mergeGitignoreContent(currentContent, detectGitignoreVariant(expectedContent));
+    if (fileContentsEqual(filePath, currentContent, merged.content)) {
+      return {
+        path: filePath,
+        status: 'unchanged',
+        currentContent,
+        newContent: currentContent,
+        mergeSafe: merged.mergeSafe,
+      };
+    }
+
+    return {
+      path: filePath,
+      status: 'modified',
+      currentContent,
+      newContent: merged.content,
+      mergeSafe: merged.mergeSafe,
+    };
+  }
+
+  if (fileContentsEqual(filePath, currentContent, expectedContent)) {
+    return {
+      path: filePath,
+      status: 'unchanged',
+      currentContent,
+      newContent: currentContent,
+    };
+  }
+
+  return {
+    path: filePath,
+    status: 'modified',
+    currentContent,
+    newContent: expectedContent,
+  };
+}
+
 /**
  * Compares expected files with disk and categorizes changes.
  */
@@ -526,21 +570,7 @@ export async function compareWithDisk(
 
       if (await fileExists(fullPath)) {
         const currentContent = await readFile(fullPath, 'utf-8');
-        if (fileContentsEqual(filePath, currentContent, newContent)) {
-          changes.push({
-            path: filePath,
-            status: 'unchanged',
-            currentContent,
-            newContent,
-          });
-        } else {
-          changes.push({
-            path: filePath,
-            status: 'modified',
-            currentContent,
-            newContent,
-          });
-        }
+        changes.push(compareTextFileWithDisk(filePath, currentContent, newContent));
       } else {
         changes.push({
           path: filePath,
@@ -581,7 +611,7 @@ export async function compareWithDisk(
 
     // Determine if user has modifications
     // A file is "user modified" if it exists but doesn't match what we'd generate
-    const hasUserModifications = changes.some((c) => c.status === 'modified');
+    const hasUserModifications = changes.some((c) => c.status === 'modified' && !c.mergeSafe);
 
     categories.push({
       category,
