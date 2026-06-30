@@ -25,6 +25,7 @@ import { detectMonorepoRoot, type InheritedWorkspaceSettings } from './cli/works
 import { clearConfig, getConfigPath } from './config/index.js';
 import {
   getBaseTemplate,
+  getPackageDirectoryName,
   planProject,
   resolveProjectPlanInput,
   planWorkspace,
@@ -217,11 +218,12 @@ async function handleSingleWorkspaceCreation(
     base === 'vanilla' ? 'vanilla-app' : base === 'react' ? 'react-app' : 'react-three-app';
   projectOptions.name ??= defaultFallbackName;
   const packageManager = getPackageManagerName(projectOptions.packageManager);
+  const projectDirName = getPackageDirectoryName(projectOptions.name);
 
   /**
    * Render: Create files from the resolved options
    */
-  const projectPath = join(cwd(), projectOptions.name);
+  const projectPath = join(cwd(), projectDirName);
   const spinner = p.spinner();
 
   spinner.start('Creating project...');
@@ -238,16 +240,12 @@ async function handleSingleWorkspaceCreation(
 
     const nextSteps =
       projectOptions.projectType === 'library'
-        ? [
-            `cd ${projectOptions.name}`,
-            `${packageManager} install`,
-            `${packageManager} run build`,
-          ].join('\n')
-        : [
-            `cd ${projectOptions.name}`,
-            `${packageManager} install`,
-            `${packageManager} run dev`,
-          ].join('\n');
+        ? [`cd ${projectDirName}`, `${packageManager} install`, `${packageManager} run build`].join(
+            '\n'
+          )
+        : [`cd ${projectDirName}`, `${packageManager} install`, `${packageManager} run dev`].join(
+            '\n'
+          );
 
     p.note(nextSteps, 'Next steps');
 

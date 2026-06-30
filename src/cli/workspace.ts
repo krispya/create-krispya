@@ -17,6 +17,7 @@ import {
 } from './workspace-utils.js';
 import {
   getBaseTemplate,
+  getPackageDirectoryName,
   planProject,
   resolveProjectPlanInput,
   validatePackageName,
@@ -57,11 +58,11 @@ export async function createPackageInWorkspace(
     message: 'Package name?',
     initialValue: `@${scope}/`,
     validate: (value) => {
-      if (value == null) return 'Package name is required';
-      const validationError = validatePackageName(value);
+      const packageName = value ?? '';
+      const validationError = validatePackageName(packageName);
       if (validationError) return validationError;
 
-      const dirName = value.includes('/') ? value.split('/').pop()! : value;
+      const dirName = getPackageDirectoryName(packageName);
       if (!dirName) return 'Package name is required';
 
       if (!hasCustomDirectories) {
@@ -82,7 +83,7 @@ export async function createPackageInWorkspace(
   }
 
   const scopedName = packageNameInput as string;
-  const shortName = scopedName.includes('/') ? scopedName.split('/').pop()! : scopedName;
+  const shortName = getPackageDirectoryName(scopedName);
 
   const packageOptions = await promptForPackageOptions(scopedName, packageType, inheritedSettings);
 
@@ -185,11 +186,12 @@ export async function handleWorkspaceCommand(
   const baseTemplate = getBaseTemplate(template);
 
   const scopedName = name.startsWith('@') ? name : `@${scope}/${name}`;
+  const packageDirName = getPackageDirectoryName(name);
 
-  const fullPackagePath = join(monorepoRoot, targetDir, name);
+  const fullPackagePath = join(monorepoRoot, targetDir, packageDirName);
   try {
     await access(fullPackagePath, constants.F_OK);
-    console.error(color.red('Error:') + ` Directory ${targetDir}/${name} already exists`);
+    console.error(color.red('Error:') + ` Directory ${targetDir}/${packageDirName} already exists`);
     process.exit(1);
   } catch {
     // Directory doesn't exist, which is what we want.
@@ -205,7 +207,7 @@ export async function handleWorkspaceCommand(
   const pnpmManageVersions = inheritedSettings.pnpmManageVersions ?? true;
   const isLibrary = projectType === 'library';
 
-  const relativePkgPath = join(targetDir, name);
+  const relativePkgPath = join(targetDir, packageDirName);
   const workspaceRoot = calculateWorkspaceRoot(relativePkgPath);
 
   const projectOptions: ProjectOptions = {
@@ -235,13 +237,13 @@ export async function handleWorkspaceCommand(
     }),
   };
 
-  console.log(color.cyan('Creating') + ` ${scopedName} in ${targetDir}/${name}...`);
+  console.log(color.cyan('Creating') + ` ${scopedName} in ${targetDir}/${packageDirName}...`);
 
   try {
     const { files } = await planProject(resolveProjectPlanInput(projectOptions));
     await writeGeneratedFiles(fullPackagePath, files);
 
-    console.log(color.green('✓') + ` Created ${scopedName} at ${targetDir}/${name}`);
+    console.log(color.green('✓') + ` Created ${scopedName} at ${targetDir}/${packageDirName}`);
     process.exit(0);
   } catch (error) {
     console.error(color.red('Error:') + ' Failed to create package');

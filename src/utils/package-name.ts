@@ -55,3 +55,8 @@ export function validatePackageName(name: string): string | undefined {
 
   return validateNameSegment(name, 'Package name');
 }
+
+export function getPackageDirectoryName(name: string): string {
+  const slashIndex = name.indexOf('/');
+  return slashIndex === -1 ? name : name.slice(slashIndex + 1);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePackageName } from '../src/utils/index.js';
+import { getPackageDirectoryName, validatePackageName } from '../src/utils/index.js';
 
 describe('validatePackageName', () => {
   describe('valid names', () => {
@@ -83,5 +83,15 @@ describe('validatePackageName', () => {
     it('rejects consecutive hyphens', () => {
       expect(validatePackageName('my--app')).toBe('Package name cannot contain consecutive hyphens');
     });
+  });
+});
+
+describe('getPackageDirectoryName', () => {
+  it('keeps unscoped package names unchanged', () => {
+    expect(getPackageDirectoryName('devtools')).toBe('devtools');
+  });
+
+  it('strips the scope from scoped package names', () => {
+    expect(getPackageDirectoryName('@pmndrs/devtools')).toBe('devtools');
   });
 });
