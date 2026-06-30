@@ -13,6 +13,7 @@ const COMMON_GITIGNORE_LINES = [
   '.env.*',
   '!.env.example',
   '.pnpm-store',
+  '.DS_Store',
 ];
 
 export type GitignoreMergeResult = {
