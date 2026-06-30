@@ -66,6 +66,10 @@ export function getPnpmProfile(spec: PackageManagerSpec): PackageManagerProfile 
   };
 }
 
+function formatPnpmWorkspaceYamlKey(key: string): string {
+  return key.startsWith('@') ? JSON.stringify(key) : key;
+}
+
 export function renderPnpmWorkspaceConfig(options: PnpmWorkspaceConfigOptions): string {
   const {
     profile,
@@ -90,7 +94,7 @@ export function renderPnpmWorkspaceConfig(options: PnpmWorkspaceConfigOptions): 
   if (profile.capabilities.pnpmBuildDependencyPolicy === 'allowBuilds') {
     lines.push('allowBuilds:');
     for (const [dependency, allowed] of Object.entries(buildDependencies)) {
-      lines.push(`  ${dependency}: ${allowed ? 'true' : 'false'}`);
+      lines.push(`  ${formatPnpmWorkspaceYamlKey(dependency)}: ${allowed ? 'true' : 'false'}`);
     }
   } else {
     const allowedDependencies = Object.entries(buildDependencies)

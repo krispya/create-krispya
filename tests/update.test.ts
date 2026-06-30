@@ -575,6 +575,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
           '',
           'onlyBuiltDependencies:',
           '  - esbuild',
+          '  - @swc/core',
           '  - sharp',
           '',
         ].join('\n')
@@ -600,6 +601,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
       const [workspaceChange] = await getWorkspaceConfigUpdates(tempDir, config);
       expect(workspaceChange!.newContent).toContain('pmOnFail: download');
       expect(workspaceChange!.newContent).toContain('allowBuilds:\n  esbuild: true');
+      expect(workspaceChange!.newContent).toContain('  "@swc/core": true');
       expect(workspaceChange!.newContent).toContain('  sharp: true');
       expect(workspaceChange!.newContent).toContain('  - "examples/*"');
       expect(workspaceChange!.newContent).not.toContain('manage-package-manager-versions');

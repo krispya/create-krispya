@@ -72,6 +72,7 @@ onlyBuiltDependencies:
         packages: ['.config/*', 'apps/*', 'packages/*'],
         buildDependencies: {
           esbuild: true,
+          '@swc/core': true,
           'untrusted-package': false,
         },
       })
@@ -84,6 +85,7 @@ packages:
 
 allowBuilds:
   esbuild: true
+  "@swc/core": true
   untrusted-package: false`);
   });
 });
