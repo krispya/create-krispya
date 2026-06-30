@@ -75,6 +75,54 @@ describe('getLatestNpmVersion', () => {
     ).resolves.toBe('1.9.0');
   });
 
+  it('uses the latest dist tag channel when buffered latest is too new', async () => {
+    mockRegistryMetadata({
+      'dist-tags': {
+        alpha: '3.0.0-alpha.1',
+        latest: '2.0.0',
+      },
+      versions: {
+        '1.9.0': {},
+        '2.0.0': {},
+        '3.0.0-alpha.1': {},
+      },
+      time: {
+        '1.9.0': minutesAgo(DEFAULT_MINIMUM_RELEASE_AGE_MINUTES + 1),
+        '2.0.0': minutesAgo(60),
+        '3.0.0-alpha.1': minutesAgo(DEFAULT_MINIMUM_RELEASE_AGE_MINUTES + 1),
+      },
+    });
+
+    await expect(
+      getLatestNpmVersion('example', '1.0.0', {
+        now: NOW,
+      })
+    ).resolves.toBe('1.9.0');
+  });
+
+  it('does not choose prereleases from non-latest channels', async () => {
+    mockRegistryMetadata({
+      'dist-tags': {
+        beta: '2.0.0-beta.1',
+        latest: '1.9.0',
+      },
+      versions: {
+        '1.9.0': {},
+        '2.0.0-beta.1': {},
+      },
+      time: {
+        '1.9.0': minutesAgo(DEFAULT_MINIMUM_RELEASE_AGE_MINUTES + 1),
+        '2.0.0-beta.1': minutesAgo(DEFAULT_MINIMUM_RELEASE_AGE_MINUTES + 1),
+      },
+    });
+
+    await expect(
+      getLatestNpmVersion('example', '1.0.0', {
+        now: NOW,
+      })
+    ).resolves.toBe('1.9.0');
+  });
+
   it('falls back when every version is newer than the minimum release age', async () => {
     mockRegistryMetadata({
       'dist-tags': { latest: '2.0.0' },
@@ -124,6 +172,19 @@ describe('getLatestNpmMajorVersion', () => {
     await expect(
       getLatestNpmMajorVersion('@types/node', '25', '25.0.0', { minimumReleaseAgeMinutes: 0 })
     ).resolves.toBe('25.0.0');
+  });
+
+  it('does not choose prereleases for the requested major', async () => {
+    mockRegistryMetadata({
+      versions: {
+        '25.1.0': {},
+        '25.2.0-alpha.1': {},
+      },
+    });
+
+    await expect(
+      getLatestNpmMajorVersion('@types/node', '25', '25.0.0', { minimumReleaseAgeMinutes: 0 })
+    ).resolves.toBe('25.1.0');
   });
 });
 

@@ -11,7 +11,15 @@ type NpmPackageMetadata = {
   time?: Record<string, string>;
 };
 
+type ParsedSemver = {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease: string[];
+};
+
 const MINUTE_IN_MS = 60 * 1000;
+const SEMVER_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function getMinimumReleaseAgeMinutes(options?: NpmVersionResolutionOptions): number {
   return Math.max(0, options?.minimumReleaseAgeMinutes ?? DEFAULT_MINIMUM_RELEASE_AGE_MINUTES);
@@ -42,6 +50,79 @@ function getInstallableVersions(
   return [...versions].filter((version) => isVersionOldEnough(version, time, options));
 }
 
+function parseSemver(version: string): ParsedSemver | undefined {
+  const match = version.match(SEMVER_PATTERN);
+  if (match == null) return undefined;
+
+  return {
+    major: Number.parseInt(match[1], 10),
+    minor: Number.parseInt(match[2], 10),
+    patch: Number.parseInt(match[3], 10),
+    prerelease: match[4]?.split('.') ?? [],
+  };
+}
+
+function hasPrerelease(version: string): boolean {
+  return (parseSemver(version)?.prerelease.length ?? 0) > 0;
+}
+
+function comparePrerelease(aParts: string[], bParts: string[]): number {
+  if (aParts.length === 0 && bParts.length === 0) return 0;
+  if (aParts.length === 0) return 1;
+  if (bParts.length === 0) return -1;
+
+  const maxLength = Math.max(aParts.length, bParts.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const aPart = aParts[index];
+    const bPart = bParts[index];
+
+    if (aPart == null) return -1;
+    if (bPart == null) return 1;
+    if (aPart === bPart) continue;
+
+    const aNumber = /^\d+$/.test(aPart) ? Number.parseInt(aPart, 10) : undefined;
+    const bNumber = /^\d+$/.test(bPart) ? Number.parseInt(bPart, 10) : undefined;
+
+    if (aNumber != null && bNumber != null) return aNumber - bNumber;
+    if (aNumber != null) return -1;
+    if (bNumber != null) return 1;
+    return aPart.localeCompare(bPart);
+  }
+
+  return 0;
+}
+
+function compareSemver(a: string, b: string): number {
+  const aParsed = parseSemver(a);
+  const bParsed = parseSemver(b);
+
+  if (aParsed == null || bParsed == null) {
+    return compareNumericSemver(a, b);
+  }
+
+  const majorDifference = aParsed.major - bParsed.major;
+  if (majorDifference !== 0) return majorDifference;
+
+  const minorDifference = aParsed.minor - bParsed.minor;
+  if (minorDifference !== 0) return minorDifference;
+
+  const patchDifference = aParsed.patch - bParsed.patch;
+  if (patchDifference !== 0) return patchDifference;
+
+  return comparePrerelease(aParsed.prerelease, bParsed.prerelease);
+}
+
+function getLatestChannelVersions(versions: Iterable<string>, latestVersion?: string): string[] {
+  const availableVersions = [...versions];
+  if (latestVersion == null) return availableVersions.filter((version) => !hasPrerelease(version));
+
+  const latestIsPrerelease = hasPrerelease(latestVersion);
+  return availableVersions.filter((version) => {
+    if (!latestIsPrerelease && hasPrerelease(version)) return false;
+    return compareSemver(version, latestVersion) <= 0;
+  });
+}
+
 async function fetchNpmPackageMetadata(packageName: string): Promise<NpmPackageMetadata> {
   const response = await fetch(`https://registry.npmjs.org/${packageName}`);
   return (await response.json()) as NpmPackageMetadata;
@@ -69,10 +150,10 @@ export async function getLatestNpmVersion(
     }
 
     const latestInstallableVersion = getInstallableVersions(
-      Object.keys(data.versions ?? {}),
+      getLatestChannelVersions(Object.keys(data.versions ?? {}), latestVersion),
       data.time,
       options
-    ).sort((a, b) => compareNumericSemver(b, a))[0];
+    ).sort((a, b) => compareSemver(b, a))[0];
 
     return latestInstallableVersion ?? fallback;
   } catch {
@@ -113,7 +194,8 @@ function getLatestMatchingMajorVersion(
 ): string | undefined {
   return getInstallableVersions(versions, time, options)
     .filter((version) => version.split('.')[0] === majorVersion)
-    .sort((a, b) => compareNumericSemver(b, a))[0];
+    .filter((version) => !hasPrerelease(version))
+    .sort((a, b) => compareSemver(b, a))[0];
 }
 
 /**
