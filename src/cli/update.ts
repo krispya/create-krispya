@@ -10,6 +10,7 @@ import {
   getPackageManagerConfigUpdates,
   getOxlintConfigReplacementUpdates,
   getPackageJsonScriptUpdates,
+  getTypescriptNodeConfigUpdates,
   planExpectedFiles,
   getWorkspaceConfigUpdates,
   type CategoryUpdate,
@@ -268,6 +269,16 @@ async function collectUpdateCategories(
       label: 'Tooling Config',
       changes: oxlintConfigChanges,
       hasUserModifications: oxlintConfigChanges.some((change) => change.status === 'modified'),
+    });
+  }
+
+  const typescriptConfigChanges = await getTypescriptNodeConfigUpdates(projectRoot, config);
+  if (typescriptConfigChanges.length > 0) {
+    allCategories.push({
+      category: 'tooling-config',
+      label: 'TypeScript Config',
+      changes: typescriptConfigChanges,
+      hasUserModifications: false,
     });
   }
 

@@ -94,6 +94,7 @@ In your package's \`tsconfig.json\`:
       extends: './base.json',
       compilerOptions: {
         lib: ['ESNext'],
+        types: ['node'],
       },
     }),
   };

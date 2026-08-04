@@ -920,6 +920,64 @@ export async function getPackageJsonScriptUpdates(
   ];
 }
 
+/**
+ * Adds the explicit Node.js type library required by TypeScript 6 to an
+ * existing generated single-package Node config while preserving its other
+ * compiler options.
+ */
+export async function getTypescriptNodeConfigUpdates(
+  root: string,
+  config: WorkspaceConfig
+): Promise<FileChange[]> {
+  if (config.isMonorepo) return [];
+
+  const relativePath =
+    config.configStrategy === 'root' ? 'tsconfig.node.json' : '.config/tsconfig.node.json';
+  const fullPath = join(root, relativePath);
+
+  let currentContent: string;
+  try {
+    currentContent = await readFile(fullPath, 'utf-8');
+  } catch {
+    return [];
+  }
+
+  let tsconfig: Record<string, unknown>;
+  try {
+    const parsed = parseJsonValue(currentContent);
+    if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+    tsconfig = parsed as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+
+  const compilerOptions = tsconfig.compilerOptions;
+  if (
+    compilerOptions == null ||
+    typeof compilerOptions !== 'object' ||
+    Array.isArray(compilerOptions)
+  ) {
+    return [];
+  }
+
+  const options = compilerOptions as Record<string, unknown>;
+  const currentTypes = options.types;
+  if (currentTypes != null && !Array.isArray(currentTypes)) return [];
+  if (currentTypes?.includes('node')) return [];
+
+  options.types = [...(currentTypes ?? []), 'node'];
+
+  return [
+    {
+      path: relativePath,
+      status: 'modified',
+      currentContent,
+      newContent: renderJson(tsconfig),
+      mergeSafe: true,
+    },
+  ];
+}
+
 export async function getPackageManagerConfigUpdates(
   root: string,
   config: WorkspaceConfig
