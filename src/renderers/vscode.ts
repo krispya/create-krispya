@@ -123,6 +123,10 @@ function resolveVscodeSettings(params: VscodeParams): Record<string, unknown> {
     }
   }
 
+  if (formatter != null) {
+    settings['editor.formatOnSave'] = true;
+  }
+
   if (formatter === 'prettier') {
     settings['editor.defaultFormatter'] = 'esbenp.prettier-vscode';
 

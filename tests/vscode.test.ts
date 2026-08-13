@@ -65,6 +65,7 @@ describe('renderVscodeFiles', () => {
     expect(settings['editor.tabSize']).toBe(defaultFormatterMetaConfig.tabWidth);
     expect(settings['files.eol']).toBe('\n');
     expect(settings['files.insertFinalNewline']).toBe(true);
+    expect(settings['editor.formatOnSave']).toBeUndefined();
   });
 
   it('resolves single-package linter and formatter settings centrally', () => {
@@ -81,6 +82,7 @@ describe('renderVscodeFiles', () => {
     expect(settings['biome.enabled']).toBe(false);
     expect(settings['oxc.configPath']).toBe('.config/oxlint.json');
     expect(settings['editor.defaultFormatter']).toBe('esbenp.prettier-vscode');
+    expect(settings['editor.formatOnSave']).toBe(true);
     expect(settings['prettier.configPath']).toBe('.config/prettier.json');
     expect(settings['prettier.ignorePath']).toBe('.config/prettierignore');
     expect(extensions.recommendations).toEqual(['oxc.oxc-vscode', 'esbenp.prettier-vscode']);
@@ -109,6 +111,7 @@ describe('renderVscodeFiles', () => {
     expect(settings['biome.enabled']).toBe(true);
     expect(settings['biome.linter.configPath']).toBe('.config/biome.json');
     expect(settings['editor.defaultFormatter']).toBe('biomejs.biome');
+    expect(settings['editor.formatOnSave']).toBe(true);
   });
 
   it('uses the same shared formatter settings for monorepos', () => {
@@ -120,6 +123,7 @@ describe('renderVscodeFiles', () => {
     const settings = readJsonFile(files['.vscode/settings.json']);
 
     expect(settings['editor.defaultFormatter']).toBe('oxc.oxc-vscode');
+    expect(settings['editor.formatOnSave']).toBe(true);
     expect(settings['[markdown]']).toEqual({
       'editor.defaultFormatter': 'vscode.markdown-language-features',
     });
