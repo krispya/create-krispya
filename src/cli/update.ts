@@ -68,8 +68,8 @@ function isMergeSafeChange(category: CategoryUpdate['category'], change: FileCha
 
 function getUpdateHint(category: CategoryUpdate['category'], change: SelectableFileChange): string {
   if (change.status === 'added') return 'new file';
-  if (isMergeSafeChange(category, change)) return 'merge update';
-  return 'changed; overwrites if selected';
+  if (isMergeSafeChange(category, change)) return 'merges existing file';
+  return 'replaces existing file';
 }
 
 type SelectableFileChange = FileChange & { status: 'added' | 'modified' };
@@ -244,7 +244,7 @@ async function promptForPackageUpdate(
     console.log(color.green('✓') + ` ${updateCommand.successMessage}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(color.red('✗') + ` ${updateCommand.failureLabel} failed: ${message}`);
+    console.log(color.red('✗') + ` ${updateCommand.failureLabel} failed. ${message}`);
     process.exit(1);
   }
 }
@@ -290,7 +290,7 @@ async function promptForTypeScriptMajorUpdate(
   await applyUpdates(changes, projectRoot);
   console.log(
     color.green('✓') +
-      ` TypeScript 7: updated ${changes.length} ${changes.length === 1 ? 'file' : 'files'}`
+      ` Updated ${changes.length} ${changes.length === 1 ? 'file' : 'files'} for TypeScript 7`
   );
 }
 
@@ -412,7 +412,7 @@ async function promptForNodeRequirementUpdate(
 
   const currentNodeLabel = currentNodeVersion == null ? 'not set' : `>=${currentNodeVersion}`;
   p.log.warn(
-    `${formatPackageManager(targetPackageManagerSpec)} requires Node >=${targetNodeVersion}; current engines.node is ${currentNodeLabel}.`
+    `${formatPackageManager(targetPackageManagerSpec)} requires Node >=${targetNodeVersion}. Current engines.node is ${currentNodeLabel}.`
   );
 
   const shouldUpdate =
@@ -506,7 +506,10 @@ async function applyPackageManagerMigration(
   }
 
   await applyUpdates(changes, projectRoot);
-  console.log(color.green('✓') + ` Package Manager: updated ${changes.length}`);
+  console.log(
+    color.green('✓') +
+      ` Updated ${changes.length} package manager ${changes.length === 1 ? 'file' : 'files'}`
+  );
 
   return migrationConfig;
 }
@@ -523,7 +526,7 @@ async function processUpdateCategory(
   const hasChanges = hasNew || hasModified;
 
   if (!hasChanges) {
-    console.log(color.green('✓') + ` ${category.label}: Up to date`);
+    console.log(color.green('✓') + ` ${category.label} is up to date`);
     return 'unchanged';
   }
 
@@ -543,12 +546,12 @@ async function processUpdateCategory(
     if (mergeSafeModifiedChanges.length > 0) {
       changesToApply = [...newChanges, ...mergeSafeModifiedChanges];
       if (changesToApply.length > 0) {
-        console.log(color.dim('  (--yes mode: applying merge updates)'));
+        console.log(color.dim('  Auto mode applies merge updates'));
       }
     } else {
       changesToApply = newChanges;
       if (newChanges.length > 0) {
-        console.log(color.dim('  (--yes mode: adding new files only)'));
+        console.log(color.dim('  Auto mode adds new files only'));
       }
     }
   } else {
@@ -565,7 +568,7 @@ async function processUpdateCategory(
     const parts = [];
     if (addedCount > 0) parts.push(`added ${addedCount}`);
     if (updatedFilesCount > 0) parts.push(`updated ${updatedFilesCount}`);
-    console.log(color.green('✓') + ` ${category.label}: ${parts.join(', ')}`);
+    console.log(color.green('✓') + ` ${category.label} ${parts.join(', ')}`);
     return 'updated';
   }
 
@@ -626,7 +629,7 @@ export async function handleUpdateCommand(
   }
 
   console.log(
-    color.cyan('Checking for updates...') + color.dim(` (${config.linter}/${config.formatter})`)
+    color.cyan('Checking for updates') + color.dim(` (${config.linter}/${config.formatter})`)
   );
   console.log();
 
@@ -641,7 +644,7 @@ export async function handleUpdateCommand(
   }
 
   if (updatedCount === 0 && skippedCount === 0) {
-    console.log(color.green('✓') + ' Everything is up to date!');
+    console.log(color.green('✓') + ' Everything is up to date');
   } else if (updatedCount > 0) {
     console.log(
       color.green('✓') + ` Updated ${updatedCount} ${updatedCount === 1 ? 'category' : 'categories'}`
