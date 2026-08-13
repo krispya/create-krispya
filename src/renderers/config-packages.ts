@@ -3,15 +3,21 @@ import {
   toPrettierConfig,
   toPrettierIgnoreContent,
 } from '../tools/formatter-config.js';
-import type { VirtualFile } from '../types.js';
+import type { PackageVersions, VirtualFile } from '../types.js';
 import { renderJson } from './json.js';
 import { renderOxlintConfig } from './oxlint-config.js';
+import { getResolvedPackageVersion } from '../workflow/resolve/package-versions.js';
+import { getSemverMajor } from '../utils/index.js';
 
 /**
  * Generates @config/typescript package with base, app, node, and react configs.
  */
-export function renderTypescriptConfigPackage(files: Record<string, VirtualFile>): void {
+export function renderTypescriptConfigPackage(
+  files: Record<string, VirtualFile>,
+  versions: PackageVersions = {}
+): void {
   const basePath = '.config/typescript';
+  const isTypeScript7 = (getSemverMajor(getResolvedPackageVersion(versions, 'typescript')) ?? 0) >= 7;
 
   // package.json
   files[`${basePath}/package.json`] = {
@@ -70,6 +76,9 @@ In your package's \`tsconfig.json\`:
         composite: true,
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
+        ...(isTypeScript7
+          ? { types: [], noUncheckedSideEffectImports: true, libReplacement: false }
+          : {}),
       },
     }),
   };
@@ -160,6 +169,7 @@ oxlint -c node_modules/@config/oxlint/base.json
     content: renderJson(
       renderOxlintConfig({
         schemaPath: './node_modules/oxlint/configuration_schema.json',
+        root: false,
         typescript: true,
       })
     ),
@@ -171,6 +181,7 @@ oxlint -c node_modules/@config/oxlint/base.json
     content: renderJson(
       renderOxlintConfig({
         schemaPath: './node_modules/oxlint/configuration_schema.json',
+        root: false,
         react: true,
         typescript: true,
       })

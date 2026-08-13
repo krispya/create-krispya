@@ -3,6 +3,7 @@ import type { LinterMetaConfig } from '../types.js';
 
 export type RenderOxlintConfigParams = {
   schemaPath: string;
+  root?: boolean;
   react?: boolean;
   reactCompiler?: boolean;
   typescript?: boolean;
@@ -45,7 +46,9 @@ export function renderOxlintConfig(params: RenderOxlintConfigParams) {
     $schema: params.schemaPath,
     plugins,
     ...(params.reactCompiler === true ? { jsPlugins: [REACT_HOOKS_JS_PLUGIN] } : {}),
-    ...(params.typescript === true ? { options: { typeAware: true } } : {}),
+    ...(params.typescript === true && params.root !== false
+      ? { options: { typeAware: true, typeCheck: true } }
+      : {}),
     rules: {
       'no-unused-vars': [
         rules.noUnusedVars.level,

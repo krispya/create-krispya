@@ -1,6 +1,6 @@
-import { readFile, access, writeFile, mkdir } from 'fs/promises';
+import { readFile, access, writeFile, mkdir, readdir } from 'fs/promises';
 import { constants } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, relative } from 'path';
 
 import type {
   BaseTemplate,
@@ -53,7 +53,7 @@ import {
   parsePackageManagerSpec,
   renderPnpmWorkspaceConfig,
 } from '../package-managers/index.js';
-import { getSemverMajorString } from '../utils/index.js';
+import { getSemverMajor, getSemverMajorString } from '../utils/index.js';
 import { parseEngine } from '../workflow/resolve/engine.js';
 
 // =============================================================================
@@ -918,6 +918,393 @@ export async function getPackageJsonScriptUpdates(
       newContent,
     },
   ];
+}
+
+const TYPESCRIPT_7_VERSION = '7.0.0';
+
+function getDeclaredVersionMajor(version: string): number | undefined {
+  const match = version.match(/^[~^]?v?(\d+)(?:\.|$)/);
+  return match == null ? undefined : getSemverMajor(match[1]);
+}
+
+export function getTypeScriptMajorUpdateTarget(
+  currentVersion: string,
+  targetVersion = TYPESCRIPT_7_VERSION
+): string | undefined {
+  if (getDeclaredVersionMajor(currentVersion) !== 5 || getSemverMajor(targetVersion) !== 7) {
+    return undefined;
+  }
+
+  const prefix = currentVersion.startsWith('^') ? '^' : currentVersion.startsWith('~') ? '~' : '';
+  return `${prefix}${targetVersion}`;
+}
+
+const TYPESCRIPT_CONFIG_IGNORED_DIRECTORIES = new Set([
+  '.git',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+]);
+
+function shouldIgnoreWorkspaceDirectory(name: string): boolean {
+  return (
+    TYPESCRIPT_CONFIG_IGNORED_DIRECTORIES.has(name) || (name.startsWith('.') && name !== '.config')
+  );
+}
+
+async function findTypeScriptConfigPaths(root: string, directory = root): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const paths: string[] = [];
+  for (const entry of entries) {
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!shouldIgnoreWorkspaceDirectory(entry.name)) {
+        paths.push(...(await findTypeScriptConfigPaths(root, fullPath)));
+      }
+      continue;
+    }
+
+    const isSharedTypeScriptConfig =
+      relative(root, directory) === join('.config', 'typescript') &&
+      entry.name !== 'package.json' &&
+      entry.name.endsWith('.json');
+    if (
+      entry.isFile() &&
+      (/^tsconfig(?:\.[^.]+)*\.json$/.test(entry.name) || isSharedTypeScriptConfig)
+    ) {
+      paths.push(relative(root, fullPath));
+    }
+  }
+
+  return paths.sort();
+}
+
+async function findWorkspacePackageJsonPaths(root: string, directory = root): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const paths: string[] = [];
+  for (const entry of entries) {
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!shouldIgnoreWorkspaceDirectory(entry.name)) {
+        paths.push(...(await findWorkspacePackageJsonPaths(root, fullPath)));
+      }
+    } else if (entry.isFile() && entry.name === 'package.json') {
+      paths.push(relative(root, fullPath));
+    }
+  }
+
+  return paths.sort((left, right) => {
+    if (left === 'package.json') return -1;
+    if (right === 'package.json') return 1;
+    return left.localeCompare(right);
+  });
+}
+
+function prefixBaseUrlPath(baseUrl: string, path: string): string {
+  if (path.startsWith('/')) return path;
+
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
+  const normalized = `${normalizedBaseUrl ? `${normalizedBaseUrl}/` : ''}${path.replace(/^\.\//, '')}`
+    .replace(/^\.\//, '')
+    .replace(/\/+/g, '/');
+  return normalized.startsWith('.') ? normalized : `./${normalized}`;
+}
+
+function migrateTypeScript7CompilerOptions(
+  options: Record<string, unknown>,
+  configPath: string
+): boolean {
+  const original = JSON.stringify(options);
+  const target = typeof options.target === 'string' ? options.target.toLowerCase() : undefined;
+  const module = typeof options.module === 'string' ? options.module.toLowerCase() : undefined;
+  const moduleResolution =
+    typeof options.moduleResolution === 'string' ? options.moduleResolution.toLowerCase() : undefined;
+
+  if (target === 'es5') options.target = 'ES2015';
+  if (['amd', 'umd', 'system', 'systemjs', 'none'].includes(module ?? '')) {
+    options.module = 'ESNext';
+  }
+  if (['classic', 'node', 'node10'].includes(moduleResolution ?? '')) {
+    if (module === 'commonjs') {
+      options.module = 'NodeNext';
+      options.moduleResolution = 'NodeNext';
+    } else {
+      options.moduleResolution = 'bundler';
+    }
+  }
+
+  delete options.downlevelIteration;
+  delete options.ignoreDeprecations;
+
+  if (options.esModuleInterop === false) options.esModuleInterop = true;
+  if (options.allowSyntheticDefaultImports === false) options.allowSyntheticDefaultImports = true;
+  if (options.alwaysStrict === false) options.alwaysStrict = true;
+  if (options.stableTypeOrdering === false) options.stableTypeOrdering = true;
+
+  const baseUrl = options.baseUrl;
+  if (typeof baseUrl === 'string') {
+    const paths = options.paths;
+    if (paths != null && typeof paths === 'object' && !Array.isArray(paths)) {
+      for (const [alias, targets] of Object.entries(paths as Record<string, unknown>)) {
+        if (!Array.isArray(targets)) continue;
+        (paths as Record<string, unknown>)[alias] = targets.map((entry) =>
+          typeof entry === 'string' ? prefixBaseUrlPath(baseUrl, entry) : entry
+        );
+      }
+    } else {
+      options.paths = { '*': [prefixBaseUrlPath(baseUrl, '*')] };
+    }
+    delete options.baseUrl;
+  }
+
+  if (options.types == null) {
+    if (/(?:^|[/\\])(?:tsconfig\.)?node\.json$/.test(configPath)) {
+      options.types = ['node'];
+    } else if (
+      /(?:^|[/\\])tsconfig\.app\.json$/.test(configPath) ||
+      /(?:^|[/\\])\.config[/\\]typescript[/\\]base\.json$/.test(configPath)
+    ) {
+      options.types = [];
+    }
+  }
+  options.noUncheckedSideEffectImports = true;
+  options.libReplacement = false;
+
+  return JSON.stringify(options) !== original;
+}
+
+export async function getTypeScript7ConfigUpdates(root: string): Promise<FileChange[]> {
+  const changes: FileChange[] = [];
+
+  for (const configPath of await findTypeScriptConfigPaths(root)) {
+    const fullPath = join(root, configPath);
+    const currentContent = await readFile(fullPath, 'utf-8');
+
+    let tsconfig: Record<string, unknown>;
+    try {
+      const parsed = parseJsonValue(currentContent);
+      if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      tsconfig = parsed as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+
+    const compilerOptions = tsconfig.compilerOptions;
+    if (
+      compilerOptions == null ||
+      typeof compilerOptions !== 'object' ||
+      Array.isArray(compilerOptions) ||
+      !migrateTypeScript7CompilerOptions(compilerOptions as Record<string, unknown>, configPath)
+    ) {
+      continue;
+    }
+
+    changes.push({
+      path: configPath,
+      status: 'modified',
+      currentContent,
+      newContent: renderJson(tsconfig),
+      mergeSafe: true,
+    });
+  }
+
+  return changes;
+}
+
+/**
+ * Updates an explicitly declared TypeScript 5 dependency to TypeScript 7.
+ * Installation remains the responsibility of the normal package update step.
+ */
+export async function getTypeScriptMajorPackageUpdates(
+  root: string,
+  config?: WorkspaceConfig,
+  targetVersion = TYPESCRIPT_7_VERSION,
+  oxlintTsgolintVersion = getResolvedPackageVersion({}, 'oxlint-tsgolint')
+): Promise<FileChange[]> {
+  if (config?.linter === 'eslint') return [];
+
+  const packages: Array<{
+    path: string;
+    currentContent: string;
+    pkg: PackageJsonForScripts;
+  }> = [];
+  for (const packagePath of await findWorkspacePackageJsonPaths(root)) {
+    try {
+      const currentContent = await readFile(join(root, packagePath), 'utf-8');
+      packages.push({
+        path: packagePath,
+        currentContent,
+        pkg: JSON.parse(currentContent) as PackageJsonForScripts,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  if (packages.some(({ pkg }) => hasPackage(pkg, 'eslint') || hasPackage(pkg, 'typescript-eslint'))) {
+    return [];
+  }
+
+  const changedPackages = new Set<string>();
+  for (const { path: packagePath, pkg } of packages) {
+    for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+      const dependencies = pkg[dependencyField];
+      if (dependencies == null) continue;
+
+      const currentVersion = dependencies.typescript;
+      if (currentVersion == null) continue;
+
+      const targetRange = getTypeScriptMajorUpdateTarget(currentVersion, targetVersion);
+      if (targetRange == null) continue;
+
+      dependencies.typescript = targetRange;
+      changedPackages.add(packagePath);
+    }
+  }
+
+  if (changedPackages.size === 0) return [];
+
+  if (config?.linter === 'oxlint') {
+    const rootPackage = packages.find(({ path }) => path === 'package.json');
+    if (rootPackage != null) {
+      const targetRange = `^${oxlintTsgolintVersion}`;
+      let dependencyUpdated = false;
+      for (const dependencyField of [
+        'dependencies',
+        'devDependencies',
+        'peerDependencies',
+      ] as const) {
+        const dependencies = rootPackage.pkg[dependencyField];
+        if (dependencies?.['oxlint-tsgolint'] == null) continue;
+        dependencies['oxlint-tsgolint'] = targetRange;
+        dependencyUpdated = true;
+      }
+
+      if (!dependencyUpdated) {
+        rootPackage.pkg.devDependencies = sortPackageMap({
+          ...rootPackage.pkg.devDependencies,
+          'oxlint-tsgolint': targetRange,
+        });
+      }
+      changedPackages.add(rootPackage.path);
+    }
+  }
+
+  const changes: FileChange[] = packages
+    .filter(({ path }) => changedPackages.has(path))
+    .map(({ path, currentContent, pkg }) => ({
+      path,
+      status: 'modified',
+      currentContent,
+      newContent: renderJson(pkg, { inlineArrays: false }),
+      mergeSafe: true,
+    }));
+
+  changes.push(...(await getTypeScript7ConfigUpdates(root)));
+
+  if (config?.linter !== 'oxlint') return changes;
+
+  if (config.isMonorepo) {
+    for (const sharedConfigPath of ['.config/oxlint/base.json', '.config/oxlint/react.json']) {
+      let sharedCurrentContent: string;
+      try {
+        sharedCurrentContent = await readFile(join(root, sharedConfigPath), 'utf-8');
+      } catch {
+        continue;
+      }
+
+      let sharedConfig: Record<string, unknown>;
+      try {
+        const parsed = parseJsonValue(sharedCurrentContent);
+        if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+        sharedConfig = parsed as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
+      const sharedOptions = sharedConfig.options;
+      if (
+        sharedOptions == null ||
+        typeof sharedOptions !== 'object' ||
+        Array.isArray(sharedOptions)
+      ) {
+        continue;
+      }
+
+      const nextOptions = { ...(sharedOptions as Record<string, unknown>) };
+      const hadRootOnlyOptions = 'typeAware' in nextOptions || 'typeCheck' in nextOptions;
+      if (!hadRootOnlyOptions) continue;
+
+      delete nextOptions.typeAware;
+      delete nextOptions.typeCheck;
+      if (Object.keys(nextOptions).length === 0) delete sharedConfig.options;
+      else sharedConfig.options = nextOptions;
+
+      changes.push({
+        path: sharedConfigPath,
+        status: 'modified',
+        currentContent: sharedCurrentContent,
+        newContent: renderJson(sharedConfig),
+        mergeSafe: true,
+      });
+    }
+  }
+
+  const oxlintConfigPath = config.isMonorepo
+    ? 'oxlint.json'
+    : config.configStrategy === 'root'
+      ? 'oxlint.json'
+      : '.config/oxlint.json';
+  let currentOxlintContent: string;
+  try {
+    currentOxlintContent = await readFile(join(root, oxlintConfigPath), 'utf-8');
+  } catch {
+    return changes;
+  }
+
+  let oxlintConfig: Record<string, unknown>;
+  try {
+    const parsed = parseJsonValue(currentOxlintContent);
+    if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) return changes;
+    oxlintConfig = parsed as Record<string, unknown>;
+  } catch {
+    return changes;
+  }
+
+  const currentOptions = oxlintConfig.options;
+  if (
+    currentOptions != null &&
+    (typeof currentOptions !== 'object' || Array.isArray(currentOptions))
+  ) {
+    return changes;
+  }
+
+  const options = (currentOptions ?? {}) as Record<string, unknown>;
+  if (options.typeAware !== true || options.typeCheck !== true) {
+    oxlintConfig.options = { ...options, typeAware: true, typeCheck: true };
+    changes.push({
+      path: oxlintConfigPath,
+      status: 'modified',
+      currentContent: currentOxlintContent,
+      newContent: renderJson(oxlintConfig),
+      mergeSafe: true,
+    });
+  }
+
+  return changes;
 }
 
 /**

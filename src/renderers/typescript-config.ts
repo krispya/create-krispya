@@ -1,8 +1,10 @@
 import {
   assignResolvedPackageVersion,
   formatNodeTypesVersion,
+  getResolvedPackageVersion,
 } from '../workflow/resolve/package-versions.js';
 import { getEngineName } from '../workflow/resolve/engine.js';
+import { getSemverMajor } from '../utils/index.js';
 import { renderJson } from './json.js';
 import type {
   BaseTemplate,
@@ -53,6 +55,10 @@ export function renderTypescriptConfig(
   } = params;
   const isReact = baseTemplate === 'react';
   const isR3f = baseTemplate === 'r3f';
+  const isTypeScript7 = (getSemverMajor(getResolvedPackageVersion(versions, 'typescript')) ?? 0) >= 7;
+  const typeScript7Options = isTypeScript7
+    ? { noUncheckedSideEffectImports: true, libReplacement: false }
+    : {};
   const files: Record<string, VirtualFile> = {};
   const devDependencies: Record<string, string> = {};
 
@@ -117,6 +123,7 @@ export function renderTypescriptConfig(
         module: 'ESNext',
         moduleResolution: 'bundler',
         lib: ['DOM', 'DOM.Iterable', 'ESNext'],
+        ...(isTypeScript7 ? { types: [] } : {}),
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         strict: true,
@@ -125,6 +132,7 @@ export function renderTypescriptConfig(
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
         noEmit: true,
+        ...typeScript7Options,
         ...(isReact || isR3f ? { jsx: 'react-jsx' } : {}),
       },
       include: ['../src', '../tests'],
@@ -152,6 +160,7 @@ export function renderTypescriptConfig(
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
         noEmit: true,
+        ...typeScript7Options,
       },
       include: ['../*.config.ts', './*.ts'],
     };
@@ -181,6 +190,7 @@ export function renderTypescriptConfig(
         module: 'ESNext',
         moduleResolution: 'bundler',
         lib: ['DOM', 'DOM.Iterable', 'ESNext'],
+        ...(isTypeScript7 ? { types: [] } : {}),
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         strict: true,
@@ -189,6 +199,7 @@ export function renderTypescriptConfig(
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
         noEmit: true,
+        ...typeScript7Options,
         ...(isReact || isR3f ? { jsx: 'react-jsx' } : {}),
       },
       include: ['src', 'tests'],
@@ -216,6 +227,7 @@ export function renderTypescriptConfig(
         rewriteRelativeImportExtensions: true,
         erasableSyntaxOnly: true,
         noEmit: true,
+        ...typeScript7Options,
       },
       include: ['*.config.ts'],
     };

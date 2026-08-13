@@ -158,6 +158,7 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
     content: JSON.stringify(
       {
         extends: '@config/typescript/base.json',
+        files: [],
         compilerOptions: {
           noEmit: true,
         },
@@ -169,7 +170,7 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
   };
 
   // Generate @config/typescript package
-  renderTypescriptConfigPackage(files);
+  renderTypescriptConfigPackage(files, versions);
 
   // Generate linter config package and root config
   if (linter === 'oxlint') {
@@ -181,6 +182,10 @@ export function renderMonorepo(params: MonorepoParams): MonorepoResult {
         {
           $schema: './node_modules/oxlint/configuration_schema.json',
           extends: ['@config/oxlint/base.json'],
+          options: {
+            typeAware: true,
+            typeCheck: true,
+          },
         },
         null,
         2

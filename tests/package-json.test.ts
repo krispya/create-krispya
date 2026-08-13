@@ -583,6 +583,12 @@ allowBuilds:
     expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^0.22.1');
 
     const oxlintConfig = readPackageJsonContent(files['.config/oxlint/base.json']);
-    expect(oxlintConfig.options).toEqual({ typeAware: true });
+    expect(oxlintConfig.options).toBeUndefined();
+
+    const rootOxlintConfig = readPackageJsonContent(files['oxlint.json']);
+    expect(rootOxlintConfig.options).toEqual({ typeAware: true, typeCheck: true });
+
+    const rootTypeScriptConfig = readPackageJsonContent(files['tsconfig.json']);
+    expect(rootTypeScriptConfig.files).toEqual([]);
   });
 });

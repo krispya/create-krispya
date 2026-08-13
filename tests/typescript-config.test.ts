@@ -18,6 +18,10 @@ function readTypes(file: VirtualFile | undefined): unknown {
   return compilerOptions.types;
 }
 
+function readCompilerOptions(file: VirtualFile | undefined): Record<string, unknown> {
+  return readTextJson(file).compilerOptions as Record<string, unknown>;
+}
+
 describe('TypeScript Node configs', () => {
   let tempDir = '';
 
@@ -47,6 +51,34 @@ describe('TypeScript Node configs', () => {
     renderTypescriptConfigPackage(files);
 
     expect(readTypes(files['.config/typescript/node.json'])).toEqual(['node']);
+  });
+
+  it('uses explicit TypeScript 7 defaults only for TypeScript 7 configs', () => {
+    const typescript5 = renderTypescriptConfig({
+      baseTemplate: 'vanilla',
+      versions: { typescript: '5.9.3' },
+    });
+    const typescript7 = renderTypescriptConfig({
+      baseTemplate: 'vanilla',
+      versions: { typescript: '7.2.4' },
+    });
+
+    expect(readCompilerOptions(typescript5.files['.config/tsconfig.app.json'])).not.toHaveProperty(
+      'types'
+    );
+    expect(readCompilerOptions(typescript7.files['.config/tsconfig.app.json'])).toMatchObject({
+      types: [],
+      noUncheckedSideEffectImports: true,
+      libReplacement: false,
+    });
+
+    const sharedFiles: Record<string, VirtualFile> = {};
+    renderTypescriptConfigPackage(sharedFiles, { typescript: '7.2.4' });
+    expect(readCompilerOptions(sharedFiles['.config/typescript/base.json'])).toMatchObject({
+      types: [],
+      noUncheckedSideEffectImports: true,
+      libReplacement: false,
+    });
   });
 
   it('merges Node types into an existing generated config during update', async () => {

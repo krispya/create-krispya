@@ -10,6 +10,9 @@ import {
   getOxlintConfigReplacementUpdates,
   getPackageManagerConfigUpdates,
   getPackageJsonScriptUpdates,
+  getTypeScriptMajorPackageUpdates,
+  getTypeScriptMajorUpdateTarget,
+  getTypeScript7ConfigUpdates,
   getWorkspaceConfigUpdates,
 } from '../src/cli/update-core.js';
 import {
@@ -113,6 +116,265 @@ describe('update helpers', () => {
     expect(getRequiredNodeUpdateTarget('22.13.0', '22.13')).toBeUndefined();
     expect(getRequiredNodeUpdateTarget(undefined, '22.13')).toBe('22.13');
     expect(getRequiredNodeUpdateTarget('22.13.0', undefined)).toBeUndefined();
+  });
+
+  it('detects only TypeScript 5 to 7 major updates', () => {
+    expect(getTypeScriptMajorUpdateTarget('^5.9.3')).toBe('^7.0.0');
+    expect(getTypeScriptMajorUpdateTarget('^5.9.3', '7.2.4')).toBe('^7.2.4');
+    expect(getTypeScriptMajorUpdateTarget('~5.8.2')).toBe('~7.0.0');
+    expect(getTypeScriptMajorUpdateTarget('5.7.0')).toBe('7.0.0');
+    expect(getTypeScriptMajorUpdateTarget('^6.0.0')).toBeUndefined();
+    expect(getTypeScriptMajorUpdateTarget('^7.0.0')).toBeUndefined();
+    expect(getTypeScriptMajorUpdateTarget('workspace:^5.9.3')).toBeUndefined();
+  });
+
+  it('updates a declared TypeScript 5 dependency without installing it', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-update-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-app',
+          scripts: { custom: 'echo custom', typecheck: 'tsc --build --noEmit' },
+          devDependencies: {
+            prettier: '^3.0.0',
+            typescript: '^5.9.3',
+          },
+        })
+      );
+
+      const changes = await getTypeScriptMajorPackageUpdates(tempDir, undefined, '7.2.4');
+
+      expect(changes).toHaveLength(1);
+      expect(changes[0]).toMatchObject({ path: 'package.json', status: 'modified' });
+      expect(JSON.parse(changes[0]!.newContent)).toEqual({
+        name: 'my-app',
+        scripts: { custom: 'echo custom', typecheck: 'tsc --build --noEmit' },
+        devDependencies: {
+          prettier: '^3.0.0',
+          typescript: '^7.2.4',
+        },
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('includes Oxlint type checking in the TypeScript 7 migration', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-oxlint-'));
+    try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          devDependencies: {
+            oxlint: '^1.77.0',
+            'oxlint-tsgolint': '^0.22.1',
+            typescript: '^5.9.3',
+          },
+        })
+      );
+      await writeFile(
+        join(tempDir, '.config/oxlint.json'),
+        JSON.stringify({
+          plugins: ['typescript'],
+          options: { typeAware: false },
+          rules: { 'no-console': 'warn' },
+        })
+      );
+
+      const changes = await getTypeScriptMajorPackageUpdates(
+        tempDir,
+        {
+          name: 'my-app',
+          linter: 'oxlint',
+          formatter: 'prettier',
+          packageManager: 'pnpm',
+          isMonorepo: false,
+          configStrategy: 'stealth',
+        },
+        '7.0.0',
+        '0.24.3'
+      );
+
+      expect(changes.map((change) => change.path)).toEqual(['package.json', '.config/oxlint.json']);
+
+      const packageJson = JSON.parse(changes[0]!.newContent);
+      expect(packageJson.devDependencies).toMatchObject({
+        'oxlint-tsgolint': '^0.24.3',
+        typescript: '^7.0.0',
+      });
+
+      const oxlintConfig = JSON.parse(changes[1]!.newContent);
+      expect(oxlintConfig.options).toEqual({ typeAware: true, typeCheck: true });
+      expect(oxlintConfig.rules).toEqual({ 'no-console': 'warn' });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('puts TypeScript 7 Oxlint options in the monorepo root config', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-monorepo-'));
+    try {
+      await mkdir(join(tempDir, '.config/typescript'), { recursive: true });
+      await mkdir(join(tempDir, '.config/oxlint'), { recursive: true });
+      await mkdir(join(tempDir, 'apps/my-app'), { recursive: true });
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          devDependencies: { oxlint: '^1.77.0' },
+        })
+      );
+      await writeFile(
+        join(tempDir, 'apps/my-app/package.json'),
+        JSON.stringify({ devDependencies: { typescript: '^5.9.3' } })
+      );
+      await writeFile(
+        join(tempDir, '.config/typescript/base.json'),
+        JSON.stringify({ compilerOptions: { moduleResolution: 'bundler' } })
+      );
+      await writeFile(
+        join(tempDir, 'oxlint.json'),
+        JSON.stringify({ extends: ['@config/oxlint/base.json'] })
+      );
+      await writeFile(
+        join(tempDir, '.config/oxlint/base.json'),
+        JSON.stringify({ options: { typeAware: true, typeCheck: true, maxWarnings: 3 } })
+      );
+      await writeFile(
+        join(tempDir, '.config/oxlint/react.json'),
+        JSON.stringify({ options: { typeAware: true, typeCheck: true } })
+      );
+
+      const changes = await getTypeScriptMajorPackageUpdates(tempDir, {
+        name: 'workspace',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: true,
+      });
+
+      expect(changes.map((change) => change.path)).toEqual([
+        'package.json',
+        'apps/my-app/package.json',
+        '.config/typescript/base.json',
+        '.config/oxlint/base.json',
+        '.config/oxlint/react.json',
+        'oxlint.json',
+      ]);
+      expect(JSON.parse(changes[1]!.newContent).devDependencies.typescript).toBe('^7.0.0');
+      expect(JSON.parse(changes[2]!.newContent).compilerOptions).toMatchObject({
+        types: [],
+        noUncheckedSideEffectImports: true,
+        libReplacement: false,
+      });
+      expect(JSON.parse(changes[3]!.newContent).options).toEqual({ maxWarnings: 3 });
+      expect(JSON.parse(changes[4]!.newContent).options).toBeUndefined();
+      expect(JSON.parse(changes[5]!.newContent).options).toEqual({
+        typeAware: true,
+        typeCheck: true,
+      });
+
+      await applyUpdates(changes, tempDir);
+      expect(
+        JSON.parse(await readFile(join(tempDir, 'apps/my-app/package.json'), 'utf-8'))
+      ).toHaveProperty('devDependencies.typescript', '^7.0.0');
+      await expect(
+        getTypeScriptMajorPackageUpdates(tempDir, {
+          name: 'workspace',
+          linter: 'oxlint',
+          formatter: 'prettier',
+          packageManager: 'pnpm',
+          isMonorepo: true,
+        })
+      ).resolves.toEqual([]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not offer a TypeScript 7 update without a TypeScript 5 declaration', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-no-typescript-7-update-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({ devDependencies: { typescript: '^6.0.0' } })
+      );
+
+      await expect(getTypeScriptMajorPackageUpdates(tempDir)).resolves.toEqual([]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not offer TypeScript 7 tooling to ESLint workspaces', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-eslint-typescript-7-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          devDependencies: {
+            eslint: '^9.0.0',
+            typescript: '^5.9.3',
+            'typescript-eslint': '^8.0.0',
+          },
+        })
+      );
+
+      await expect(
+        getTypeScriptMajorPackageUpdates(tempDir, {
+          name: 'my-app',
+          linter: 'oxlint',
+          formatter: 'prettier',
+          packageManager: 'pnpm',
+          isMonorepo: false,
+        })
+      ).resolves.toEqual([]);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('audits TypeScript configs for TypeScript 7', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-config-'));
+    try {
+      await writeFile(
+        join(tempDir, 'tsconfig.app.json'),
+        `{
+          // TypeScript 5 configuration
+          "compilerOptions": {
+            "target": "ES5",
+            "module": "CommonJS",
+            "moduleResolution": "node",
+            "baseUrl": "./src",
+            "paths": { "@app/*": ["app/*"] },
+            "downlevelIteration": true,
+            "ignoreDeprecations": "6.0",
+            "esModuleInterop": false,
+          },
+        }`
+      );
+
+      const changes = await getTypeScript7ConfigUpdates(tempDir);
+
+      expect(changes).toHaveLength(1);
+      const tsconfig = JSON.parse(changes[0]!.newContent);
+      expect(tsconfig.compilerOptions).toMatchObject({
+        target: 'ES2015',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        paths: { '@app/*': ['./src/app/*'] },
+        esModuleInterop: true,
+        types: [],
+        noUncheckedSideEffectImports: true,
+        libReplacement: false,
+      });
+      expect(tsconfig.compilerOptions).not.toHaveProperty('baseUrl');
+      expect(tsconfig.compilerOptions).not.toHaveProperty('downlevelIteration');
+      expect(tsconfig.compilerOptions).not.toHaveProperty('ignoreDeprecations');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('updates packages when the pnpm major stays the same', () => {
@@ -695,7 +957,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
       expect(changes[0]?.status).toBe('modified');
 
       const oxlintConfig = JSON.parse(changes[0]!.newContent);
-      expect(oxlintConfig.options).toEqual({ typeAware: true });
+      expect(oxlintConfig.options).toEqual({ typeAware: true, typeCheck: true });
       expect(oxlintConfig.ignorePatterns).toEqual(['dist']);
     } finally {
       await rm(tempDir, { recursive: true, force: true });

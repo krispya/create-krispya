@@ -10,6 +10,7 @@ import {
   getPackageManagerConfigUpdates,
   getOxlintConfigReplacementUpdates,
   getPackageJsonScriptUpdates,
+  getTypeScriptMajorPackageUpdates,
   getTypescriptNodeConfigUpdates,
   planExpectedFiles,
   getWorkspaceConfigUpdates,
@@ -28,7 +29,12 @@ import {
   resolvePackageManager,
 } from '../package-managers/index.js';
 import type { PackageManagerSpec } from '../types.js';
-import { compareNumericSemver, getSemverMajor } from '../utils/index.js';
+import {
+  compareNumericSemver,
+  getLatestNpmMajorVersion,
+  getLatestNpmVersion,
+  getSemverMajor,
+} from '../utils/index.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 type PackageUpdateCommand = {
@@ -241,6 +247,51 @@ async function promptForPackageUpdate(
     console.log(color.red('✗') + ` ${updateCommand.failureLabel} failed: ${message}`);
     process.exit(1);
   }
+}
+
+async function promptForTypeScriptMajorUpdate(
+  projectRoot: string,
+  config: WorkspaceConfig,
+  options: CliOptions
+): Promise<void> {
+  const candidateChanges = await getTypeScriptMajorPackageUpdates(projectRoot, config);
+  if (candidateChanges.length === 0) return;
+
+  const [latestTypeScript7Version, latestOxlintTsgolintVersion] = await Promise.all([
+    getLatestNpmMajorVersion('typescript', '7', '7.0.0'),
+    config.linter === 'oxlint'
+      ? getLatestNpmVersion('oxlint-tsgolint', '0.22.1')
+      : Promise.resolve('0.22.1'),
+  ]);
+  const changes = await getTypeScriptMajorPackageUpdates(
+    projectRoot,
+    config,
+    latestTypeScript7Version,
+    latestOxlintTsgolintVersion
+  );
+
+  const shouldUpdate =
+    options.yes ||
+    (await p.confirm({
+      message: 'Update to TypeScript 7 tooling?',
+      initialValue: true,
+    }));
+
+  if (p.isCancel(shouldUpdate)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  if (!shouldUpdate) {
+    console.log(color.dim('  Skipped TypeScript 7 update'));
+    return;
+  }
+
+  await applyUpdates(changes, projectRoot);
+  console.log(
+    color.green('✓') +
+      ` TypeScript 7: updated ${changes.length} ${changes.length === 1 ? 'file' : 'files'}`
+  );
 }
 
 async function collectUpdateCategories(
@@ -601,6 +652,8 @@ export async function handleUpdateCommand(
   }
 
   const finalConfig = await applyPackageManagerMigration(projectRoot, isMonorepo, options, config);
+
+  await promptForTypeScriptMajorUpdate(projectRoot, finalConfig, options);
 
   await promptForPackageUpdate(projectRoot, finalConfig, options);
 
