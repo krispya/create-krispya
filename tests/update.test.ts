@@ -10,6 +10,7 @@ import {
   getOxlintConfigReplacementUpdates,
   getPackageManagerConfigUpdates,
   getPackageJsonScriptUpdates,
+  selectPackageJsonScriptOverwrites,
   getTypeScriptMajorPackageUpdates,
   getTypeScriptMajorUpdateTarget,
   getTypeScript7ConfigUpdates,
@@ -810,6 +811,13 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
 
       expect(changes).toHaveLength(1);
       expect(changes[0]?.status).toBe('modified');
+      expect(changes[0]?.scriptOverwrites).toEqual([
+        {
+          name: 'typecheck',
+          current: 'tsc --noEmit',
+          proposed: 'tsc --build --noEmit',
+        },
+      ]);
 
       const packageJson = JSON.parse(changes[0]!.newContent);
       expect(packageJson.scripts).toMatchObject({
@@ -826,6 +834,73 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
+  });
+
+  it('preserves declined package scripts while applying the rest of the package update', () => {
+    const currentContent = JSON.stringify({
+      scripts: {
+        lint: 'custom-lint',
+      },
+    });
+    const change = selectPackageJsonScriptOverwrites(
+      {
+        path: 'package.json',
+        status: 'modified',
+        currentContent,
+        newContent: JSON.stringify({
+          scripts: {
+            lint: 'oxlint',
+            test: 'vitest',
+          },
+        }),
+        scriptOverwrites: [
+          {
+            name: 'lint',
+            current: 'custom-lint',
+            proposed: 'oxlint',
+          },
+        ],
+      },
+      []
+    );
+
+    expect(JSON.parse(change!.newContent)).toEqual({
+      scripts: {
+        lint: 'custom-lint',
+        test: 'vitest',
+      },
+    });
+  });
+
+  it('skips a package update when all remaining script overwrites are declined', () => {
+    const currentContent = JSON.stringify({
+      scripts: {
+        lint: 'custom-lint',
+      },
+    });
+
+    expect(
+      selectPackageJsonScriptOverwrites(
+        {
+          path: 'package.json',
+          status: 'modified',
+          currentContent,
+          newContent: JSON.stringify({
+            scripts: {
+              lint: 'oxlint',
+            },
+          }),
+          scriptOverwrites: [
+            {
+              name: 'lint',
+              current: 'custom-lint',
+              proposed: 'oxlint',
+            },
+          ],
+        },
+        []
+      )
+    ).toBeUndefined();
   });
 
   it('adds oxlint type-aware backend during single-package updates', async () => {

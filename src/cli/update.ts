@@ -10,6 +10,7 @@ import {
   getPackageManagerConfigUpdates,
   getOxlintConfigReplacementUpdates,
   getPackageJsonScriptUpdates,
+  selectPackageJsonScriptOverwrites,
   getTypeScriptMajorPackageUpdates,
   getTypescriptNodeConfigUpdates,
   planExpectedFiles,
@@ -68,6 +69,7 @@ function isMergeSafeChange(category: CategoryUpdate['category'], change: FileCha
 
 function getUpdateHint(category: CategoryUpdate['category'], change: SelectableFileChange): string {
   if (change.status === 'added') return 'new file';
+  if (change.scriptOverwrites?.length) return 'requires script review';
   if (isMergeSafeChange(category, change)) return 'merges existing file';
   return 'replaces existing file';
 }
@@ -109,12 +111,55 @@ async function promptForUpdateSelections(category: CategoryUpdate) {
   return selectableChanges.filter((change) => selectedFiles.includes(change.path));
 }
 
+async function promptForPackageJsonUpdate(category: CategoryUpdate): Promise<FileChange[]> {
+  const changes = category.changes.filter(isSelectableFileChange);
+  const shouldUpdate = await p.confirm({
+    message: 'Update package.json?',
+    initialValue: true,
+  });
+
+  if (p.isCancel(shouldUpdate)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
+
+  if (!shouldUpdate) return [];
+
+  const selectedChanges: FileChange[] = [];
+  for (const change of changes) {
+    const selectedScripts: string[] = [];
+    for (const overwrite of change.scriptOverwrites ?? []) {
+      console.log();
+      console.log(color.yellow(`Script "${overwrite.name}" in ${change.path} differs:`));
+      console.log(color.red(`  - ${overwrite.current}`));
+      console.log(color.green(`  + ${overwrite.proposed}`));
+
+      const shouldOverwrite = await p.confirm({
+        message: `Overwrite the "${overwrite.name}" script?`,
+        initialValue: false,
+      });
+
+      if (p.isCancel(shouldOverwrite)) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+      }
+
+      if (shouldOverwrite) selectedScripts.push(overwrite.name);
+    }
+
+    const selectedChange = selectPackageJsonScriptOverwrites(change, selectedScripts);
+    if (selectedChange) selectedChanges.push(selectedChange);
+  }
+
+  return selectedChanges;
+}
+
 async function promptForAiFileInstall(category: CategoryUpdate): Promise<FileChange[]> {
   const newChanges = category.changes.filter((change) => change.status === 'added');
   const fileList = newChanges.map((change) => change.path).join(', ');
   const shouldInstall = await p.confirm({
     message: fileList ? `Install more AI files? (${fileList})` : 'Install more AI files?',
-    initialValue: true,
+    initialValue: false,
   });
 
   if (p.isCancel(shouldInstall)) {
@@ -558,7 +603,9 @@ async function processUpdateCategory(
     changesToApply =
       category.category === 'ai-files-install'
         ? await promptForAiFileInstall(category)
-        : await promptForUpdateSelections(category);
+        : category.category === 'package-json'
+          ? await promptForPackageJsonUpdate(category)
+          : await promptForUpdateSelections(category);
   }
 
   if (changesToApply.length > 0) {

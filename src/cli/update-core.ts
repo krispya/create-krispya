@@ -1,6 +1,7 @@
 import { readFile, access, writeFile, mkdir, readdir } from 'fs/promises';
 import { constants } from 'fs';
 import { join, dirname, relative } from 'path';
+import { isDeepStrictEqual } from 'util';
 
 import type {
   BaseTemplate,
@@ -75,12 +76,19 @@ type ExpectedUpdateCategory = Exclude<UpdateCategory, 'ai-files-install' | 'ai-f
 
 export type FileChangeStatus = 'added' | 'modified' | 'unchanged';
 
+export type PackageJsonScriptOverwrite = {
+  name: string;
+  current: string;
+  proposed: string;
+};
+
 export type FileChange = {
   path: string;
   status: FileChangeStatus;
   currentContent?: string;
   newContent: string;
   mergeSafe?: boolean;
+  scriptOverwrites?: PackageJsonScriptOverwrite[];
 };
 
 export type CategoryUpdate = {
@@ -756,6 +764,16 @@ function scriptsEqual(left: Record<string, string>, right: Record<string, string
   return leftEntries.every(([key, value]) => right[key] === value);
 }
 
+function getPackageJsonScriptOverwrites(
+  currentScripts: Record<string, string>,
+  expectedScripts: Record<string, string>
+): PackageJsonScriptOverwrite[] {
+  return Object.entries(expectedScripts).flatMap(([name, proposed]) => {
+    const current = currentScripts[name];
+    return current != null && current !== proposed ? [{ name, current, proposed }] : [];
+  });
+}
+
 function packageManagerFieldsEqual(
   pkg: PackageJsonForScripts,
   packageManagerSpec: PackageManagerSpec | undefined,
@@ -877,6 +895,7 @@ export async function getPackageJsonScriptUpdates(
   const currentScripts = pkg.scripts ?? {};
   const expectedScripts = await getExpectedPackageScripts(root, config, pkg);
   const nextScripts = mergePackageJsonScripts(currentScripts, expectedScripts);
+  const scriptOverwrites = getPackageJsonScriptOverwrites(currentScripts, expectedScripts);
   const currentDevDependencies = pkg.devDependencies ?? {};
   const nextDevDependencies = await getExpectedPackageDevDependencies(root, config, pkg);
   const targetPackageManagerSpec = config.targetPackageManagerSpec;
@@ -916,8 +935,43 @@ export async function getPackageJsonScriptUpdates(
       status: 'modified',
       currentContent,
       newContent,
+      ...(scriptOverwrites.length > 0 ? { scriptOverwrites } : {}),
     },
   ];
+}
+
+/**
+ * Applies the user's script overwrite choices to a proposed package.json update.
+ * Returns undefined when declining overwrites leaves no other package.json changes.
+ */
+export function selectPackageJsonScriptOverwrites(
+  change: FileChange,
+  selectedScripts: Iterable<string>
+): FileChange | undefined {
+  const overwrites = change.scriptOverwrites ?? [];
+  if (overwrites.length === 0) return change;
+
+  const selected = new Set(selectedScripts);
+  const currentPackageJson = JSON.parse(change.currentContent ?? '{}') as {
+    scripts?: Record<string, string>;
+  };
+  const nextPackageJson = JSON.parse(change.newContent) as {
+    scripts?: Record<string, string>;
+  };
+
+  nextPackageJson.scripts ??= {};
+  for (const overwrite of overwrites) {
+    if (!selected.has(overwrite.name)) {
+      nextPackageJson.scripts[overwrite.name] = overwrite.current;
+    }
+  }
+
+  if (isDeepStrictEqual(currentPackageJson, nextPackageJson)) return undefined;
+
+  return {
+    ...change,
+    newContent: renderJson(nextPackageJson, { inlineArrays: false }),
+  };
 }
 
 const TYPESCRIPT_7_VERSION = '7.0.0';

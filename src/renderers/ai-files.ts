@@ -69,7 +69,7 @@ export function renderAiFiles(files: Record<string, VirtualFile>, params: AiFile
 }
 
 export function renderManagedAiFileContent(content: string): string {
-  return [AI_FILE_MANAGED_BEGIN, content.trimEnd(), AI_FILE_MANAGED_END, ''].join('\n');
+  return [AI_FILE_MANAGED_BEGIN, '', content.trim(), '', AI_FILE_MANAGED_END, ''].join('\n');
 }
 
 function getManagedBlockRange(content: string) {
@@ -100,8 +100,8 @@ function getManagedInnerContent(content: string): string | undefined {
       range.beginIndex + AI_FILE_MANAGED_BEGIN.length,
       range.endIndex - AI_FILE_MANAGED_END.length
     )
-    .replace(/^\r?\n/, '')
-    .replace(/\r?\n$/, '');
+    .replace(/^(?:\r?\n)+/, '')
+    .replace(/(?:\r?\n)+$/, '');
 }
 
 function mergeMissingManagedAiBlock(
