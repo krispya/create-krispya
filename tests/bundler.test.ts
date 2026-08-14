@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { LIBRARY_BUILD_OUTPUT } from '../src/defaults/library.js';
+import { LIBRARY_BUILD_OUTPUT } from '../src/plan/defaults/library.js';
 import { planProject, resolveProjectPlanInput } from '../src/index.js';
 import {
   DEFAULT_LIBRARY_BUNDLER,
@@ -10,7 +10,7 @@ import {
   getLibraryBundlerPromptOptions,
   isLibraryBundler,
   libraryBundlerNames,
-} from '../src/library-bundlers.js';
+} from '../src/intent/bundlers.js';
 import type { LibraryBundler, ProjectOptions, VirtualFile } from '../src/types.js';
 
 function readTextFile(file: VirtualFile | undefined): string {
@@ -109,7 +109,7 @@ describe('library bundlers', () => {
   });
 
   it('generates a stealth tsdown build by default', async () => {
-    const { files } = await planProject(libraryOptions());
+    const { files } = planProject(libraryOptions());
     const packageJson = readPackageJson(files['package.json']);
     const config = readTextFile(files['.config/tsdown.config.ts']);
 
@@ -144,7 +144,7 @@ describe('library bundlers', () => {
   });
 
   it('keeps unbuild available when explicitly selected', async () => {
-    const { files } = await planProject(
+    const { files } = planProject(
       libraryOptions({
         libraryBundler: 'unbuild',
         versions: { ...versions, typescript: '6.0.3' },
@@ -160,14 +160,14 @@ describe('library bundlers', () => {
     );
   });
 
-  it('rejects unbuild when TypeScript 7 is being installed', async () => {
-    await expect(planProject(libraryOptions({ libraryBundler: 'unbuild' }))).rejects.toThrow(
+  it('rejects unbuild when TypeScript 7 is being installed', () => {
+    expect(() => planProject(libraryOptions({ libraryBundler: 'unbuild' }))).toThrow(
       'unbuild does not support TypeScript 7; use tsdown'
     );
   });
 
   it('keeps unbuild available for JavaScript libraries', async () => {
-    const { files } = await planProject(
+    const { files } = planProject(
       libraryOptions({ libraryBundler: 'unbuild', template: 'vanilla-js' })
     );
     const packageJson = readPackageJson(files['package.json']);
@@ -178,7 +178,7 @@ describe('library bundlers', () => {
   });
 
   it('places tsdown config at the package root in a workspace', async () => {
-    const { files } = await planProject(
+    const { files } = planProject(
       libraryOptions({ name: '@scope/my-lib', workspaceRoot: '../..' })
     );
     const packageJson = readPackageJson(files['package.json']);

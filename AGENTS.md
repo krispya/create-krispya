@@ -37,17 +37,17 @@ The create app allows for building a workspace from a recipe and update it over 
 intent -> resolve -> plan -> apply
 ```
 
-**Intent**
-Figure out what the user asked for: CLI flags, prompts, saved config, workspace inheritance.
+Each stage is a top-level directory in `src/`. Data flows one way, and facts move between stages as function arguments. It is forbidden to import a downstream stage.
 
-**Resolve**
-Turn that into concrete facts: exact package manager version, Node version, package versions, pnpm capabilities, detected workspace state.
+**`intent/`** — what the user asked for: intent types, defaults, spec parsing, and the catalog of choosable tools (names, packages, prompts, constraints). Pure.
 
-**Plan**
-Decide what should exist: project files, workspace config, scripts, dependencies, tool configs. This is where feature/tool planners run. This ends with a plan, a single array of jobs.
+**`resolve/`** — turns intent into concrete facts: registry versions, package manager and Node versions, saved config, detected workspace state. The only place that reads (network, disk).
 
-**Apply**
-Execute the plan and create the workspace on disk.
+**`plan/`** — decides what should exist: files, scripts, dependencies, tool configs. Tool/feature planners and renderers run here. Pure, sync, deterministic — a resolved input always produces the same plan.
+
+**`apply/`** — executes a plan. The only place that writes to disk.
+
+**`cli/`** — flags, prompts, and pipeline composition. May import every stage.
 
 ### Updating and Migration
 

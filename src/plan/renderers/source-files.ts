@@ -1,0 +1,148 @@
+import {
+  htmlContent,
+  indexContent,
+  viteHtmlContent,
+  viteEnvContent,
+  viteIndexContent,
+  viteStyleContent,
+} from '../defaults/html.js';
+import type { BaseTemplate, CodeInjectionLocation, VirtualFile } from '../../types.js';
+
+export type SourceFilesParams = {
+  name: string;
+  baseTemplate: BaseTemplate;
+  language: 'javascript' | 'typescript';
+  isLibrary: boolean;
+  codeSnippets: Partial<Record<CodeInjectionLocation, string[]>>;
+  replacements: Array<{ search: string; replace: string }>;
+};
+
+/**
+ * Generates source files for the project based on template type.
+ */
+export function renderSourceFiles(params: SourceFilesParams): Record<string, VirtualFile> {
+  const { name, baseTemplate, language, isLibrary, codeSnippets, replacements } = params;
+
+  const files: Record<string, VirtualFile> = {};
+  const ext = language === 'typescript' ? 'ts' : 'js';
+  const jsxExt = language === 'typescript' ? 'tsx' : 'jsx';
+  const isVanilla = baseTemplate === 'vanilla';
+  const isReact = baseTemplate === 'react';
+  const isR3f = baseTemplate === 'r3f';
+
+  if (!isLibrary && language === 'typescript') {
+    files['src/vite-env.d.ts'] = { type: 'text', content: viteEnvContent };
+  }
+
+  if (isLibrary) {
+    // Library entry point
+    const libExt = isReact || isR3f ? jsxExt : ext;
+    let libContent: string;
+
+    if (isVanilla) {
+      libContent = [
+        `// Library entry point`,
+        `export function hello(name: string = "world"): string {`,
+        `  return \`Hello, \${name}!\``,
+        `}`,
+      ].join('\n');
+    } else if (isReact) {
+      libContent = [
+        `// Library entry point`,
+        `export function MyComponent({ message = "Hello from library!" }: { message?: string }) {`,
+        `  return <div>{message}</div>`,
+        `}`,
+      ].join('\n');
+    } else {
+      // R3F library
+      libContent = [
+        `// Library entry point`,
+        `export function MyMesh({ color = "orange" }: { color?: string }) {`,
+        `  return (`,
+        `    <mesh>`,
+        `      <boxGeometry />`,
+        `      <meshStandardMaterial color={color} />`,
+        `    </mesh>`,
+        `  )`,
+        `}`,
+      ].join('\n');
+    }
+
+    files[`src/index.${libExt}`] = { type: 'text', content: libContent };
+  } else if (isVanilla) {
+    // Vanilla template
+    files[`src/main.${ext}`] = { type: 'text', content: viteIndexContent };
+    files['src/index.css'] = { type: 'text', content: viteStyleContent };
+    const indexHtml = viteHtmlContent
+      .replace('$indexPath', `./src/main.${ext}`)
+      .replace('$title', name);
+    files['index.html'] = { type: 'text', content: indexHtml };
+  } else {
+    // React and R3F templates
+    files[`src/main.${jsxExt}`] = {
+      type: 'text',
+      content:
+        language === 'typescript'
+          ? indexContent
+          : indexContent.replace(
+              "document.getElementById('root')!",
+              "document.getElementById('root')"
+            ),
+    };
+    files['src/index.css'] = { type: 'text', content: viteStyleContent };
+
+    const indexHtml = htmlContent
+      .replace('$indexPath', `./src/main.${jsxExt}`)
+      .replace('$title', name);
+    files['index.html'] = { type: 'text', content: indexHtml };
+
+    // Generate app component
+    codeSnippets['dom-end']?.reverse();
+    codeSnippets['global-end']?.reverse();
+    codeSnippets['scene-end']?.reverse();
+
+    let appCode: string;
+    if (isReact) {
+      // Simple React app without Canvas
+      appCode = [
+        ...(codeSnippets['import'] ?? []),
+        ...(codeSnippets['global-start'] ?? []),
+        `export function App() {`,
+        '  return (',
+        '    <div style={{ padding: "2rem" }}>',
+        '      <h1>Hello React!</h1>',
+        '      <p>Edit src/app.tsx and save to see changes.</p>',
+        '    </div>',
+        '  )',
+        '}',
+        ...(codeSnippets['global-end'] ?? []),
+      ].join('\n');
+    } else {
+      // R3F app with Canvas
+      appCode = [
+        ...(codeSnippets['import'] ?? []),
+        ...(codeSnippets['global-start'] ?? []),
+        `export function App() {`,
+        ' return <>',
+        ...(codeSnippets['dom-start'] ?? []),
+        ...(codeSnippets['dom'] ?? []),
+        '   <Canvas>',
+        ...(codeSnippets['scene-start'] ?? []),
+        ...(codeSnippets['scene'] ?? []),
+        ...(codeSnippets['scene-end'] ?? []),
+        '   </Canvas>',
+        ...(codeSnippets['dom-end'] ?? []),
+        ' </>',
+        '}',
+        ...(codeSnippets['global-end'] ?? []),
+      ].join('\n');
+    }
+
+    for (const { search, replace } of replacements) {
+      appCode = appCode.replace(search, replace);
+    }
+    files[`src/app.${jsxExt}`] = { type: 'text', content: appCode };
+  }
+
+  return files;
+}

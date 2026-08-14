@@ -3,8 +3,8 @@ import color from 'chalk';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { renderAiFiles } from '../renderers/ai-files.js';
-import { renderJson } from '../renderers/json.js';
+import { renderAiFiles } from '../plan/renderers/ai-files.js';
+import { renderJson } from '../plan/renderers/json.js';
 import {
   renderEslintConfigPackage,
   renderOxfmtConfigPackage,
@@ -12,12 +12,10 @@ import {
   renderPrettierConfigPackage,
   renderTypescriptConfigPackage,
   renderVscodeFiles,
-} from '../renderers/monorepo.js';
-import {
-  getResolvedPackageVersion,
-  resolveMonorepoRootPackageVersions,
-} from '../workflow/resolve/package-versions.js';
-import { validateWorkspace } from '../validation/index.js';
+} from '../plan/renderers/monorepo.js';
+import { getResolvedPackageVersion } from '../intent/package-versions.js';
+import { resolveMonorepoRootPackageVersions } from '../resolve/package-versions.js';
+import { validateWorkspace } from '../resolve/workspace-validation.js';
 import type { CliOptions } from '../cli.js';
 import { promptForAiAgentPlatforms } from './ai.js';
 import {

@@ -1,7 +1,7 @@
 import color from 'chalk';
-import { DEFAULT_LIBRARY_BUNDLER } from '../library-bundlers.js';
-import { getPackageManagerName } from '../package-managers/index.js';
-import { getEngineName } from '../workflow/resolve/engine.js';
+import { DEFAULT_LIBRARY_BUNDLER } from '../intent/bundlers.js';
+import { getPackageManagerName } from '../intent/package-manager/index.js';
+import { getEngineName } from '../intent/engine.js';
 import type { EngineSpec, ProjectOptions, PackageManagerSpec } from '../types.js';
 import { getBaseTemplate, getLanguageFromTemplate, shouldEnableReactCompiler } from '../types.js';
 

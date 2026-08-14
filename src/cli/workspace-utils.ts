@@ -4,8 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { cwd } from 'node:process';
 
 import { detectTooling, parseWorkspaceYamlContent } from '../index.js';
-import { parsePackageManagerSpec } from '../package-managers/index.js';
-import { parseEngine } from '../workflow/resolve/engine.js';
+import { parsePackageManagerSpec } from '../intent/package-manager/index.js';
+import { parseEngine } from '../intent/engine.js';
 import type { EngineSpec, PackageManagerSpec } from '../types.js';
 
 export type InheritedWorkspaceSettings = {

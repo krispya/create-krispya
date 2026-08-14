@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderJson } from '../src/renderers/json.js';
+import { renderJson } from '../src/plan/renderers/json.js';
 
 describe('renderJson', () => {
   it('inlines short primitive arrays', () => {

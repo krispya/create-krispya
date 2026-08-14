@@ -1,12 +1,12 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
-import { getConfigStrategy } from '../config/index.js';
+import { getConfigStrategy } from '../resolve/user-config.js';
 import {
   DEFAULT_LIBRARY_BUNDLER,
   getLibraryBundler,
   getLibraryBundlerPromptOptions,
-} from '../library-bundlers.js';
-import { getPackageFallbackVersion } from '../workflow/resolve/package-versions.js';
+} from '../intent/bundlers.js';
+import { getPackageFallbackVersion } from '../intent/package-versions.js';
 import type {
   EngineSpec,
   ProjectOptions,
@@ -18,7 +18,8 @@ import type {
   Template,
 } from '../types.js';
 import { getBaseTemplate } from '../types.js';
-import { generateRandomName, getLatestNpmVersion } from '../utils/index.js';
+import { generateRandomName } from '../utils/index.js';
+import { getLatestNpmVersion } from '../resolve/registry.js';
 import { formatConfigSummary, formatMonorepoConfigSummary } from './format.js';
 
 const R3F_INTEGRATION_OPTIONS = [

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { validateWorkspace } from '../src/validation/index.js';
+import { validateWorkspace } from '../src/resolve/workspace-validation.js';
 import { planWorkspace } from '../src/index.js';
 
 describe('validateWorkspace', () => {
@@ -79,7 +79,7 @@ describe('validateWorkspace', () => {
 
 describe('renderMonorepo with eslint/prettier', () => {
   it('generates .config/eslint package when eslint is selected', async () => {
-    const { files } = await planWorkspace({
+    const { files } = planWorkspace({
       name: 'test-workspace',
       linter: 'eslint',
       formatter: 'prettier',

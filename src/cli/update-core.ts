@@ -22,51 +22,52 @@ import {
   isLibraryBundlerCompatible,
   usesLibraryBundlerScript,
   type LibraryBundlerDefinition,
-} from '../library-bundlers.js';
-import type { LibraryBundlerBuildArtifacts } from '../tools/library-bundler-types.js';
+} from '../intent/bundlers.js';
+import type { LibraryBundlerBuildArtifacts } from '../plan/tools/library-bundler-types.js';
+import { createLibraryBundlerBuild } from '../plan/bundlers.js';
 import {
   renderTypescriptConfigPackage,
   renderOxlintConfigPackage,
   renderEslintConfigPackage,
   renderPrettierConfigPackage,
   renderOxfmtConfigPackage,
-} from '../renderers/monorepo.js';
+} from '../plan/renderers/monorepo.js';
 import {
   renderAiFiles,
   ALL_AI_PLATFORMS,
   isManagedAiFilePath,
   mergeAiFileContent,
-} from '../renderers/ai-files.js';
-import { renderEditorConfig } from '../renderers/editorconfig.js';
+} from '../plan/renderers/ai-files.js';
+import { renderEditorConfig } from '../plan/renderers/editorconfig.js';
 import {
   detectGitignoreVariant,
   mergeGitignoreContent,
   renderGitignore,
-} from '../renderers/gitignore.js';
-import { renderVscodeFiles } from '../renderers/vscode.js';
+} from '../plan/renderers/gitignore.js';
+import { renderVscodeFiles } from '../plan/renderers/vscode.js';
 import {
   formatResolvedPackageVersion,
   getResolvedPackageVersion,
-  resolveMonorepoRootPackageVersions,
-} from '../workflow/resolve/package-versions.js';
+} from '../intent/package-versions.js';
+import { resolveMonorepoRootPackageVersions } from '../resolve/package-versions.js';
 import {
   mergePackageJsonScripts,
   packageJsonScripts,
   resolveDefaultPackageJsonScripts,
-} from '../renderers/package-json-scripts.js';
-import { toPrettierIgnoreContent } from '../tools/formatter-config.js';
-import { renderOxlintConfig } from '../renderers/oxlint-config.js';
-import { renderViteConfig } from '../renderers/vite-config.js';
-import { renderJson } from '../renderers/json.js';
-import { detectTooling } from '../utils/index.js';
+} from '../plan/renderers/package-json-scripts.js';
+import { toPrettierIgnoreContent } from '../plan/tools/formatter-config.js';
+import { renderOxlintConfig } from '../plan/renderers/oxlint-config.js';
+import { renderViteConfig } from '../plan/renderers/vite-config.js';
+import { renderJson } from '../plan/renderers/json.js';
+import { detectTooling } from '../resolve/tooling.js';
 import {
   formatPackageManager,
   getPackageManagerProfile,
   parsePackageManagerSpec,
-  renderPnpmWorkspaceConfig,
-} from '../package-managers/index.js';
+} from '../intent/package-manager/index.js';
+import { renderPnpmWorkspaceConfig } from '../plan/renderers/pnpm-workspace-config.js';
 import { getSemverMajor, getSemverMajorString } from '../utils/index.js';
-import { parseEngine } from '../workflow/resolve/engine.js';
+import { parseEngine } from '../intent/engine.js';
 
 // =============================================================================
 // Types
@@ -769,7 +770,7 @@ async function resolveLibraryBundlerBuild(
   const language = (await detectTypeScriptPackage(root, pkg)) ? 'typescript' : 'javascript';
   const bundler = detectLibraryBundler(pkg) ?? getLibraryBundler();
   const needsArtifacts = !usesLibraryBundlerScript(bundler, pkg.scripts?.build);
-  const build = bundler.createBuild({
+  const build = createLibraryBundlerBuild(bundler.name, {
     template: detectLibraryTemplate(pkg, language),
     configStrategy: config.configStrategy,
     typescriptConfigPath:
@@ -1356,7 +1357,7 @@ export async function getTypeScriptMajorPackageUpdates(
     const nextBundler = getLibraryBundler();
     assertLibraryBundlerCompatible(nextBundler, { typescriptVersion: targetVersion });
     const isWorkspacePackage = config?.isMonorepo === true && packagePath !== 'package.json';
-    const build = nextBundler.createBuild({
+    const build = createLibraryBundlerBuild(nextBundler.name, {
       template: detectLibraryTemplate(pkg, 'typescript'),
       configStrategy: isWorkspacePackage ? 'root' : config?.configStrategy,
       workspaceRoot: isWorkspacePackage ? '..' : undefined,

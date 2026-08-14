@@ -3,7 +3,7 @@ import {
   AI_FILE_MANAGED_BEGIN,
   AI_FILE_MANAGED_END,
   renderAiFiles,
-} from '../src/renderers/ai-files.js';
+} from '../src/plan/renderers/ai-files.js';
 import type { VirtualFile } from '../src/types.js';
 
 const exampleFiles = 'src/App.tsx src/core/systems/move-entity.ts';

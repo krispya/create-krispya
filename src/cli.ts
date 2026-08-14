@@ -3,13 +3,13 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
 import { Command } from 'commander';
-import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { cwd } from 'node:process';
-import { fetch } from 'undici';
 
 import type { Ide } from './types.js';
+
+import { writeGeneratedFiles } from './apply/index.js';
 
 import { getDefaultProjectName, promptForOptions, type CliPresets } from './cli/index.js';
 import { promptForAiAgentPlatforms } from './cli/ai.js';
@@ -22,27 +22,24 @@ import {
   handleWorkspaceCommand,
 } from './cli/workspace.js';
 import { detectMonorepoRoot, type InheritedWorkspaceSettings } from './cli/workspace-utils.js';
-import { clearConfig, getConfigPath } from './config/index.js';
-import {
-  DEFAULT_LIBRARY_BUNDLER,
-  isLibraryBundler,
-  libraryBundlerNames,
-} from './library-bundlers.js';
+import { clearConfig, getConfigPath } from './resolve/user-config.js';
+import { DEFAULT_LIBRARY_BUNDLER, isLibraryBundler, libraryBundlerNames } from './intent/bundlers.js';
 import {
   getBaseTemplate,
   getPackageDirectoryName,
   planProject,
-  resolveProjectPlanInput,
   planWorkspace,
+  resolveProjectFacts,
+  resolveProjectPlanInput,
+  resolveWorkspaceFacts,
   resolveWorkspacePlanInput,
-  type VirtualFile,
   type ProjectOptions,
   type LibraryBundler,
   type ProjectType,
   type Template,
 } from './index.js';
-import { getPackageManagerName } from './package-managers/index.js';
-import { parsePackageManagerSpec } from './package-managers/index.js';
+import { getPackageManagerName } from './intent/package-manager/index.js';
+import { parsePackageManagerSpec } from './intent/package-manager/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -111,29 +108,6 @@ function hasConfigOptions(options: CliOptions): boolean {
 // =============================================================================
 
 /**
- * Writes generated files to disk.
- */
-async function writeGeneratedFiles(
-  basePath: string,
-  files: Record<string, VirtualFile>
-): Promise<void> {
-  const filePaths = Object.keys(files).sort();
-
-  for (const filePath of filePaths) {
-    const fullFilePath = join(basePath, filePath);
-    await mkdir(dirname(fullFilePath), { recursive: true });
-    const file = files[filePath]!;
-
-    if (file.type === 'text') {
-      await writeFile(fullFilePath, file.content);
-    } else {
-      const response = await fetch(file.url);
-      await writeFile(fullFilePath, response.body!);
-    }
-  }
-}
-
-/**
  * Handles monorepo creation.
  */
 async function handleMonorepoCreation(
@@ -160,7 +134,9 @@ async function handleMonorepoCreation(
       ide: projectOptions.ide ?? 'vscode',
     });
 
-    const { files } = await planWorkspace(planInput);
+    // intent -> resolve -> plan -> apply
+    const resolvedInput = await resolveWorkspaceFacts(planInput);
+    const { files } = planWorkspace(resolvedInput);
 
     await writeGeneratedFiles(projectPath, files);
 
@@ -189,8 +165,7 @@ async function handleMonorepoCreation(
         projectPath,
         packageManager,
         newWorkspaceSettings,
-        scope,
-        writeGeneratedFiles
+        scope
       );
     }
 
@@ -234,8 +209,9 @@ async function handleSingleWorkspaceCreation(
   spinner.start('Creating project...');
 
   try {
-    const planInput = resolveProjectPlanInput(projectOptions);
-    const { files } = await planProject(planInput);
+    // intent -> resolve -> plan -> apply
+    const resolvedInput = await resolveProjectFacts(resolveProjectPlanInput(projectOptions));
+    const { files } = planProject(resolvedInput);
     await writeGeneratedFiles(projectPath, files);
 
     spinner.stop(color.green.inverse(' ✓ Project created! '));
@@ -412,7 +388,7 @@ async function main() {
 
       // Handle --workspace flag
       if (options.workspace) {
-        await handleWorkspaceCommand(name!, options, writeGeneratedFiles);
+        await handleWorkspaceCommand(name!, options);
       }
 
       // Interactive mode starts here
@@ -422,7 +398,7 @@ async function main() {
       // Check if we're inside a monorepo workspace (only if no config options provided)
       const monorepoRoot = await detectMonorepoRoot();
       if (monorepoRoot && !hasConfigOptions(options)) {
-        await handleInteractiveMonorepoMode(monorepoRoot, writeGeneratedFiles);
+        await handleInteractiveMonorepoMode(monorepoRoot);
       }
 
       // Get generate options

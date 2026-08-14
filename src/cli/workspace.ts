@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
-import { DEFAULT_LIBRARY_BUNDLER } from '../library-bundlers.js';
+import { DEFAULT_LIBRARY_BUNDLER } from '../intent/bundlers.js';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -16,13 +16,14 @@ import {
   parseWorkspaceDirectories,
   type InheritedWorkspaceSettings,
 } from './workspace-utils.js';
+import { writeGeneratedFiles } from '../apply/index.js';
 import {
   getBaseTemplate,
   getPackageDirectoryName,
   planProject,
+  resolveProjectFacts,
   resolveProjectPlanInput,
   validatePackageName,
-  type VirtualFile,
   type ProjectOptions,
   type ProjectType,
   type Template,
@@ -32,14 +33,11 @@ import type { CliOptions } from '../cli.js';
 
 const require = createRequire(import.meta.url);
 
-type WriteGeneratedFiles = (basePath: string, files: Record<string, VirtualFile>) => Promise<void>;
-
 export async function createPackageInWorkspace(
   monorepoRoot: string,
   packageManager: PackageManagerName,
   inheritedSettings: InheritedWorkspaceSettings,
-  scope: string,
-  writeGeneratedFiles: WriteGeneratedFiles
+  scope: string
 ): Promise<boolean> {
   const workspaceDirectories = await parseWorkspaceDirectories(monorepoRoot);
   const defaultDirectories = ['apps', 'packages'];
@@ -139,7 +137,9 @@ export async function createPackageInWorkspace(
   spinner.start('Creating package...');
 
   try {
-    const { files } = await planProject(resolveProjectPlanInput(packageOptions));
+    // intent -> resolve -> plan -> apply
+    const resolvedInput = await resolveProjectFacts(resolveProjectPlanInput(packageOptions));
+    const { files } = planProject(resolvedInput);
     await writeGeneratedFiles(outputPath, files);
 
     spinner.stop(color.green.inverse(` ✓ Package created at ${relativePkgPath}! `));
@@ -161,11 +161,7 @@ export async function createPackageInWorkspace(
   }
 }
 
-export async function handleWorkspaceCommand(
-  name: string,
-  options: CliOptions,
-  writeGeneratedFiles: WriteGeneratedFiles
-): Promise<void> {
+export async function handleWorkspaceCommand(name: string, options: CliOptions): Promise<void> {
   const monorepoRoot = await detectMonorepoRoot();
   if (!monorepoRoot) {
     console.error(color.red('Error:') + ' --workspace flag requires being inside a monorepo');
@@ -241,7 +237,9 @@ export async function handleWorkspaceCommand(
   console.log(color.cyan('Creating') + ` ${scopedName} in ${targetDir}/${packageDirName}...`);
 
   try {
-    const { files } = await planProject(resolveProjectPlanInput(projectOptions));
+    // intent -> resolve -> plan -> apply
+    const resolvedInput = await resolveProjectFacts(resolveProjectPlanInput(projectOptions));
+    const { files } = planProject(resolvedInput);
     await writeGeneratedFiles(fullPackagePath, files);
 
     console.log(color.green('✓') + ` Created ${scopedName} at ${targetDir}/${packageDirName}`);
@@ -253,10 +251,7 @@ export async function handleWorkspaceCommand(
   }
 }
 
-export async function handleInteractiveMonorepoMode(
-  monorepoRoot: string,
-  writeGeneratedFiles: WriteGeneratedFiles
-): Promise<void> {
+export async function handleInteractiveMonorepoMode(monorepoRoot: string): Promise<void> {
   const choice = await p.select({
     message: 'Detected monorepo workspace',
     options: [
@@ -293,8 +288,7 @@ export async function handleInteractiveMonorepoMode(
         monorepoRoot,
         inheritedSettings.packageManager?.name ?? 'pnpm',
         inheritedSettings,
-        scope,
-        writeGeneratedFiles
+        scope
       );
     }
 

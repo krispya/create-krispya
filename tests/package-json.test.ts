@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { format as formatPrettier } from 'prettier';
 import { planProject, planWorkspace } from '../src/index.js';
-import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
+import { defaultFormatterMetaConfig } from '../src/intent/defaults/formatter.js';
 
-import { renderPackageJson } from '../src/renderers/package-json.js';
+import { renderPackageJson } from '../src/plan/renderers/package-json.js';
 
 const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space';
 const formatterIndentSize = defaultFormatterMetaConfig.useTabs
@@ -239,7 +239,7 @@ allowBuilds:
   });
 
   it('composes single-package scripts from the shared script registry', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'vanilla',
       testing: 'vitest',
@@ -271,7 +271,7 @@ allowBuilds:
   });
 
   it('adds React Compiler dev dependencies to TypeScript React apps by default', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react',
       packageManager: { name: 'pnpm', version: '10.0.0' },
@@ -292,7 +292,7 @@ allowBuilds:
   });
 
   it('adds React Compiler JS plugin rules to Oxlint React apps', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react',
       linter: 'oxlint',
@@ -314,7 +314,7 @@ allowBuilds:
   });
 
   it('does not add React Compiler JS plugin rules to Oxlint React libraries', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-lib',
       projectType: 'library',
       template: 'react',
@@ -330,7 +330,7 @@ allowBuilds:
   });
 
   it('omits Babel core types for JavaScript React apps with React Compiler', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react-js',
       packageManager: { name: 'pnpm', version: '10.0.0' },
@@ -343,7 +343,7 @@ allowBuilds:
   });
 
   it('adds editorconfig to single-package workspaces', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'vanilla',
       formatter: 'prettier',
@@ -367,7 +367,7 @@ allowBuilds:
   });
 
   it('omits vscode files when single-package IDE is none', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'vanilla',
       formatter: 'prettier',
@@ -380,7 +380,7 @@ allowBuilds:
   });
 
   it('uses the shared script registry for monorepo root scripts', async () => {
-    const { files } = await planWorkspace({
+    const { files } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'prettier',
@@ -399,7 +399,7 @@ allowBuilds:
   });
 
   it('preformats monorepo config package json and js files', async () => {
-    const workspaces = await Promise.all([
+    const workspaces = [
       planWorkspace({
         name: 'eslint-workspace',
         linter: 'eslint',
@@ -412,7 +412,7 @@ allowBuilds:
         formatter: 'oxfmt',
         packageManager: { name: 'pnpm', version: '10.0.0' },
       }),
-    ]);
+    ];
 
     for (const { files } of workspaces) {
       await expectPreformattedFiles(
@@ -423,7 +423,7 @@ allowBuilds:
   });
 
   it('preformats single-package json config files', async () => {
-    const projects = await Promise.all([
+    const projects = [
       planProject({
         name: 'prettier-app',
         template: 'react',
@@ -442,7 +442,7 @@ allowBuilds:
         linter: 'biome',
         formatter: 'biome',
       }),
-    ]);
+    ];
 
     const configPathPattern =
       /^(?:\.config\/.*\.json|\.vscode\/.*\.json|tsconfig.*\.json|package\.json|oxlint\.json|oxfmt\.json|biome\.json)$/;
@@ -453,12 +453,12 @@ allowBuilds:
   });
 
   it('generates prettier ignore files for lock files', async () => {
-    const { files: singlePackageFiles } = await planProject({
+    const { files: singlePackageFiles } = planProject({
       name: 'my-app',
       template: 'vanilla',
       formatter: 'prettier',
     });
-    const { files: monorepoFiles } = await planWorkspace({
+    const { files: monorepoFiles } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'prettier',
@@ -485,12 +485,12 @@ allowBuilds:
   });
 
   it('adds formatter ignore patterns to oxfmt configs', async () => {
-    const { files: singlePackageFiles } = await planProject({
+    const { files: singlePackageFiles } = planProject({
       name: 'my-app',
       template: 'vanilla',
       formatter: 'oxfmt',
     });
-    const { files: monorepoFiles } = await planWorkspace({
+    const { files: monorepoFiles } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'oxfmt',
@@ -516,7 +516,7 @@ allowBuilds:
   });
 
   it('adds editorconfig to monorepo roots', async () => {
-    const { files } = await planWorkspace({
+    const { files } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'prettier',
@@ -527,7 +527,7 @@ allowBuilds:
   });
 
   it('omits vscode files when monorepo IDE is none', async () => {
-    const { files } = await planWorkspace({
+    const { files } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'prettier',
@@ -550,7 +550,7 @@ allowBuilds:
       vite: '6.3.4',
     };
 
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'vanilla',
       linter: 'oxlint',
@@ -566,7 +566,7 @@ allowBuilds:
   });
 
   it('adds oxlint type-aware support to monorepo roots', async () => {
-    const { files } = await planWorkspace({
+    const { files } = planWorkspace({
       name: 'workspace',
       linter: 'oxlint',
       formatter: 'prettier',

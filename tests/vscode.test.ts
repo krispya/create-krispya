@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
-import { renderVscodeFiles } from '../src/renderers/vscode.js';
+import { defaultFormatterMetaConfig } from '../src/intent/defaults/formatter.js';
+import { renderVscodeFiles } from '../src/plan/renderers/vscode.js';
 
 function readJsonFile(file: { type: 'text'; content: string } | { type: 'remote'; url: string }) {
   if (file.type !== 'text') {

@@ -16,6 +16,26 @@ export type EngineSpec = {
   version?: string;
 };
 
+export type PackageManagerCapabilities = {
+  pnpmWorkspaceVersionPolicy?: 'manage-package-manager-versions' | 'pmOnFail';
+  pnpmBuildDependencyPolicy?: 'onlyBuiltDependencies' | 'allowBuilds';
+};
+
+export type PackageManagerRequirements = {
+  node?: string;
+};
+
+export type PackageManagerProfile = PackageManagerSpec & {
+  major?: number;
+  capabilities: PackageManagerCapabilities;
+  requirements: PackageManagerRequirements;
+};
+
+export type PackageManagerIntent = {
+  name: PackageManagerName;
+  version?: string;
+};
+
 // Package versions resolved from the npm registry.
 export type PackageVersions = Record<string, string>;
 export type VersionRangePrefix = '^' | '~' | '';
@@ -182,6 +202,24 @@ export type FeatureSelections = {
   xr?: PlanXrOptions;
   zustand?: PlanZustandOptions;
   githubPages?: PlanGithubPagesOptions;
+};
+
+/**
+ * Parameters for generating a monorepo workspace.
+ * Note: Monorepos are currently pnpm-only.
+ */
+export type MonorepoParams = {
+  name: string;
+  linter: Linter;
+  formatter: Formatter;
+  /** Currently always "pnpm" - monorepos are pnpm-only */
+  packageManager: PackageManagerSpec;
+  pnpmManageVersions?: boolean;
+  engine?: EngineSpec;
+  versions?: PackageVersions;
+  ide?: Ide;
+  /** AI platforms to generate files for */
+  aiPlatforms?: AiPlatform[];
 };
 
 export type ProjectPlanContext = {

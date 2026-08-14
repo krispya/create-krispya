@@ -20,23 +20,19 @@ import {
   type UpdateCategory,
   type WorkspaceConfig,
 } from './update-core.js';
-import { validateWorkspace } from '../validation/index.js';
+import { validateWorkspace } from '../resolve/workspace-validation.js';
 import type { CliOptions } from '../cli.js';
 import { detectMonorepoRoot, detectPackageRoot } from './workspace-utils.js';
 import {
   formatPackageManager,
   getPackageManagerProfile,
   parsePackageManagerSpec,
-  resolvePackageManager,
-} from '../package-managers/index.js';
+} from '../intent/package-manager/index.js';
+import { resolvePackageManager } from '../resolve/package-manager.js';
 import type { PackageManagerSpec } from '../types.js';
-import {
-  compareNumericSemver,
-  getLatestNpmMajorVersion,
-  getLatestNpmVersion,
-  getSemverMajor,
-} from '../utils/index.js';
-import { getPackageFallbackVersion } from '../workflow/resolve/package-versions.js';
+import { compareNumericSemver, getSemverMajor } from '../utils/index.js';
+import { getLatestNpmMajorVersion, getLatestNpmVersion } from '../resolve/registry.js';
+import { getPackageFallbackVersion } from '../intent/package-versions.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 type PackageUpdateCommand = {

@@ -21,9 +21,9 @@ import {
   getPackageManagerMajorUpdateTarget,
   getRequiredNodeUpdateTarget,
 } from '../src/cli/update.js';
-import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
-import { renderManagedGitignoreBlock } from '../src/renderers/gitignore.js';
-import { generateWorkspace, renderManagedAiFileContent } from '../src/renderers/ai-files.js';
+import { defaultFormatterMetaConfig } from '../src/intent/defaults/formatter.js';
+import { renderManagedGitignoreBlock } from '../src/plan/renderers/gitignore.js';
+import { generateWorkspace, renderManagedAiFileContent } from '../src/plan/renderers/ai-files.js';
 
 const formatterIndentStyle = defaultFormatterMetaConfig.useTabs ? 'tab' : 'space';
 const formatterIndentSize = defaultFormatterMetaConfig.useTabs

@@ -5,7 +5,7 @@ import {
   getLatestNpmMajorVersionAtOrBelow,
   getLatestNpmVersion,
   DEFAULT_MINIMUM_RELEASE_AGE_MINUTES,
-} from '../src/utils/index.js';
+} from '../src/resolve/registry.js';
 
 const NOW = Date.parse('2026-06-30T12:00:00.000Z');
 

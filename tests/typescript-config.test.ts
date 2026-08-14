@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getTypescriptNodeConfigUpdates } from '../src/cli/update-core.js';
-import { renderTypescriptConfigPackage } from '../src/renderers/config-packages.js';
-import { renderTypescriptConfig } from '../src/renderers/typescript-config.js';
+import { renderTypescriptConfigPackage } from '../src/plan/renderers/config-packages.js';
+import { renderTypescriptConfig } from '../src/plan/renderers/typescript-config.js';
 import type { VirtualFile } from '../src/types.js';
 
 function readTextJson(file: VirtualFile | undefined): Record<string, unknown> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planProject } from '../src/index.js';
-import { defaultFormatterMetaConfig } from '../src/defaults/formatter.js';
+import { defaultFormatterMetaConfig } from '../src/intent/defaults/formatter.js';
 import type { VirtualFile } from '../src/types.js';
 
 const formatterIndent = defaultFormatterMetaConfig.useTabs
@@ -17,7 +17,7 @@ function readTextFile(file: VirtualFile | undefined): string {
 
 describe('source file generation', () => {
   it('generates Vite-style TypeScript React app entry files', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react',
     });
@@ -35,7 +35,7 @@ describe('source file generation', () => {
   });
 
   it('generates preformatted Vite config files', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react',
     });
@@ -56,7 +56,7 @@ describe('source file generation', () => {
   });
 
   it('generates JavaScript React app entry files without TypeScript env files', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'react-js',
     });
@@ -73,7 +73,7 @@ describe('source file generation', () => {
   });
 
   it('generates vanilla app index css and Vite env types', async () => {
-    const { files } = await planProject({
+    const { files } = planProject({
       name: 'my-app',
       template: 'vanilla',
     });
