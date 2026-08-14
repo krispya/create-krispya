@@ -1,4 +1,5 @@
 import color from 'chalk';
+import { DEFAULT_LIBRARY_BUNDLER } from '../library-bundlers.js';
 import { getPackageManagerName } from '../package-managers/index.js';
 import { getEngineName } from '../workflow/resolve/engine.js';
 import type { EngineSpec, ProjectOptions, PackageManagerSpec } from '../types.js';
@@ -62,7 +63,7 @@ export function formatConfigSummary(options: ProjectOptions, inherited?: Inherit
 
   // Bundler
   if (projectType === 'library') {
-    lines.push(formatRow('Bundler', options.libraryBundler ?? 'tsdown'));
+    lines.push(formatRow('Bundler', options.libraryBundler ?? DEFAULT_LIBRARY_BUNDLER));
   } else {
     lines.push(formatRow('Bundler', 'vite'));
   }

@@ -12,7 +12,18 @@ import type {
   VirtualFile,
   PackageManagerName,
   PackageManagerSpec,
+  Template,
 } from '../types.js';
+import {
+  DEFAULT_LIBRARY_BUNDLER,
+  assertLibraryBundlerCompatible,
+  detectLibraryBundler,
+  getLibraryBundler,
+  isLibraryBundlerCompatible,
+  usesLibraryBundlerScript,
+  type LibraryBundlerDefinition,
+} from '../library-bundlers.js';
+import type { LibraryBundlerBuildArtifacts } from '../tools/library-bundler-types.js';
 import {
   renderTypescriptConfigPackage,
   renderOxlintConfigPackage,
@@ -712,6 +723,62 @@ function detectLibraryPackage(pkg: PackageJsonForScripts): boolean {
   );
 }
 
+type ResolvedLibraryBundlerBuild = {
+  bundler: LibraryBundlerDefinition;
+  build: LibraryBundlerBuildArtifacts;
+  needsArtifacts: boolean;
+};
+
+function detectLibraryTemplate(
+  pkg: PackageJsonForScripts,
+  language: 'javascript' | 'typescript'
+): Template {
+  const baseTemplate: BaseTemplate = hasPackage(pkg, '@react-three/fiber')
+    ? 'r3f'
+    : hasPackage(pkg, 'react')
+      ? 'react'
+      : 'vanilla';
+
+  return language === 'typescript' ? baseTemplate : `${baseTemplate}-js`;
+}
+
+async function detectTypeScriptConfigPath(
+  root: string,
+  config: WorkspaceConfig
+): Promise<string | null> {
+  const candidates = config.isMonorepo
+    ? ['tsconfig.json']
+    : config.configStrategy === 'stealth'
+      ? ['.config/tsconfig.app.json', 'tsconfig.json', 'tsconfig.app.json']
+      : ['tsconfig.app.json', 'tsconfig.json', '.config/tsconfig.app.json'];
+
+  for (const path of candidates) {
+    if (await fileExists(join(root, path))) return `./${path}`;
+  }
+
+  return null;
+}
+
+async function resolveLibraryBundlerBuild(
+  root: string,
+  config: WorkspaceConfig,
+  pkg: PackageJsonForScripts
+): Promise<ResolvedLibraryBundlerBuild | undefined> {
+  if (config.isMonorepo || !detectLibraryPackage(pkg)) return undefined;
+
+  const language = (await detectTypeScriptPackage(root, pkg)) ? 'typescript' : 'javascript';
+  const bundler = detectLibraryBundler(pkg) ?? getLibraryBundler();
+  const needsArtifacts = !usesLibraryBundlerScript(bundler, pkg.scripts?.build);
+  const build = bundler.createBuild({
+    template: detectLibraryTemplate(pkg, language),
+    configStrategy: config.configStrategy,
+    typescriptConfigPath:
+      language === 'typescript' ? await detectTypeScriptConfigPath(root, config) : undefined,
+  });
+
+  return { bundler, build, needsArtifacts };
+}
+
 function getPackageManagerForScripts(config: WorkspaceConfig, pkg: PackageJsonForScripts) {
   const packageManager = parsePackageManagerSpec(pkg.packageManager)?.name ?? config.packageManager;
   return isPackageManagerName(packageManager) ? packageManager : 'pnpm';
@@ -739,21 +806,19 @@ function getSinglePackageToolScripts(config: WorkspaceConfig) {
   return mergePackageJsonScripts(linterScripts, formatterScripts);
 }
 
-function getLibraryBuildScripts(pkg: PackageJsonForScripts) {
-  if (!detectLibraryPackage(pkg)) return undefined;
+function getLibraryBuildScripts(
+  pkg: PackageJsonForScripts,
+  resolvedBuild: ResolvedLibraryBundlerBuild | undefined
+) {
+  if (resolvedBuild == null) return undefined;
 
+  const { bundler, build } = resolvedBuild;
   const buildScript = pkg.scripts?.build;
-  if (buildScript?.startsWith('unbuild') === true) {
-    return { build: buildScript };
-  }
-  if (hasPackage(pkg, 'unbuild')) {
-    return packageJsonScripts.build.unbuild();
-  }
-  if (buildScript?.startsWith('tsdown') === true) {
+  if (usesLibraryBundlerScript(bundler, buildScript)) {
     return { build: buildScript };
   }
 
-  return packageJsonScripts.build.tsdown();
+  return build.scripts;
 }
 
 function getTestingScripts(pkg: PackageJsonForScripts) {
@@ -829,7 +894,8 @@ function applyPackageManagerFields(
 async function getExpectedPackageScripts(
   root: string,
   config: WorkspaceConfig,
-  pkg: PackageJsonForScripts
+  pkg: PackageJsonForScripts,
+  libraryBuild: ResolvedLibraryBundlerBuild | undefined
 ) {
   if (config.isMonorepo) {
     return packageJsonScripts.monorepoRoot(config.linter, config.formatter);
@@ -845,7 +911,7 @@ async function getExpectedPackageScripts(
       isLibrary,
       packageManagerName,
     }),
-    getLibraryBuildScripts(pkg),
+    getLibraryBuildScripts(pkg, libraryBuild),
     getTestingScripts(pkg),
     getSinglePackageToolScripts(config)
   );
@@ -854,7 +920,8 @@ async function getExpectedPackageScripts(
 async function getExpectedPackageDevDependencies(
   root: string,
   config: WorkspaceConfig,
-  pkg: PackageJsonForScripts
+  pkg: PackageJsonForScripts,
+  libraryBuild: ResolvedLibraryBundlerBuild | undefined
 ) {
   const nextDevDependencies = { ...pkg.devDependencies };
   const shouldAddOxlintTypeAwareBackend =
@@ -864,6 +931,10 @@ async function getExpectedPackageDevDependencies(
 
   if (shouldAddOxlintTypeAwareBackend) {
     nextDevDependencies['oxlint-tsgolint'] = formatResolvedPackageVersion({}, 'oxlint-tsgolint');
+  }
+
+  if (libraryBuild != null) {
+    addMissingDevDependency(pkg, nextDevDependencies, libraryBuild.bundler.packageName);
   }
 
   if (!config.isMonorepo && config.viteTemplate === 'react') {
@@ -880,6 +951,30 @@ async function getExpectedPackageDevDependencies(
   }
 
   return sortPackageMap(nextDevDependencies);
+}
+
+async function getLibraryBundlerArtifactUpdates(
+  root: string,
+  libraryBuild: ResolvedLibraryBundlerBuild | undefined
+): Promise<FileChange[]> {
+  if (libraryBuild?.needsArtifacts !== true) return [];
+
+  const changes: FileChange[] = [];
+  for (const [path, file] of Object.entries(libraryBuild.build.files)) {
+    if (file.type !== 'text') continue;
+
+    let currentContent: string;
+    try {
+      currentContent = await readFile(join(root, path), 'utf-8');
+    } catch {
+      changes.push({ path, status: 'added', newContent: file.content });
+      continue;
+    }
+
+    changes.push(compareTextFileWithDisk(path, currentContent, file.content));
+  }
+
+  return changes;
 }
 
 /**
@@ -899,12 +994,19 @@ export async function getPackageJsonScriptUpdates(
   }
 
   const pkg = JSON.parse(currentContent) as PackageJsonForScripts;
+  const libraryBuild = await resolveLibraryBundlerBuild(root, config, pkg);
+  const artifactChanges = await getLibraryBundlerArtifactUpdates(root, libraryBuild);
   const currentScripts = pkg.scripts ?? {};
-  const expectedScripts = await getExpectedPackageScripts(root, config, pkg);
+  const expectedScripts = await getExpectedPackageScripts(root, config, pkg, libraryBuild);
   const nextScripts = mergePackageJsonScripts(currentScripts, expectedScripts);
   const scriptOverwrites = getPackageJsonScriptOverwrites(currentScripts, expectedScripts);
   const currentDevDependencies = pkg.devDependencies ?? {};
-  const nextDevDependencies = await getExpectedPackageDevDependencies(root, config, pkg);
+  const nextDevDependencies = await getExpectedPackageDevDependencies(
+    root,
+    config,
+    pkg,
+    libraryBuild
+  );
   const targetPackageManagerSpec = config.targetPackageManagerSpec;
   const targetNodeVersion = config.targetNodeVersion;
 
@@ -920,6 +1022,7 @@ export async function getPackageJsonScriptUpdates(
         currentContent,
         newContent: currentContent,
       },
+      ...artifactChanges,
     ];
   }
 
@@ -944,6 +1047,7 @@ export async function getPackageJsonScriptUpdates(
       newContent,
       ...(scriptOverwrites.length > 0 ? { scriptOverwrites } : {}),
     },
+    ...artifactChanges,
   ];
 }
 
@@ -1193,7 +1297,8 @@ export async function getTypeScriptMajorPackageUpdates(
   root: string,
   config?: WorkspaceConfig,
   targetVersion = TYPESCRIPT_7_VERSION,
-  oxlintTsgolintVersion = getResolvedPackageVersion({}, 'oxlint-tsgolint')
+  oxlintTsgolintVersion = getResolvedPackageVersion({}, 'oxlint-tsgolint'),
+  libraryBundlerVersion = getResolvedPackageVersion({}, DEFAULT_LIBRARY_BUNDLER)
 ): Promise<FileChange[]> {
   if (config?.linter === 'eslint') return [];
 
@@ -1220,7 +1325,9 @@ export async function getTypeScriptMajorPackageUpdates(
   }
 
   const changedPackages = new Set<string>();
+  const bundlerArtifactChanges: FileChange[] = [];
   for (const { path: packagePath, pkg } of packages) {
+    let updatesTypeScript = false;
     for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
       const dependencies = pkg[dependencyField];
       if (dependencies == null) continue;
@@ -1232,7 +1339,56 @@ export async function getTypeScriptMajorPackageUpdates(
       if (targetRange == null) continue;
 
       dependencies.typescript = targetRange;
+      updatesTypeScript = true;
       changedPackages.add(packagePath);
+    }
+
+    if (!updatesTypeScript || !detectLibraryPackage(pkg)) continue;
+
+    const currentBundler = detectLibraryBundler(pkg);
+    if (
+      currentBundler == null ||
+      isLibraryBundlerCompatible(currentBundler, { typescriptVersion: targetVersion })
+    ) {
+      continue;
+    }
+
+    const nextBundler = getLibraryBundler();
+    assertLibraryBundlerCompatible(nextBundler, { typescriptVersion: targetVersion });
+    const isWorkspacePackage = config?.isMonorepo === true && packagePath !== 'package.json';
+    const build = nextBundler.createBuild({
+      template: detectLibraryTemplate(pkg, 'typescript'),
+      configStrategy: isWorkspacePackage ? 'root' : config?.configStrategy,
+      workspaceRoot: isWorkspacePackage ? '..' : undefined,
+    });
+
+    for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+      delete pkg[dependencyField]?.[currentBundler.packageName];
+    }
+    pkg.devDependencies = sortPackageMap({
+      ...pkg.devDependencies,
+      [nextBundler.packageName]: `^${libraryBundlerVersion}`,
+    });
+    pkg.scripts = {
+      ...pkg.scripts,
+      ...build.scripts,
+    };
+
+    const packageDirectory = dirname(packagePath);
+    for (const [artifactPath, file] of Object.entries(build.files)) {
+      if (file.type !== 'text') continue;
+
+      const path = packageDirectory === '.' ? artifactPath : join(packageDirectory, artifactPath);
+      let currentContent: string;
+      try {
+        currentContent = await readFile(join(root, path), 'utf-8');
+      } catch {
+        bundlerArtifactChanges.push({ path, status: 'added', newContent: file.content });
+        continue;
+      }
+
+      const change = compareTextFileWithDisk(path, currentContent, file.content);
+      if (change.status !== 'unchanged') bundlerArtifactChanges.push(change);
     }
   }
 
@@ -1273,6 +1429,8 @@ export async function getTypeScriptMajorPackageUpdates(
       newContent: renderJson(pkg, { inlineArrays: false }),
       mergeSafe: true,
     }));
+
+  changes.push(...bundlerArtifactChanges);
 
   changes.push(...(await getTypeScript7ConfigUpdates(root)));
 

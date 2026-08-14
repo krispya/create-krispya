@@ -1,4 +1,5 @@
 import { formatNodeTypesVersion } from '../workflow/resolve/package-versions.js';
+import { LIBRARY_BUILD_OUTPUT } from '../defaults/library.js';
 import { getEngineName, getEngineSpec } from '../workflow/resolve/engine.js';
 import { getSemverMajorString } from '../utils/index.js';
 import {
@@ -67,19 +68,19 @@ export function renderPackageJson(params: PackageJsonParams): PackageJsonResult 
   // Add library-specific fields (ESM-first)
   if (isLibrary) {
     packageJson.version = DEFAULT_LIBRARY_VERSION;
-    packageJson.main = './dist/index.mjs';
-    packageJson.module = './dist/index.mjs';
+    packageJson.main = LIBRARY_BUILD_OUTPUT.main;
+    packageJson.module = LIBRARY_BUILD_OUTPUT.module;
     if (language === 'typescript') {
-      packageJson.types = './dist/index.d.ts';
+      packageJson.types = LIBRARY_BUILD_OUTPUT.types;
     }
     packageJson.exports = {
       '.': {
-        ...(language === 'typescript' && { types: './dist/index.d.ts' }),
-        import: './dist/index.mjs',
-        require: './dist/index.cjs',
+        ...(language === 'typescript' && { types: LIBRARY_BUILD_OUTPUT.types }),
+        import: LIBRARY_BUILD_OUTPUT.import,
+        require: LIBRARY_BUILD_OUTPUT.require,
       },
     };
-    packageJson.files = ['dist'];
+    packageJson.files = [LIBRARY_BUILD_OUTPUT.directory];
   }
 
   // Helper to sort object keys alphabetically

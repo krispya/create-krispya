@@ -17,6 +17,7 @@ export type {
 export * from './types.js';
 export * from './utils/index.js';
 export * from './package-managers/index.js';
+export * from './library-bundlers.js';
 export * from './workflow/index.js';
 export * from './config/index.js';
 export * from './validation/index.js';

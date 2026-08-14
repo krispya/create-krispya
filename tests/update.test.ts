@@ -214,6 +214,59 @@ describe('update helpers', () => {
     }
   });
 
+  it('migrates unbuild libraries to tsdown with TypeScript 7', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-tsdown-'));
+    try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-lib',
+          type: 'module',
+          exports: { '.': './dist/index.mjs' },
+          scripts: { build: 'unbuild --config .config/build.config.ts' },
+          devDependencies: {
+            typescript: '^5.9.3',
+            unbuild: '^3.6.1',
+          },
+        })
+      );
+
+      const changes = await getTypeScriptMajorPackageUpdates(
+        tempDir,
+        {
+          name: 'my-lib',
+          linter: 'oxlint',
+          formatter: 'prettier',
+          packageManager: 'pnpm',
+          isMonorepo: false,
+          configStrategy: 'stealth',
+        },
+        '7.2.4',
+        '0.24.3',
+        '0.23.0'
+      );
+
+      const packageChange = changes.find((change) => change.path === 'package.json');
+      const packageJson = JSON.parse(packageChange!.newContent);
+      expect(packageJson.scripts.build).toBe('tsdown --config .config/tsdown.config.ts');
+      expect(packageJson.devDependencies).toMatchObject({
+        typescript: '^7.2.4',
+        tsdown: '^0.23.0',
+      });
+      expect(packageJson.devDependencies.unbuild).toBeUndefined();
+      expect(changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '.config/tsdown.config.ts', status: 'added' }),
+          expect.objectContaining({ path: 'tsconfig.build.json', status: 'added' }),
+        ])
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('puts TypeScript 7 Oxlint options in the monorepo root config', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-typescript-7-monorepo-'));
     try {
@@ -836,9 +889,11 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     }
   });
 
-  it('defaults regenerated library build scripts to tsdown', async () => {
+  it('migrates incomplete library builds through the default bundler adapter', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-tsdown-scripts-'));
     try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
       await writeFile(
         join(tempDir, 'package.json'),
         JSON.stringify({
@@ -849,7 +904,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         })
       );
 
-      const [change] = await getPackageJsonScriptUpdates(tempDir, {
+      const changes = await getPackageJsonScriptUpdates(tempDir, {
         name: 'my-lib',
         linter: 'oxlint',
         formatter: 'prettier',
@@ -858,7 +913,60 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         configStrategy: 'stealth',
       });
 
-      expect(JSON.parse(change!.newContent).scripts.build).toBe('tsdown');
+      const packageChange = changes.find((change) => change.path === 'package.json');
+      const packageJson = JSON.parse(packageChange!.newContent);
+      expect(packageJson.scripts.build).toBe('tsdown --config .config/tsdown.config.ts');
+      expect(packageJson.devDependencies.tsdown).toBe('^0.22.14');
+      expect(changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '.config/tsdown.config.ts', status: 'added' }),
+          expect.objectContaining({ path: 'tsconfig.build.json', status: 'added' }),
+        ])
+      );
+
+      const configChange = changes.find((change) => change.path === '.config/tsdown.config.ts');
+      expect(configChange?.newContent).toContain('cwd: ".."');
+      expect(configChange?.newContent).toContain('dts: ".d.ts"');
+
+      const tsconfigChange = changes.find((change) => change.path === 'tsconfig.build.json');
+      expect(JSON.parse(tsconfigChange!.newContent)).toMatchObject({
+        extends: './.config/tsconfig.app.json',
+        compilerOptions: { noEmit: false },
+        include: ['src'],
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('installs the dependency for an explicitly configured bundler script', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-tsdown-dependency-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-lib',
+          type: 'module',
+          exports: { '.': './dist/index.mjs' },
+          scripts: { build: 'tsdown --config custom.ts' },
+          devDependencies: { typescript: '^7.0.0' },
+        })
+      );
+
+      const changes = await getPackageJsonScriptUpdates(tempDir, {
+        name: 'my-lib',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+
+      const packageChange = changes.find((change) => change.path === 'package.json');
+      const packageJson = JSON.parse(packageChange!.newContent);
+      expect(packageJson.scripts.build).toBe('tsdown --config custom.ts');
+      expect(packageJson.devDependencies.tsdown).toBe('^0.22.14');
+      expect(changes).toHaveLength(1);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }

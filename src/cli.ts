@@ -24,6 +24,11 @@ import {
 import { detectMonorepoRoot, type InheritedWorkspaceSettings } from './cli/workspace-utils.js';
 import { clearConfig, getConfigPath } from './config/index.js';
 import {
+  DEFAULT_LIBRARY_BUNDLER,
+  isLibraryBundler,
+  libraryBundlerNames,
+} from './library-bundlers.js';
+import {
   getBaseTemplate,
   getPackageDirectoryName,
   planProject,
@@ -269,7 +274,7 @@ async function main() {
     .option('--type <type>', 'project type: app or library (default: app)')
     .option(
       '--bundler <bundler>',
-      'library bundler: tsdown or unbuild (default: tsdown, only for libraries)'
+      `library bundler: ${libraryBundlerNames.join(' or ')} (default: ${DEFAULT_LIBRARY_BUNDLER}, only for libraries)`
     )
     .option(
       '--template <type>',
@@ -332,6 +337,11 @@ async function main() {
 
       if (options.ide && !['vscode', 'none'].includes(options.ide)) {
         console.error(color.red('Error:') + ' --ide must be "vscode" or "none"');
+        process.exit(1);
+      }
+
+      if (options.bundler != null && !isLibraryBundler(options.bundler)) {
+        console.error(color.red('Error:') + ` --bundler must be ${libraryBundlerNames.join(' or ')}`);
         process.exit(1);
       }
 
@@ -428,7 +438,8 @@ async function main() {
         projectOptions = {
           name: name || defaultName,
           projectType,
-          libraryBundler: projectType === 'library' ? (options.bundler ?? 'tsdown') : undefined,
+          libraryBundler:
+            projectType === 'library' ? (options.bundler ?? DEFAULT_LIBRARY_BUNDLER) : undefined,
           template,
           linter: options.linter ?? 'oxlint',
           formatter: options.formatter ?? 'prettier',

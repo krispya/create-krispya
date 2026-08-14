@@ -19,20 +19,6 @@ export const packageJsonScripts = {
     } satisfies PackageJsonScripts,
   },
 
-  build: {
-    unbuild(configPath?: string): PackageJsonScripts {
-      return {
-        build: configPath == null ? 'unbuild' : `unbuild --config ${configPath}`,
-      };
-    },
-
-    tsdown(configPath?: string): PackageJsonScripts {
-      return {
-        build: configPath == null ? 'tsdown' : `tsdown --config ${configPath}`,
-      };
-    },
-  },
-
   lint: {
     oxlint(configPath?: string): PackageJsonScripts {
       return {
