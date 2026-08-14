@@ -100,6 +100,70 @@ describe('renderPackageJson', () => {
     expect(packageJson.version).toBe('0.1.0');
   });
 
+  it('omits workspace config and version pinning for npm projects', async () => {
+    const result = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        packageManager: { name: 'npm' },
+      },
+    });
+
+    expect(result.files['pnpm-workspace.yaml']).toBeUndefined();
+
+    const packageJson = readPackageJsonContent(result.files['package.json']);
+    expect(packageJson.packageManager).toBeUndefined();
+    expect(packageJson.engines).toBeUndefined();
+  });
+
+  it('pins npm when a version is explicitly requested', async () => {
+    const result = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        packageManager: { name: 'npm', version: '12.0.2' },
+      },
+    });
+
+    const packageJson = readPackageJsonContent(result.files['package.json']);
+    expect(packageJson.packageManager).toBe('npm@12.0.2');
+    expect(packageJson.engines).toEqual({ npm: '>=12.0.0' });
+  });
+
+  it('uses npm in library release scripts', async () => {
+    const result = renderPackageJson({
+      name: 'my-lib',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: true,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-lib',
+        packageManager: { name: 'npm' },
+      },
+    });
+
+    const packageJson = readPackageJsonContent(result.files['package.json']);
+    expect(packageJson.scripts.release).toBe('npm run build && npm publish');
+  });
+
   it('renders pnpm 11 workspace config for single-package projects', async () => {
     const result = renderPackageJson({
       name: 'my-app',

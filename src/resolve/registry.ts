@@ -241,10 +241,6 @@ export async function getLatestYarnVersion(): Promise<string> {
   return getLatestNpmVersion('yarn', '4.6.0');
 }
 
-export async function getLatestNpmCliVersion(): Promise<string> {
-  return getLatestNpmVersion('npm', '11.0.0');
-}
-
 export async function getLatestNodeVersion(): Promise<string> {
   try {
     const response = await fetch('https://nodejs.org/dist/index.json');
