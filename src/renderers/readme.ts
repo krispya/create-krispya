@@ -1,4 +1,5 @@
 import type { BaseTemplate, CodeInjectionLocation, VirtualFile, LibraryBundler } from '../types.js';
+import { getLibraryBundler } from '../library-bundlers.js';
 
 export type ReadmeParams = {
   name: string;
@@ -93,9 +94,7 @@ export function renderReadme(params: ReadmeParams): VirtualFile {
   }
 
   const bundlerDescription = isLibrary
-    ? libraryBundler === 'unbuild'
-      ? `This library uses [unbuild](https://github.com/unjs/unbuild) for building.`
-      : `This library uses [tsdown](https://tsdown.dev/) for building.`
+    ? getLibraryBundler(libraryBundler).architectureDescription
     : `This project uses [Vite](https://vitejs.dev/) as the bundler for fast development and optimized production builds.`;
 
   const content = [

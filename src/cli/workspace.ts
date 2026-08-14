@@ -1,5 +1,6 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
+import { DEFAULT_LIBRARY_BUNDLER } from '../library-bundlers.js';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -213,7 +214,7 @@ export async function handleWorkspaceCommand(
   const projectOptions: ProjectOptions = {
     name: scopedName,
     projectType,
-    libraryBundler: isLibrary ? (options.bundler ?? 'tsdown') : undefined,
+    libraryBundler: isLibrary ? (options.bundler ?? DEFAULT_LIBRARY_BUNDLER) : undefined,
     template,
     linter,
     formatter,

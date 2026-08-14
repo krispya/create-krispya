@@ -6,6 +6,7 @@ import type {
   ProjectOptions,
   VersionRangePrefix,
 } from '../../types.js';
+import { getLibraryBundler } from '../../library-bundlers.js';
 import { getBaseTemplate, getLanguageFromTemplate, shouldEnableReactCompiler } from '../../types.js';
 import {
   getLatestNodeVersion,
@@ -221,7 +222,7 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
   const testing = options.testing ?? (isLibrary ? 'vitest' : 'none');
   const linter = options.linter ?? 'oxlint';
   const formatter = options.formatter ?? 'prettier';
-  const bundler = options.libraryBundler ?? 'tsdown';
+  const bundler = getLibraryBundler(options.libraryBundler);
   const packageManager = getPackageManagerName(options.packageManager);
   const engine = getEngineSpec(options.engine);
 
@@ -346,7 +347,7 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
   }
 
   if (isLibrary) {
-    addPackageName(packageNames, explicitVersions, bundler === 'unbuild' ? 'unbuild' : 'tsdown');
+    addPackageName(packageNames, explicitVersions, bundler.packageName);
   }
 
   return [...packageNames];

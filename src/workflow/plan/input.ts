@@ -1,5 +1,6 @@
 import { defaultFormatterMetaConfig } from '../../defaults/formatter.js';
 import { defaultLinterMetaConfig } from '../../defaults/linter.js';
+import { getLibraryBundler } from '../../library-bundlers.js';
 import type { MonorepoParams } from '../../renderers/monorepo.js';
 import type {
   ProjectOptions,
@@ -55,7 +56,7 @@ export function resolveProjectPlanInput(options: ProjectOptions): ProjectPlanInp
       },
     },
     libraryBundler: {
-      tool: options.libraryBundler ?? 'tsdown',
+      tool: getLibraryBundler(options.libraryBundler).name,
       config: {},
     },
     features: {

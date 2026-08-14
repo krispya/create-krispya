@@ -26,13 +26,12 @@ import { planPostprocessing } from '../../features/postprocessing.js';
 import { planPrettier } from '../../tools/prettier.js';
 import { planRapier } from '../../features/rapier.js';
 import { planTriplex } from '../../features/triplex.js';
-import { planTsdown } from '../../tools/tsdown.js';
 import { planUikit } from '../../features/uikit.js';
-import { planUnbuild } from '../../tools/unbuild.js';
 import { planVitest } from '../../tools/vitest.js';
 import { planViverse } from '../../features/viverse.js';
 import { planXr } from '../../features/xr.js';
 import { planZustand } from '../../features/zustand.js';
+import { planLibraryBundler } from '../../library-bundlers.js';
 import { merge } from '../../utils/index.js';
 import {
   assignResolvedPackageVersion,
@@ -258,11 +257,7 @@ function createProjectPlan(planInput: ProjectPlanInput): ProjectPlan {
 
   // Library bundler adapters
   if (isLibrary) {
-    if (libraryBundler === 'unbuild') {
-      planUnbuild(builder);
-    } else if (libraryBundler === 'tsdown') {
-      planTsdown(builder);
-    }
+    planLibraryBundler(builder, libraryBundler);
   }
 
   // Testing - only if enabled (libraries default to vitest, apps default to none)

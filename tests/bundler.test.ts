@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { LIBRARY_BUILD_OUTPUT } from '../src/defaults/library.js';
 import { planProject, resolveProjectPlanInput } from '../src/index.js';
-import type { ProjectOptions, VirtualFile } from '../src/types.js';
+import {
+  DEFAULT_LIBRARY_BUNDLER,
+  detectLibraryBundler,
+  getLibraryBundler,
+  isLibraryBundler,
+  libraryBundlerNames,
+} from '../src/library-bundlers.js';
+import type { LibraryBundler, ProjectOptions, VirtualFile } from '../src/types.js';
 
 function readTextFile(file: VirtualFile | undefined): string {
   if (file?.type !== 'text') {
@@ -41,7 +51,50 @@ describe('library bundlers', () => {
   it('defaults project plans to tsdown', () => {
     const input = resolveProjectPlanInput(libraryOptions());
 
-    expect(input.libraryBundler.tool).toBe('tsdown');
+    expect(input.libraryBundler.tool).toBe(DEFAULT_LIBRARY_BUNDLER);
+  });
+
+  it('keeps selection and detection behind the typed registry', () => {
+    expect(libraryBundlerNames).toEqual(['tsdown', 'unbuild']);
+    expect(isLibraryBundler('tsdown')).toBe(true);
+    expect(isLibraryBundler('rollup')).toBe(false);
+    expect(getLibraryBundler().name).toBe(DEFAULT_LIBRARY_BUNDLER);
+    expect(
+      detectLibraryBundler({
+        scripts: { build: 'unbuild --config custom.ts' },
+        devDependencies: { tsdown: '^0.22.14' },
+      })?.name
+    ).toBe('unbuild');
+  });
+
+  it('rejects unsupported bundlers through the programmatic API', () => {
+    expect(() =>
+      resolveProjectPlanInput(libraryOptions({ libraryBundler: 'rollup' as LibraryBundler }))
+    ).toThrow('Unsupported library bundler: rollup');
+  });
+
+  it('rejects unsupported bundlers through the CLI', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(process.cwd(), 'node_modules/tsx/dist/cli.mjs'),
+        'src/cli.ts',
+        'my-lib',
+        '--type',
+        'library',
+        '--bundler',
+        'rollup',
+        '--yes',
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: { ...process.env, NO_COLOR: '1' },
+      }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--bundler must be tsdown or unbuild');
   });
 
   it('generates a stealth tsdown build by default', async () => {
@@ -52,6 +105,19 @@ describe('library bundlers', () => {
     expect(packageJson.scripts.build).toBe('tsdown --config .config/tsdown.config.ts');
     expect(packageJson.devDependencies.tsdown).toBe('^0.22.14');
     expect(packageJson.devDependencies.unbuild).toBeUndefined();
+    expect(packageJson).toMatchObject({
+      main: LIBRARY_BUILD_OUTPUT.main,
+      module: LIBRARY_BUILD_OUTPUT.module,
+      types: LIBRARY_BUILD_OUTPUT.types,
+      exports: {
+        '.': {
+          types: LIBRARY_BUILD_OUTPUT.types,
+          import: LIBRARY_BUILD_OUTPUT.import,
+          require: LIBRARY_BUILD_OUTPUT.require,
+        },
+      },
+      files: [LIBRARY_BUILD_OUTPUT.directory],
+    });
     expect(files['tsdown.config.ts']).toBeUndefined();
     expect(config).toContain('cwd: ".."');
     expect(config).toContain('entry: ["./src/index.ts"]');
@@ -73,7 +139,9 @@ describe('library bundlers', () => {
     expect(packageJson.scripts.build).toBe('unbuild --config .config/build.config.ts');
     expect(packageJson.devDependencies.unbuild).toBe('^3.6.1');
     expect(packageJson.devDependencies.tsdown).toBeUndefined();
-    expect(files['.config/build.config.ts']).toBeDefined();
+    expect(readTextFile(files['.config/build.config.ts'])).toContain(
+      `outDir: "${LIBRARY_BUILD_OUTPUT.directory}"`
+    );
   });
 
   it('places tsdown config at the package root in a workspace', async () => {

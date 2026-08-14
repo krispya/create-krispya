@@ -1,17 +1,22 @@
-import { packageJsonScripts } from '../renderers/package-json-scripts.js';
-import { getBaseTemplate, getLanguageFromTemplate, type PlanBuilder } from '../types.js';
+import { LIBRARY_BUILD_OUTPUT } from '../defaults/library.js';
+import { getBaseTemplate, getLanguageFromTemplate } from '../types.js';
+import type {
+  LibraryBundlerBuildArtifacts,
+  LibraryBundlerBuildOptions,
+} from './library-bundler-types.js';
 
-export function planUnbuild(builder: PlanBuilder) {
-  builder.addDevDependency('unbuild');
-
-  const template = builder.options.template ?? 'vanilla';
+export function createUnbuildBuild(
+  options: LibraryBundlerBuildOptions
+): LibraryBundlerBuildArtifacts {
+  const template = options.template ?? 'vanilla';
   const baseTemplate = getBaseTemplate(template);
   const language = getLanguageFromTemplate(template);
   const isReact = baseTemplate === 'react' || baseTemplate === 'r3f';
   const ext = language === 'typescript' ? 'ts' : 'js';
+  const files: LibraryBundlerBuildArtifacts['files'] = {};
 
   // Check if we're in a monorepo context (workspaceRoot is set)
-  const isMonorepo = builder.options.workspaceRoot != null;
+  const isMonorepo = options.workspaceRoot != null;
 
   // Build config
   const buildConfigLines = [
@@ -19,6 +24,7 @@ export function planUnbuild(builder: PlanBuilder) {
     ``,
     `export default defineBuildConfig({`,
     `  entries: ["./src/index"],`,
+    `  outDir: "${LIBRARY_BUILD_OUTPUT.directory}",`,
     `  declaration: ${language === 'typescript'},`,
     `  clean: true,`,
     `  rollup: {`,
@@ -35,26 +41,18 @@ export function planUnbuild(builder: PlanBuilder) {
   buildConfigLines.push(`  },`);
   buildConfigLines.push(`})`);
 
-  const isStealth = builder.isStealthConfig() && !isMonorepo;
+  const isStealth = (options.configStrategy ?? 'stealth') === 'stealth' && !isMonorepo;
+  const configPath = isStealth ? `.config/build.config.${ext}` : `build.config.${ext}`;
 
-  if (isStealth) {
-    // Single-package stealth: place config in .config/
-    builder.addFile(`.config/build.config.${ext}`, {
-      type: 'text',
-      content: buildConfigLines.join('\n'),
-    });
-    builder.addScripts(packageJsonScripts.build.unbuild(`.config/build.config.${ext}`));
-  } else {
-    // Monorepo or root strategy: place config at package root
-    builder.addFile(`build.config.${ext}`, {
-      type: 'text',
-      content: buildConfigLines.join('\n'),
-    });
-    builder.addScripts(packageJsonScripts.build.unbuild());
-  }
+  files[configPath] = {
+    type: 'text',
+    content: buildConfigLines.join('\n'),
+  };
 
-  builder.inject(
-    'readme-libraries',
-    '[unbuild](https://github.com/unjs/unbuild) - Unified JavaScript build system'
-  );
+  return {
+    files,
+    scripts: {
+      build: isStealth ? `unbuild --config ${configPath}` : 'unbuild',
+    },
+  };
 }

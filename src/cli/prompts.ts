@@ -1,6 +1,7 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
 import { getConfigStrategy } from '../config/index.js';
+import { DEFAULT_LIBRARY_BUNDLER, libraryBundlerPromptOptions } from '../library-bundlers.js';
 import type {
   EngineSpec,
   ProjectOptions,
@@ -93,7 +94,8 @@ export function getDefaultOptions(
     name,
     template,
     projectType,
-    libraryBundler: projectType === 'library' ? (libraryBundler ?? 'tsdown') : undefined,
+    libraryBundler:
+      projectType === 'library' ? (libraryBundler ?? DEFAULT_LIBRARY_BUNDLER) : undefined,
     packageManager: inheritedSettings?.packageManager ?? { name: 'pnpm' },
     pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
     engine: inheritedSettings?.engine ?? { name: 'node', version: 'latest' },
@@ -164,11 +166,8 @@ export async function promptForCustomization(
   if (projectType === 'library') {
     const bundler = await p.select({
       message: 'Library bundler',
-      options: [
-        { value: 'tsdown', label: 'tsdown', hint: 'fast, Rolldown-based' },
-        { value: 'unbuild', label: 'unbuild', hint: 'unjs, simple config' },
-      ],
-      initialValue: presets?.bundler ?? 'tsdown',
+      options: libraryBundlerPromptOptions,
+      initialValue: presets?.bundler ?? DEFAULT_LIBRARY_BUNDLER,
     });
 
     if (p.isCancel(bundler)) {
@@ -600,7 +599,7 @@ export type InheritedWorkspaceSettings = {
 export type CliPresets = {
   type?: 'app' | 'library' | 'monorepo';
   template?: Template;
-  bundler?: 'unbuild' | 'tsdown';
+  bundler?: LibraryBundler;
   linter?: 'oxlint' | 'eslint' | 'biome';
   formatter?: 'oxfmt' | 'prettier' | 'biome';
   packageManager?: PackageManagerSpec;

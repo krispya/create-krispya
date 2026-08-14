@@ -836,9 +836,11 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     }
   });
 
-  it('defaults regenerated library build scripts to tsdown', async () => {
+  it('migrates incomplete library builds through the default bundler adapter', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-tsdown-scripts-'));
     try {
+      await mkdir(join(tempDir, '.config'), { recursive: true });
+      await writeFile(join(tempDir, '.config/tsconfig.app.json'), '{}');
       await writeFile(
         join(tempDir, 'package.json'),
         JSON.stringify({
@@ -849,7 +851,7 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         })
       );
 
-      const [change] = await getPackageJsonScriptUpdates(tempDir, {
+      const changes = await getPackageJsonScriptUpdates(tempDir, {
         name: 'my-lib',
         linter: 'oxlint',
         formatter: 'prettier',
@@ -858,7 +860,60 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
         configStrategy: 'stealth',
       });
 
-      expect(JSON.parse(change!.newContent).scripts.build).toBe('tsdown');
+      const packageChange = changes.find((change) => change.path === 'package.json');
+      const packageJson = JSON.parse(packageChange!.newContent);
+      expect(packageJson.scripts.build).toBe('tsdown --config .config/tsdown.config.ts');
+      expect(packageJson.devDependencies.tsdown).toBe('^0.22.14');
+      expect(changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '.config/tsdown.config.ts', status: 'added' }),
+          expect.objectContaining({ path: 'tsconfig.build.json', status: 'added' }),
+        ])
+      );
+
+      const configChange = changes.find((change) => change.path === '.config/tsdown.config.ts');
+      expect(configChange?.newContent).toContain('cwd: ".."');
+      expect(configChange?.newContent).toContain('dts: ".d.ts"');
+
+      const tsconfigChange = changes.find((change) => change.path === 'tsconfig.build.json');
+      expect(JSON.parse(tsconfigChange!.newContent)).toMatchObject({
+        extends: './.config/tsconfig.app.json',
+        compilerOptions: { noEmit: false },
+        include: ['src'],
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('installs the dependency for an explicitly configured bundler script', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-tsdown-dependency-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-lib',
+          type: 'module',
+          exports: { '.': './dist/index.mjs' },
+          scripts: { build: 'tsdown --config custom.ts' },
+          devDependencies: { typescript: '^7.0.0' },
+        })
+      );
+
+      const changes = await getPackageJsonScriptUpdates(tempDir, {
+        name: 'my-lib',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+
+      const packageChange = changes.find((change) => change.path === 'package.json');
+      const packageJson = JSON.parse(packageChange!.newContent);
+      expect(packageJson.scripts.build).toBe('tsdown --config custom.ts');
+      expect(packageJson.devDependencies.tsdown).toBe('^0.22.14');
+      expect(changes).toHaveLength(1);
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
