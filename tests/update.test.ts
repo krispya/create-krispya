@@ -836,6 +836,65 @@ ${JSON.stringify(reversedSettings, null, 4).slice(2, -2)},
     }
   });
 
+  it('defaults regenerated library build scripts to tsdown', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-tsdown-scripts-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-lib',
+          type: 'module',
+          exports: { '.': './dist/index.mjs' },
+          devDependencies: { typescript: '^7.0.0' },
+        })
+      );
+
+      const [change] = await getPackageJsonScriptUpdates(tempDir, {
+        name: 'my-lib',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+
+      expect(JSON.parse(change!.newContent).scripts.build).toBe('tsdown');
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves explicitly configured unbuild library scripts', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'create-krispya-unbuild-scripts-'));
+    try {
+      await writeFile(
+        join(tempDir, 'package.json'),
+        JSON.stringify({
+          name: 'my-lib',
+          type: 'module',
+          exports: { '.': './dist/index.mjs' },
+          scripts: { build: 'unbuild --config .config/build.config.ts' },
+          devDependencies: { typescript: '^5.9.3', unbuild: '^3.6.1' },
+        })
+      );
+
+      const [change] = await getPackageJsonScriptUpdates(tempDir, {
+        name: 'my-lib',
+        linter: 'oxlint',
+        formatter: 'prettier',
+        packageManager: 'pnpm',
+        isMonorepo: false,
+        configStrategy: 'stealth',
+      });
+
+      expect(JSON.parse(change!.newContent).scripts.build).toBe(
+        'unbuild --config .config/build.config.ts'
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('preserves declined package scripts while applying the rest of the package update', () => {
     const currentContent = JSON.stringify({
       scripts: {

@@ -93,7 +93,7 @@ export function getDefaultOptions(
     name,
     template,
     projectType,
-    libraryBundler: projectType === 'library' ? (libraryBundler ?? 'unbuild') : undefined,
+    libraryBundler: projectType === 'library' ? (libraryBundler ?? 'tsdown') : undefined,
     packageManager: inheritedSettings?.packageManager ?? { name: 'pnpm' },
     pnpmManageVersions: inheritedSettings?.pnpmManageVersions ?? true,
     engine: inheritedSettings?.engine ?? { name: 'node', version: 'latest' },
@@ -165,10 +165,10 @@ export async function promptForCustomization(
     const bundler = await p.select({
       message: 'Library bundler',
       options: [
+        { value: 'tsdown', label: 'tsdown', hint: 'fast, Rolldown-based' },
         { value: 'unbuild', label: 'unbuild', hint: 'unjs, simple config' },
-        { value: 'tsdown', label: 'tsdown', hint: 'fast, esbuild-based' },
       ],
-      initialValue: presets?.bundler ?? 'unbuild',
+      initialValue: presets?.bundler ?? 'tsdown',
     });
 
     if (p.isCancel(bundler)) {

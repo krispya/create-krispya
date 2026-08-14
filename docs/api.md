@@ -180,12 +180,12 @@ Select which files to generate during project creation. Your selection can be sa
 
 ## Tooling Options
 
-| Category  | Options                      | Default   |
-| --------- | ---------------------------- | --------- |
-| Linter    | `oxlint`, `eslint`, `biome`  | `oxlint`  |
-| Formatter | `oxfmt`, `prettier`, `biome` | `oxfmt`   |
-| Bundler   | `unbuild`, `tsdown`          | `unbuild` |
-| Testing   | `vitest`, `none`             | varies\*  |
+| Category  | Options                      | Default  |
+| --------- | ---------------------------- | -------- |
+| Linter    | `oxlint`, `eslint`, `biome`  | `oxlint` |
+| Formatter | `oxfmt`, `prettier`, `biome` | `oxfmt`  |
+| Bundler   | `tsdown`, `unbuild`          | `tsdown` |
+| Testing   | `vitest`, `none`             | varies\* |
 
 \*Testing defaults to `vitest` for libraries, `none` for applications (configurable via prompts).
 
@@ -243,7 +243,7 @@ Project Options:
   --template <type>           vanilla | react | r3f (+ -js variants)
   --linter <type>             eslint | oxlint | biome
   --formatter <type>          prettier | oxfmt | biome
-  --bundler <bundler>         unbuild | tsdown (libraries only)
+  --bundler <bundler>         tsdown | unbuild (libraries only)
   --package-manager <pm>      npm | yarn | pnpm (monorepos: pnpm only)
   --node-version <version>    Node.js version (default: latest)
   --pnpm-manage-versions      Enable pnpm version management (default: true)
@@ -301,8 +301,8 @@ pnpm create krispya my-example --workspace --dir examples --template r3f
 # R3F with integrations
 pnpm create krispya my-3d-app --template r3f --drei --rapier --leva
 
-# Library with tsdown
-pnpm create krispya my-lib --type library --template react --bundler tsdown
+# Library with unbuild
+pnpm create krispya my-lib --type library --template react --bundler unbuild
 
 # Custom tooling
 pnpm create krispya my-app --linter eslint --formatter prettier

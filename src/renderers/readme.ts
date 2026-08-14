@@ -95,7 +95,7 @@ export function renderReadme(params: ReadmeParams): VirtualFile {
   const bundlerDescription = isLibrary
     ? libraryBundler === 'unbuild'
       ? `This library uses [unbuild](https://github.com/unjs/unbuild) for building.`
-      : `This library uses [tsdown](https://github.com/nicepkg/tsdown) for building.`
+      : `This library uses [tsdown](https://tsdown.dev/) for building.`
     : `This project uses [Vite](https://vitejs.dev/) as the bundler for fast development and optimized production builds.`;
 
   const content = [

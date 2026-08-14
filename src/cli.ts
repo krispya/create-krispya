@@ -269,7 +269,7 @@ async function main() {
     .option('--type <type>', 'project type: app or library (default: app)')
     .option(
       '--bundler <bundler>',
-      'library bundler: unbuild or tsdown (default: unbuild, only for libraries)'
+      'library bundler: tsdown or unbuild (default: tsdown, only for libraries)'
     )
     .option(
       '--template <type>',
@@ -428,7 +428,7 @@ async function main() {
         projectOptions = {
           name: name || defaultName,
           projectType,
-          libraryBundler: projectType === 'library' ? (options.bundler ?? 'unbuild') : undefined,
+          libraryBundler: projectType === 'library' ? (options.bundler ?? 'tsdown') : undefined,
           template,
           linter: options.linter ?? 'oxlint',
           formatter: options.formatter ?? 'prettier',

@@ -62,7 +62,7 @@ export function formatConfigSummary(options: ProjectOptions, inherited?: Inherit
 
   // Bundler
   if (projectType === 'library') {
-    lines.push(formatRow('Bundler', options.libraryBundler ?? 'unbuild'));
+    lines.push(formatRow('Bundler', options.libraryBundler ?? 'tsdown'));
   } else {
     lines.push(formatRow('Bundler', 'vite'));
   }

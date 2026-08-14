@@ -742,11 +742,18 @@ function getSinglePackageToolScripts(config: WorkspaceConfig) {
 function getLibraryBuildScripts(pkg: PackageJsonForScripts) {
   if (!detectLibraryPackage(pkg)) return undefined;
 
-  if (hasPackage(pkg, 'tsdown') || pkg.scripts?.build === 'tsdown') {
-    return packageJsonScripts.build.tsdown;
+  const buildScript = pkg.scripts?.build;
+  if (buildScript?.startsWith('unbuild') === true) {
+    return { build: buildScript };
+  }
+  if (hasPackage(pkg, 'unbuild')) {
+    return packageJsonScripts.build.unbuild();
+  }
+  if (buildScript?.startsWith('tsdown') === true) {
+    return { build: buildScript };
   }
 
-  return packageJsonScripts.build.unbuild();
+  return packageJsonScripts.build.tsdown();
 }
 
 function getTestingScripts(pkg: PackageJsonForScripts) {

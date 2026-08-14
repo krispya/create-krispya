@@ -26,9 +26,11 @@ export const packageJsonScripts = {
       };
     },
 
-    tsdown: {
-      build: 'tsdown',
-    } satisfies PackageJsonScripts,
+    tsdown(configPath?: string): PackageJsonScripts {
+      return {
+        build: configPath == null ? 'tsdown' : `tsdown --config ${configPath}`,
+      };
+    },
   },
 
   lint: {

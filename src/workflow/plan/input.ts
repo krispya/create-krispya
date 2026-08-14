@@ -55,7 +55,7 @@ export function resolveProjectPlanInput(options: ProjectOptions): ProjectPlanInp
       },
     },
     libraryBundler: {
-      tool: options.libraryBundler ?? 'unbuild',
+      tool: options.libraryBundler ?? 'tsdown',
       config: {},
     },
     features: {

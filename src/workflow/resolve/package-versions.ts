@@ -56,7 +56,7 @@ const PACKAGE_VERSION_DEFINITIONS: Record<string, PackageVersionDefinition> = {
   react: { fallbackVersion: '19.0.0' },
   'react-dom': { fallbackVersion: '19.0.0' },
   three: { fallbackVersion: '0.175.0', prefix: '~' },
-  tsdown: { fallbackVersion: '0.12.0' },
+  tsdown: { fallbackVersion: '0.22.14' },
   typescript: { fallbackVersion: '5.9.3' },
   'typescript-eslint': { fallbackVersion: '8.18.0' },
   unbuild: { fallbackVersion: '3.5.0' },
@@ -221,7 +221,7 @@ function collectProjectPackageNames(options: ProjectOptions): string[] {
   const testing = options.testing ?? (isLibrary ? 'vitest' : 'none');
   const linter = options.linter ?? 'oxlint';
   const formatter = options.formatter ?? 'prettier';
-  const bundler = options.libraryBundler ?? 'unbuild';
+  const bundler = options.libraryBundler ?? 'tsdown';
   const packageManager = getPackageManagerName(options.packageManager);
   const engine = getEngineSpec(options.engine);
 

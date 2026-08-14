@@ -213,7 +213,7 @@ export async function handleWorkspaceCommand(
   const projectOptions: ProjectOptions = {
     name: scopedName,
     projectType,
-    libraryBundler: isLibrary ? (options.bundler ?? 'unbuild') : undefined,
+    libraryBundler: isLibrary ? (options.bundler ?? 'tsdown') : undefined,
     template,
     linter,
     formatter,
