@@ -5,6 +5,7 @@ import {
   renderPnpmWorkspaceConfig,
 } from '../src/index.js';
 import { resolvePackageManager } from '../src/resolve/package-manager.js';
+import { getLatestNpmMajorVersion } from '../src/resolve/registry.js';
 
 vi.mock('../src/resolve/registry.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/resolve/registry.js')>();
@@ -26,6 +27,7 @@ describe('package manager specs', () => {
     });
     expect(parsePackageManagerSpec('npm')).toEqual({ name: 'npm' });
     expect(parsePackageManagerSpec('npm@12')).toEqual({ name: 'npm', version: '12' });
+    expect(parsePackageManagerSpec('yarn@4')).toEqual({ name: 'yarn', version: '4' });
     expect(parsePackageManagerSpec('bun')).toBeUndefined();
   });
 
@@ -34,6 +36,26 @@ describe('package manager specs', () => {
       name: 'npm',
       version: '12.0.2',
       major: 12,
+      capabilities: {},
+      requirements: {},
+    });
+  });
+
+  it('profiles modern yarn with the node-modules linker', () => {
+    expect(getPackageManagerProfile({ name: 'yarn', version: '4.6.0' })).toEqual({
+      name: 'yarn',
+      version: '4.6.0',
+      major: 4,
+      capabilities: { yarnNodeLinker: 'node-modules' },
+      requirements: { node: '18.12' },
+    });
+  });
+
+  it('profiles yarn classic without special capabilities', () => {
+    expect(getPackageManagerProfile({ name: 'yarn', version: '1.22.22' })).toEqual({
+      name: 'yarn',
+      version: '1.22.22',
+      major: 1,
       capabilities: {},
       requirements: {},
     });
@@ -139,5 +161,29 @@ describe('resolvePackageManager', () => {
         packageManager: { name: 'npm', version: '12.0.2' },
       })
     ).resolves.toEqual({ name: 'npm', version: '12.0.2' });
+  });
+
+  it('resolves the latest modern yarn version by default', async () => {
+    await expect(
+      resolvePackageManager({ name: 'my-app', packageManager: { name: 'yarn' } })
+    ).resolves.toEqual({ name: 'yarn', version: '4.6.0' });
+  });
+
+  it('resolves modern yarn majors from @yarnpkg/cli-dist', async () => {
+    await expect(
+      resolvePackageManager({ name: 'my-app', packageManager: { name: 'yarn', version: '4' } })
+    ).resolves.toEqual({ name: 'yarn', version: '4.9.9' });
+    expect(vi.mocked(getLatestNpmMajorVersion)).toHaveBeenLastCalledWith(
+      '@yarnpkg/cli-dist',
+      '4',
+      '4.0.0'
+    );
+  });
+
+  it('resolves yarn classic majors from the yarn package', async () => {
+    await expect(
+      resolvePackageManager({ name: 'my-app', packageManager: { name: 'yarn', version: '1' } })
+    ).resolves.toEqual({ name: 'yarn', version: '1.9.9' });
+    expect(vi.mocked(getLatestNpmMajorVersion)).toHaveBeenLastCalledWith('yarn', '1', '1.0.0');
   });
 });

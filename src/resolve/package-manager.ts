@@ -1,5 +1,10 @@
 import type { ProjectOptions } from '../types.js';
-import { getLatestNpmMajorVersion, getLatestPnpmVersion, getLatestYarnVersion } from './registry.js';
+import {
+  getLatestNpmMajorVersion,
+  getLatestPnpmVersion,
+  getLatestYarnVersion,
+  getYarnDistPackageName,
+} from './registry.js';
 import { getPackageManagerProfile } from '../intent/package-manager/profiles.js';
 import { getPackageManagerSpec } from '../intent/package-manager/spec.js';
 import type { PackageManagerProfile } from '../types.js';
@@ -17,8 +22,12 @@ export async function resolvePackageManager(options: ProjectOptions) {
     // with EBADENGINE on install. Only pin npm when a version is requested.
   } else if (/^\d+$/.test(packageManager.version)) {
     const fallback = `${packageManager.version}.0.0`;
+    const registryPackage =
+      packageManager.name === 'yarn'
+        ? getYarnDistPackageName(Number(packageManager.version))
+        : packageManager.name;
     packageManager.version = await getLatestNpmMajorVersion(
-      packageManager.name,
+      registryPackage,
       packageManager.version,
       fallback
     );

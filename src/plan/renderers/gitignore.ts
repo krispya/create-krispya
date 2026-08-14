@@ -13,6 +13,7 @@ const COMMON_GITIGNORE_LINES = [
   '.env.*',
   '!.env.example',
   '.pnpm-store',
+  '.yarn/install-state.gz',
 ];
 
 export type GitignoreMergeResult = {

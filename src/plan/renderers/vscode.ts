@@ -54,7 +54,7 @@ function resolvePackageJsonNestedFiles(packageManager?: PackageManagerName): str
   }
 
   if (packageManager === 'yarn') {
-    return ['yarn.lock'];
+    return ['yarn.lock', '.yarnrc.yml'];
   }
 
   return [];

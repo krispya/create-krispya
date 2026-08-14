@@ -52,7 +52,7 @@ describe('renderVscodeFiles', () => {
     expect(settings['explorer.fileNesting.patterns']).toEqual({
       '.gitignore': '.gitattributes',
       'AGENTS.md': 'CLAUDE.md',
-      'package.json': 'yarn.lock',
+      'package.json': 'yarn.lock, .yarnrc.yml',
     });
   });
 

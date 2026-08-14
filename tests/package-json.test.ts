@@ -164,6 +164,64 @@ describe('renderPackageJson', () => {
     expect(packageJson.scripts.release).toBe('npm run build && npm publish');
   });
 
+  it('renders a node-modules yarnrc for modern yarn projects', async () => {
+    const result = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        packageManager: { name: 'yarn', version: '4.6.0' },
+      },
+    });
+
+    expect(readTextFile(result.files['.yarnrc.yml'])).toBe('nodeLinker: node-modules');
+
+    const packageJson = readPackageJsonContent(result.files['package.json']);
+    expect(packageJson.packageManager).toBe('yarn@4.6.0');
+    expect(packageJson.engines).toEqual({ yarn: '>=4.0.0' });
+  });
+
+  it('omits the yarnrc for yarn classic and workspace packages', async () => {
+    const classic = renderPackageJson({
+      name: 'my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: 'my-app',
+        packageManager: { name: 'yarn', version: '1.22.22' },
+      },
+    });
+    expect(classic.files['.yarnrc.yml']).toBeUndefined();
+
+    const workspacePackage = renderPackageJson({
+      name: '@scope/my-app',
+      baseTemplate: 'vanilla',
+      language: 'typescript',
+      isLibrary: false,
+      dependencies: {},
+      devDependencies: {},
+      peerDependencies: {},
+      scripts: {},
+      options: {
+        name: '@scope/my-app',
+        packageManager: { name: 'yarn', version: '4.6.0' },
+        workspaceRoot: '../..',
+      },
+    });
+    expect(workspacePackage.files['.yarnrc.yml']).toBeUndefined();
+  });
+
   it('renders pnpm 11 workspace config for single-package projects', async () => {
     const result = renderPackageJson({
       name: 'my-app',

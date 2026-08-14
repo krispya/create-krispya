@@ -1,6 +1,7 @@
 import type { PackageManagerSpec } from '../../types.js';
 import { getSemverMajor } from '../../utils/index.js';
 import { getPnpmProfile } from './pnpm.js';
+import { getYarnProfile } from './yarn.js';
 import type { PackageManagerProfile } from '../../types.js';
 
 export function getPackageManagerProfile(spec: PackageManagerSpec): PackageManagerProfile {
@@ -8,6 +9,10 @@ export function getPackageManagerProfile(spec: PackageManagerSpec): PackageManag
 
   if (spec.name === 'pnpm') {
     return getPnpmProfile(spec);
+  }
+
+  if (spec.name === 'yarn') {
+    return getYarnProfile(spec);
   }
 
   return {

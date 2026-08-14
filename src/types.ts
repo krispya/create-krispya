@@ -19,6 +19,7 @@ export type EngineSpec = {
 export type PackageManagerCapabilities = {
   pnpmWorkspaceVersionPolicy?: 'manage-package-manager-versions' | 'pmOnFail';
   pnpmBuildDependencyPolicy?: 'onlyBuiltDependencies' | 'allowBuilds';
+  yarnNodeLinker?: 'node-modules';
 };
 
 export type PackageManagerRequirements = {

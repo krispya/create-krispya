@@ -3,6 +3,7 @@ export {
   renderPnpmWorkspaceConfig,
   type PnpmWorkspaceConfigOptions,
 } from './renderers/pnpm-workspace-config.js';
+export { renderYarnrcConfig, type YarnrcConfigOptions } from './renderers/yarnrc.js';
 export { mergePartialPlans } from './merge.js';
 export { planProject } from './project.js';
 export { planWorkspace } from './workspace.js';

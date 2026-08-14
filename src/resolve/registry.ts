@@ -238,7 +238,15 @@ export async function getLatestPnpmVersion(): Promise<string> {
 }
 
 export async function getLatestYarnVersion(): Promise<string> {
-  return getLatestNpmVersion('yarn', '4.6.0');
+  return getLatestNpmVersion(getYarnDistPackageName(), '4.6.0');
+}
+
+/**
+ * Modern Yarn (2+) is published as @yarnpkg/cli-dist; the `yarn` package on the
+ * registry is frozen at classic 1.x.
+ */
+export function getYarnDistPackageName(major?: number): string {
+  return major != null && major < 2 ? 'yarn' : '@yarnpkg/cli-dist';
 }
 
 export async function getLatestNodeVersion(): Promise<string> {

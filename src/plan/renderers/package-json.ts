@@ -8,6 +8,7 @@ import {
   getPackageManagerSpec,
 } from '../../intent/package-manager/index.js';
 import { renderPnpmWorkspaceConfig } from './pnpm-workspace-config.js';
+import { renderYarnrcConfig } from './yarnrc.js';
 import type { BaseTemplate, VirtualFile, ProjectOptions } from '../../types.js';
 import { renderJson } from './json.js';
 import { mergePackageJsonScripts, resolveDefaultPackageJsonScripts } from './package-json-scripts.js';
@@ -147,6 +148,17 @@ export function renderPackageJson(params: PackageJsonParams): PackageJsonResult 
         manageVersions: options.pnpmManageVersions ?? true,
       }),
     };
+  }
+
+  // Add .yarnrc.yml when modern Yarn is selected (but not in a workspace package)
+  if (packageManager.name === 'yarn' && !options.workspaceRoot) {
+    const yarnrc = renderYarnrcConfig({ profile: getPackageManagerProfile(packageManager) });
+    if (yarnrc != null) {
+      files['.yarnrc.yml'] = {
+        type: 'text',
+        content: yarnrc,
+      };
+    }
   }
 
   return { files };
