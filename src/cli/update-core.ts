@@ -15,8 +15,11 @@ import type {
   Template,
 } from '../types.js';
 import {
+  DEFAULT_LIBRARY_BUNDLER,
+  assertLibraryBundlerCompatible,
   detectLibraryBundler,
   getLibraryBundler,
+  isLibraryBundlerCompatible,
   usesLibraryBundlerScript,
   type LibraryBundlerDefinition,
 } from '../library-bundlers.js';
@@ -1294,7 +1297,8 @@ export async function getTypeScriptMajorPackageUpdates(
   root: string,
   config?: WorkspaceConfig,
   targetVersion = TYPESCRIPT_7_VERSION,
-  oxlintTsgolintVersion = getResolvedPackageVersion({}, 'oxlint-tsgolint')
+  oxlintTsgolintVersion = getResolvedPackageVersion({}, 'oxlint-tsgolint'),
+  libraryBundlerVersion = getResolvedPackageVersion({}, DEFAULT_LIBRARY_BUNDLER)
 ): Promise<FileChange[]> {
   if (config?.linter === 'eslint') return [];
 
@@ -1321,7 +1325,9 @@ export async function getTypeScriptMajorPackageUpdates(
   }
 
   const changedPackages = new Set<string>();
+  const bundlerArtifactChanges: FileChange[] = [];
   for (const { path: packagePath, pkg } of packages) {
+    let updatesTypeScript = false;
     for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
       const dependencies = pkg[dependencyField];
       if (dependencies == null) continue;
@@ -1333,7 +1339,56 @@ export async function getTypeScriptMajorPackageUpdates(
       if (targetRange == null) continue;
 
       dependencies.typescript = targetRange;
+      updatesTypeScript = true;
       changedPackages.add(packagePath);
+    }
+
+    if (!updatesTypeScript || !detectLibraryPackage(pkg)) continue;
+
+    const currentBundler = detectLibraryBundler(pkg);
+    if (
+      currentBundler == null ||
+      isLibraryBundlerCompatible(currentBundler, { typescriptVersion: targetVersion })
+    ) {
+      continue;
+    }
+
+    const nextBundler = getLibraryBundler();
+    assertLibraryBundlerCompatible(nextBundler, { typescriptVersion: targetVersion });
+    const isWorkspacePackage = config?.isMonorepo === true && packagePath !== 'package.json';
+    const build = nextBundler.createBuild({
+      template: detectLibraryTemplate(pkg, 'typescript'),
+      configStrategy: isWorkspacePackage ? 'root' : config?.configStrategy,
+      workspaceRoot: isWorkspacePackage ? '..' : undefined,
+    });
+
+    for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies'] as const) {
+      delete pkg[dependencyField]?.[currentBundler.packageName];
+    }
+    pkg.devDependencies = sortPackageMap({
+      ...pkg.devDependencies,
+      [nextBundler.packageName]: `^${libraryBundlerVersion}`,
+    });
+    pkg.scripts = {
+      ...pkg.scripts,
+      ...build.scripts,
+    };
+
+    const packageDirectory = dirname(packagePath);
+    for (const [artifactPath, file] of Object.entries(build.files)) {
+      if (file.type !== 'text') continue;
+
+      const path = packageDirectory === '.' ? artifactPath : join(packageDirectory, artifactPath);
+      let currentContent: string;
+      try {
+        currentContent = await readFile(join(root, path), 'utf-8');
+      } catch {
+        bundlerArtifactChanges.push({ path, status: 'added', newContent: file.content });
+        continue;
+      }
+
+      const change = compareTextFileWithDisk(path, currentContent, file.content);
+      if (change.status !== 'unchanged') bundlerArtifactChanges.push(change);
     }
   }
 
@@ -1374,6 +1429,8 @@ export async function getTypeScriptMajorPackageUpdates(
       newContent: renderJson(pkg, { inlineArrays: false }),
       mergeSafe: true,
     }));
+
+  changes.push(...bundlerArtifactChanges);
 
   changes.push(...(await getTypeScript7ConfigUpdates(root)));
 

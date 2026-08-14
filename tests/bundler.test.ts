@@ -7,6 +7,7 @@ import {
   DEFAULT_LIBRARY_BUNDLER,
   detectLibraryBundler,
   getLibraryBundler,
+  getLibraryBundlerPromptOptions,
   isLibraryBundler,
   libraryBundlerNames,
 } from '../src/library-bundlers.js';
@@ -65,6 +66,16 @@ describe('library bundlers', () => {
         devDependencies: { tsdown: '^0.22.14' },
       })?.name
     ).toBe('unbuild');
+  });
+
+  it('removes unbuild from TypeScript 7 choices', () => {
+    expect(getLibraryBundlerPromptOptions({ typescriptVersion: '7.0.0' })).toEqual([
+      expect.objectContaining({ value: 'tsdown' }),
+    ]);
+    expect(
+      getLibraryBundlerPromptOptions({ typescriptVersion: '6.0.3' }).map(({ value }) => value)
+    ).toEqual(['tsdown', 'unbuild']);
+    expect(getLibraryBundlerPromptOptions().map(({ value }) => value)).toEqual(['tsdown', 'unbuild']);
   });
 
   it('rejects unsupported bundlers through the programmatic API', () => {
@@ -133,7 +144,12 @@ describe('library bundlers', () => {
   });
 
   it('keeps unbuild available when explicitly selected', async () => {
-    const { files } = await planProject(libraryOptions({ libraryBundler: 'unbuild' }));
+    const { files } = await planProject(
+      libraryOptions({
+        libraryBundler: 'unbuild',
+        versions: { ...versions, typescript: '6.0.3' },
+      })
+    );
     const packageJson = readPackageJson(files['package.json']);
 
     expect(packageJson.scripts.build).toBe('unbuild --config .config/build.config.ts');
@@ -142,6 +158,23 @@ describe('library bundlers', () => {
     expect(readTextFile(files['.config/build.config.ts'])).toContain(
       `outDir: "${LIBRARY_BUILD_OUTPUT.directory}"`
     );
+  });
+
+  it('rejects unbuild when TypeScript 7 is being installed', async () => {
+    await expect(planProject(libraryOptions({ libraryBundler: 'unbuild' }))).rejects.toThrow(
+      'unbuild does not support TypeScript 7; use tsdown'
+    );
+  });
+
+  it('keeps unbuild available for JavaScript libraries', async () => {
+    const { files } = await planProject(
+      libraryOptions({ libraryBundler: 'unbuild', template: 'vanilla-js' })
+    );
+    const packageJson = readPackageJson(files['package.json']);
+
+    expect(packageJson.scripts.build).toBe('unbuild --config .config/build.config.js');
+    expect(packageJson.devDependencies.unbuild).toBe('^3.6.1');
+    expect(packageJson.devDependencies.typescript).toBeUndefined();
   });
 
   it('places tsdown config at the package root in a workspace', async () => {

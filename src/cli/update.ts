@@ -36,6 +36,7 @@ import {
   getLatestNpmVersion,
   getSemverMajor,
 } from '../utils/index.js';
+import { getPackageFallbackVersion } from '../workflow/resolve/package-versions.js';
 
 type FixCommand = (options: CliOptions) => Promise<void>;
 type PackageUpdateCommand = {
@@ -302,17 +303,20 @@ async function promptForTypeScriptMajorUpdate(
   const candidateChanges = await getTypeScriptMajorPackageUpdates(projectRoot, config);
   if (candidateChanges.length === 0) return;
 
-  const [latestTypeScript7Version, latestOxlintTsgolintVersion] = await Promise.all([
-    getLatestNpmMajorVersion('typescript', '7', '7.0.0'),
-    config.linter === 'oxlint'
-      ? getLatestNpmVersion('oxlint-tsgolint', '0.22.1')
-      : Promise.resolve('0.22.1'),
-  ]);
+  const [latestTypeScript7Version, latestOxlintTsgolintVersion, latestTsdownVersion] =
+    await Promise.all([
+      getLatestNpmMajorVersion('typescript', '7', '7.0.0'),
+      config.linter === 'oxlint'
+        ? getLatestNpmVersion('oxlint-tsgolint', '0.22.1')
+        : Promise.resolve('0.22.1'),
+      getLatestNpmVersion('tsdown', getPackageFallbackVersion('tsdown')),
+    ]);
   const changes = await getTypeScriptMajorPackageUpdates(
     projectRoot,
     config,
     latestTypeScript7Version,
-    latestOxlintTsgolintVersion
+    latestOxlintTsgolintVersion,
+    latestTsdownVersion
   );
 
   const shouldUpdate =

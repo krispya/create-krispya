@@ -1,7 +1,12 @@
 import * as p from '@clack/prompts';
 import color from 'chalk';
 import { getConfigStrategy } from '../config/index.js';
-import { DEFAULT_LIBRARY_BUNDLER, libraryBundlerPromptOptions } from '../library-bundlers.js';
+import {
+  DEFAULT_LIBRARY_BUNDLER,
+  getLibraryBundler,
+  getLibraryBundlerPromptOptions,
+} from '../library-bundlers.js';
+import { getPackageFallbackVersion } from '../workflow/resolve/package-versions.js';
 import type {
   EngineSpec,
   ProjectOptions,
@@ -13,7 +18,7 @@ import type {
   Template,
 } from '../types.js';
 import { getBaseTemplate } from '../types.js';
-import { generateRandomName } from '../utils/index.js';
+import { generateRandomName, getLatestNpmVersion } from '../utils/index.js';
 import { formatConfigSummary, formatMonorepoConfigSummary } from './format.js';
 
 const R3F_INTEGRATION_OPTIONS = [
@@ -159,24 +164,9 @@ export async function promptForCustomization(
   projectType: ProjectType,
   features?: string[],
   inheritedSettings?: InheritedWorkspaceSettings,
-  presets?: CliPresets
+  presets?: CliPresets,
+  typescriptVersion?: string
 ): Promise<ProjectOptions> {
-  // Library bundler selection (only for libraries)
-  let libraryBundler: LibraryBundler | undefined;
-  if (projectType === 'library') {
-    const bundler = await p.select({
-      message: 'Library bundler',
-      options: libraryBundlerPromptOptions,
-      initialValue: presets?.bundler ?? DEFAULT_LIBRARY_BUNDLER,
-    });
-
-    if (p.isCancel(bundler)) {
-      p.cancel('Operation cancelled.');
-      process.exit(0);
-    }
-    libraryBundler = bundler as LibraryBundler;
-  }
-
   // Skip workspace-level settings if inherited from workspace
   let engine: EngineSpec = inheritedSettings?.engine ??
     presets?.engine ?? { name: 'node', version: 'latest' };
@@ -307,6 +297,29 @@ export async function promptForCustomization(
     process.exit(0);
   }
 
+  // Library bundler selection depends on the TypeScript version being installed.
+  let libraryBundler: LibraryBundler | undefined;
+  if (projectType === 'library') {
+    const compatibility = {
+      typescriptVersion: language === 'typescript' ? typescriptVersion : undefined,
+    };
+    const bundlerOptions = getLibraryBundlerPromptOptions(compatibility);
+    const initialBundler = getLibraryBundler(presets?.bundler);
+    const bundler = await p.select({
+      message: 'Library bundler',
+      options: bundlerOptions,
+      initialValue: bundlerOptions.some(({ value }) => value === initialBundler.name)
+        ? initialBundler.name
+        : DEFAULT_LIBRARY_BUNDLER,
+    });
+
+    if (p.isCancel(bundler)) {
+      p.cancel('Operation cancelled.');
+      process.exit(0);
+    }
+    libraryBundler = bundler as LibraryBundler;
+  }
+
   // Config strategy
   const configStrategyChoice = await p.select({
     message: 'Config strategy',
@@ -357,6 +370,10 @@ export async function promptForCustomization(
     testing: testing as 'vitest' | 'none',
     configStrategy: configStrategyChoice as 'stealth' | 'root',
     ide: ideChoice as Ide,
+    versions:
+      language === 'typescript' && typescriptVersion != null
+        ? { typescript: typescriptVersion }
+        : undefined,
   };
 
   return {
@@ -665,6 +682,10 @@ export async function promptForPackageOptions(
 
   const template = templateSelection as Template;
   const baseTemplate = getBaseTemplate(template);
+  const typescriptVersion =
+    projectType === 'library'
+      ? await getLatestNpmVersion('typescript', getPackageFallbackVersion('typescript'))
+      : undefined;
 
   // For R3F, immediately prompt for features
   let features: string[] | undefined;
@@ -680,6 +701,9 @@ export async function promptForPackageOptions(
     features,
     inheritedSettings ?? presetsToInheritedSettings(presets)
   );
+  if (typescriptVersion != null) {
+    defaultOptions.versions = { typescript: typescriptVersion };
+  }
   if (presets?.ide && !inheritedSettings) {
     defaultOptions.ide = presets.ide;
   }
@@ -701,6 +725,7 @@ export async function promptForPackageOptions(
     projectType,
     features,
     inheritedSettings,
-    presets
+    presets,
+    typescriptVersion
   );
 }

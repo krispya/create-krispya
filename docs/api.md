@@ -189,6 +189,9 @@ Select which files to generate during project creation. Your selection can be sa
 
 \*Testing defaults to `vitest` for libraries, `none` for applications (configurable via prompts).
 
+`unbuild` is available for JavaScript libraries and TypeScript versions up to 6. TypeScript 7
+libraries use `tsdown`.
+
 ## Config Strategy
 
 Control where configuration files are placed in single-package workspaces:
@@ -301,8 +304,8 @@ pnpm create krispya my-example --workspace --dir examples --template r3f
 # R3F with integrations
 pnpm create krispya my-3d-app --template r3f --drei --rapier --leva
 
-# Library with unbuild
-pnpm create krispya my-lib --type library --template react --bundler unbuild
+# JavaScript library with unbuild
+pnpm create krispya my-lib --type library --template react-js --bundler unbuild
 
 # Custom tooling
 pnpm create krispya my-app --linter eslint --formatter prettier
